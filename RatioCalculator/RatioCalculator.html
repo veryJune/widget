@@ -1,56 +1,48 @@
 <!DOCTYPE html>
 <html>
-  <head>
-    <title>Ratio Calculator</title>
-    <link rel="stylesheet" href="RatioC_style.css">
-  </head>
-  <body>
-    <div class="calculator">
-      <h1>Ratio Calculator</h1>
-      <form>
-        <div>
-          <label for="input1">Input 1</label>
-			  <div class="input-with-buttons">
-				<button class="minus-btn"  type="button" id="inputm1" >&lt;</button>
-				<input type="text" id="input1" value="16">
-				<button class="plus-btn"   type="button" id="inputp1" >&gt;</button>
-			  </div>
-        </div>
-        <div>
-          <label for="input2">Input 2</label>
-			  <div class="input-with-buttons">
-				<button class="minus-btn"  type="button" id="inputm2" >&lt;</button>
-          		<input type="text" id="input2" value="9">
-				<button class="plus-btn"   type="button" id="inputp2" >&gt;</button>
-			  </div>
-        </div>
-        <div>
-          <label for="input3">Input 3</label>
-			  <div class="input-with-buttons">
-				<button class="minus-btn"  type="button" id="inputm3" >&lt;</button>
-          		<input type="text" id="input3">
-				<button class="plus-btn"   type="button" id="inputp3" >&gt;</button>
-			  </div>
-        </div>
-        <div>
-          <label for="input4">Input 4</label>
-			  <div class="input-with-buttons">
-				<button class="minus-btn"  type="button" id="inputm4" >&lt;</button>
-          		<input type="text" id="input4">
-				<button class="plus-btn"   type="button" id="inputp4" >&gt;</button>
-			  </div>
-        </div>
-        <button type="button" id="calculate-btn">CALCULATE</button>
-		<button type="button" id="reset-btn">RESET</button>
-		<div></div><div></div>
-		<button type="button" id="preset-btn1">4:3</button>
-        <button type="button" id="preset-btn2">3:2</button>
-        <button type="button" id="preset-btn3">16:9</button>
-        <button type="button" id="preset-btn4">1.85:1</button>
-        <button type="button" id="preset-btn5">2.35:1</button>
-</form>
-      <div id="output"></div>
-    </div>
-  </body>
+
+<head>
+  <title>Ratio Calculator</title>
+  <meta name="author" content="Very More JUNE">
+  <meta name="description" content="ratio calculations">
+  <meta name="keywords" content="ratios, calculations, math">
+  <link rel="stylesheet" href="RatioC_style.css">
+</head>
+
+<body>
+  <div class="calculator">
+    <h1>Ratio Calculator</h1>
+    <form>
+      <div>
+        <label for="input1">Input 1</label>
+        <input type="number" id="input1" value="16">
+      </div>
+      <div>
+        <label for="input2">Input 2</label>
+        <input type="number" id="input2" value="9">
+      </div>
+      <div>
+        <label for="input3">Input 3</label>
+        <input type="number" id="input3" title="*middle click to empty it!">
+      </div>
+      <div>
+        <label for="input4">Input 4</label>
+        <input type="number" id="input4">
+      </div>
+      <button type="button" id="calculate-btn">CALCULATE</button>
+      <button type="button" id="reset-btn">RESET</button>
+      <div></div>
+      <div></div>
+      <button type="button" class="preset" id="preset-btn1">4:3</button>
+      <button type="button" class="preset" id="preset-btn2">3:2</button>
+      <button type="button" class="preset" id="preset-btn3">16:9</button>
+      <button type="button" class="preset" id="preset-btn4">1.85:1</button>
+      <button type="button" class="preset" id="preset-btn5">2.35:1</button>
+    </form>
+    <div id="output"><h5 style="color:#50597b; font-weight : normal;">* middle click to empty the input value</h5></div>
+  </div>
+</body>
+
 <script src="RatioC_script.js"></script>
+
 </html>
