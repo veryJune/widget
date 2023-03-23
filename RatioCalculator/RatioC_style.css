@@ -42,14 +42,16 @@ input[type="number"] {
   background: #50597b;
   color: #fff;
   border: solid 1px #1f253d;
-  border-radius: 5px;		
+  border-radius: 5px;
   box-sizing: border-box;
   font-size: 16px;
   padding: 10px;
   width: 100%;
 }
+
 input[type="number"]:focus {
-  outline: none; /* removes the default orange border when focus */
+  outline: none;
+  /* removes the default orange border when focus */
   border: 1px solid #11a8ab;
 }
 
@@ -68,12 +70,20 @@ button {
   padding: 10px 24px;
 }
 
+button.preset {
+  background: #2d3347;
+  color: #5a6999;
+}
+
 button:hover {
   background: #0F9295
 }
 
 button.preset:hover {
-  background: #f5a53c
+  background: #3f5094;
+  color: #ffffff;
+  box-shadow: #11a8ab 0px 4px 14px;
+  border: 1px solid #11a9abbe;
 }
 
 button:active {
