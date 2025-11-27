@@ -3,9 +3,33 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ChromaZen - Pro Color Tool v3</title>
+    <title>ChromaZen - Pro Color Tool v3.5</title>
+    
+    <!-- Dependencies -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
+
+    <!-- Tailwind Config for Dark Mode -->
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        dark: {
+                            bg: '#121212',
+                            surface: '#1E1E1E',
+                            border: '#333333',
+                            text: '#EDEDED',
+                            muted: '#A1A1AA'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
         @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&display=swap');
@@ -14,6 +38,12 @@
             font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
             background-color: #F5F5F7;
             color: #1D1D1F;
+            transition: background-color 0.3s, color 0.3s;
+        }
+
+        body.dark {
+            background-color: #121212;
+            color: #EDEDED;
         }
 
         /* Custom Slider */
@@ -34,12 +64,21 @@
             border: 1px solid rgba(0,0,0,0.1);
         }
 
+        .dark input[type=range]::-webkit-slider-thumb {
+            background: #333;
+            border-color: #555;
+        }
+
         input[type=range]::-webkit-slider-runnable-track {
             width: 100%;
             height: 4px;
             cursor: pointer;
             background: #E5E5E5;
             border-radius: 2px;
+        }
+
+        .dark input[type=range]::-webkit-slider-runnable-track {
+            background: #333;
         }
 
         /* Color Panel Transition */
@@ -62,10 +101,13 @@
             box-shadow: 0 8px 32px rgba(0,0,0,0.15);
         }
 
-        /* CSS Code Modal */
-        #code-modal {
+        /* Modal Overlay */
+        .modal-backdrop {
             backdrop-filter: blur(5px);
             background: rgba(0,0,0,0.4);
+        }
+        .dark .modal-backdrop {
+            background: rgba(0,0,0,0.7);
         }
 
         .mono-font {
@@ -80,94 +122,153 @@
             background-color: #E5E5E5;
             border-radius: 3px;
         }
+        .dark .scrollbar-thin::-webkit-scrollbar-thumb {
+            background-color: #333;
+        }
+
+        /* Noise Texture */
+        .noise-overlay {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none;
+            z-index: 9999;
+            opacity: 0.05;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='1'/%3E%3C/svg%3E");
+            display: none;
+        }
+
+        /* Button Animation */
+        @keyframes pop {
+            0% { transform: scale(1); }
+            40% { transform: scale(0.95); }
+            70% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+        .btn-pop {
+            animation: pop 0.3s ease-in-out;
+        }
+
+        /* Particles */
+        .particle {
+            position: absolute;
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            pointer-events: none;
+            animation: particle-fade 0.8s ease-out forwards;
+        }
+        @keyframes particle-fade {
+            0% { opacity: 1; transform: translate(0, 0) scale(1); }
+            100% { opacity: 0; transform: translate(var(--tx), var(--ty)) scale(0); }
+        }
     </style>
 </head>
-<body class="h-screen w-full flex flex-col overflow-hidden select-none">
+<body class="h-screen w-full flex flex-col overflow-hidden select-none transition-colors duration-300">
+
+    <!-- Noise Overlay -->
+    <div id="noise-layer" class="noise-overlay"></div>
 
     <!-- Top Bar -->
-    <header class="h-16 flex items-center justify-between px-4 md:px-6 bg-white border-b border-gray-200 z-20 shadow-sm shrink-0">
+    <header class="h-16 flex items-center justify-between px-4 md:px-6 bg-white dark:bg-dark-surface border-b border-gray-200 dark:border-dark-border z-20 shadow-sm shrink-0 transition-colors duration-300">
         <div class="flex items-center gap-3">
             <div class="w-8 h-8 rounded-lg bg-gradient-to-tr from-indigo-500 to-purple-500 flex items-center justify-center text-white shadow-md">
                 <i data-lucide="palette" class="w-5 h-5"></i>
             </div>
             <div>
-                <h1 class="text-base md:text-lg font-bold tracking-tight text-gray-900 leading-none">ChromaZen</h1>
-                <span class="text-[10px] font-medium text-gray-400">Pro Color Tool v3.0</span>
+                <h1 class="text-base md:text-lg font-bold tracking-tight text-gray-900 dark:text-white leading-none">ChromaZen</h1>
+                <span class="text-[10px] font-medium text-gray-400 dark:text-gray-500">Pro Color Tool v3.5</span>
             </div>
         </div>
         
-        <div class="flex items-center gap-4">
-            <!-- Undo/Redo -->
-            <div class="hidden md:flex items-center bg-gray-100 p-1 rounded-lg">
-                <button onclick="undo()" class="p-1.5 rounded hover:bg-white hover:shadow-sm text-gray-500 transition-all" title="Undo (Ctrl+Z)">
+        <div class="flex items-center gap-2 md:gap-4">
+            
+             <!-- Undo/Redo (Desktop) -->
+            <div class="hidden md:flex items-center bg-gray-100 dark:bg-dark-bg p-1 rounded-lg border dark:border-dark-border">
+                <button onclick="undo()" class="p-1.5 rounded hover:bg-white dark:hover:bg-dark-surface hover:shadow-sm text-gray-500 dark:text-gray-400 transition-all" title="Undo (Ctrl+Z)">
                     <i data-lucide="undo-2" class="w-4 h-4"></i>
                 </button>
-                <div class="w-px h-4 bg-gray-300 mx-1"></div>
-                <button onclick="redo()" class="p-1.5 rounded hover:bg-white hover:shadow-sm text-gray-500 transition-all" title="Redo (Ctrl+Y)">
+                <div class="w-px h-4 bg-gray-300 dark:bg-dark-border mx-1"></div>
+                <button onclick="redo()" class="p-1.5 rounded hover:bg-white dark:hover:bg-dark-surface hover:shadow-sm text-gray-500 dark:text-gray-400 transition-all" title="Redo (Ctrl+Y)">
                     <i data-lucide="redo-2" class="w-4 h-4"></i>
                 </button>
             </div>
 
-            <div class="h-6 w-px bg-gray-200 hidden md:block"></div>
-
             <!-- View Modes -->
-            <div class="flex bg-gray-100 p-1 rounded-lg">
-                <button onclick="setViewMode('palette')" id="view-palette" class="px-3 py-1.5 text-xs font-semibold rounded-md shadow-sm bg-white text-gray-900 transition-all flex items-center gap-1.5">
+            <div class="hidden md:flex bg-gray-100 dark:bg-dark-bg p-1 rounded-lg border dark:border-dark-border">
+                <button onclick="setViewMode('palette')" id="view-palette" class="px-3 py-1.5 text-xs font-semibold rounded-md shadow-sm bg-white dark:bg-dark-surface text-gray-900 dark:text-white transition-all flex items-center gap-1.5">
                     <i data-lucide="columns" class="w-3 h-3"></i> Palette
                 </button>
-                <button onclick="setViewMode('gradient')" id="view-gradient" class="px-3 py-1.5 text-xs font-semibold rounded-md text-gray-500 hover:text-gray-900 transition-all flex items-center gap-1.5">
+                <button onclick="setViewMode('gradient')" id="view-gradient" class="px-3 py-1.5 text-xs font-semibold rounded-md text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-all flex items-center gap-1.5">
                     <i data-lucide="activity" class="w-3 h-3"></i> Gradient
                 </button>
-                <button onclick="setViewMode('mockup')" id="view-mockup" class="px-3 py-1.5 text-xs font-semibold rounded-md text-gray-500 hover:text-gray-900 transition-all flex items-center gap-1.5">
+                <button onclick="setViewMode('mockup')" id="view-mockup" class="px-3 py-1.5 text-xs font-semibold rounded-md text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-all flex items-center gap-1.5">
                     <i data-lucide="layout-template" class="w-3 h-3"></i> Mockup
                 </button>
             </div>
 
-            <div class="h-6 w-px bg-gray-200 hidden md:block"></div>
+            <div class="h-6 w-px bg-gray-200 dark:bg-dark-border hidden md:block"></div>
+
+            <!-- Analyze Contrast -->
+            <button onclick="showContrastModal()" class="hidden md:flex px-3 py-1.5 text-xs font-medium rounded-md border border-gray-300 dark:border-dark-border text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-dark-bg transition-colors items-center gap-1.5">
+                <i data-lucide="eye" class="w-3 h-3"></i> Analyze
+            </button>
 
             <!-- Export -->
-            <div class="relative group">
-                <button class="px-3 py-1.5 text-xs font-medium rounded-md border border-gray-300 hover:bg-gray-50 transition-colors flex items-center gap-1.5">
+            <div class="relative group z-50">
+                <button class="px-3 py-1.5 text-xs font-medium rounded-md border border-gray-300 dark:border-dark-border text-gray-900 dark:text-white hover:bg-gray-50 dark:hover:bg-dark-bg transition-colors flex items-center gap-1.5">
                     <i data-lucide="download" class="w-3 h-3"></i> Export
                 </button>
-                <div class="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-xl border border-gray-100 hidden group-hover:block p-1 z-50">
-                    <button onclick="showCSSModal()" class="w-full text-left px-3 py-2 text-xs hover:bg-gray-50 rounded-lg flex items-center gap-2">
+                <div class="absolute right-0 mt-2 w-48 bg-white dark:bg-dark-surface rounded-xl shadow-xl border border-gray-100 dark:border-dark-border hidden group-hover:block p-1 z-50">
+                    <button onclick="exportImage()" class="w-full text-left px-3 py-2 text-xs hover:bg-gray-50 dark:hover:bg-dark-bg dark:text-gray-200 rounded-lg flex items-center gap-2">
+                        <i data-lucide="image" class="w-3 h-3 text-pink-500"></i> Image (PNG)
+                    </button>
+                    <button onclick="showCSSModal()" class="w-full text-left px-3 py-2 text-xs hover:bg-gray-50 dark:hover:bg-dark-bg dark:text-gray-200 rounded-lg flex items-center gap-2">
                         <i data-lucide="code" class="w-3 h-3 text-blue-500"></i> CSS Code
                     </button>
-                    <button onclick="downloadASE()" class="w-full text-left px-3 py-2 text-xs hover:bg-gray-50 rounded-lg flex items-center gap-2">
+                    <button onclick="downloadASE()" class="w-full text-left px-3 py-2 text-xs hover:bg-gray-50 dark:hover:bg-dark-bg dark:text-gray-200 rounded-lg flex items-center gap-2">
                         <i data-lucide="file-box" class="w-3 h-3 text-purple-500"></i> Adobe ASE
                     </button>
                 </div>
             </div>
+
+            <!-- Dark Mode Toggle -->
+            <button onclick="toggleDarkMode()" class="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-dark-bg text-gray-500 dark:text-yellow-400 transition-colors">
+                <i data-lucide="sun" class="w-4 h-4 dark:hidden"></i>
+                <i data-lucide="moon" class="w-4 h-4 hidden dark:block"></i>
+            </button>
         </div>
     </header>
 
     <!-- Main Workspace -->
-    <main class="flex-1 flex flex-col md:flex-row relative overflow-hidden">
+    <main class="flex-1 flex flex-col md:flex-row relative overflow-hidden bg-gray-50 dark:bg-dark-bg transition-colors duration-300">
         
         <!-- Controls Sidebar -->
-        <aside class="w-full md:w-80 bg-white border-r border-gray-200 p-5 flex flex-col gap-6 z-10 overflow-y-auto scrollbar-thin shrink-0">
+        <aside class="w-full md:w-80 bg-white dark:bg-dark-surface border-r border-gray-200 dark:border-dark-border p-5 flex flex-col gap-6 z-10 overflow-y-auto scrollbar-thin shrink-0 transition-colors duration-300">
             
             <!-- Generate & Count -->
             <div class="space-y-3">
-                <div class="flex bg-gray-100 p-1 rounded-lg w-full">
-                    <button id="mode2" class="flex-1 py-1.5 text-xs font-semibold rounded-md text-gray-500" onclick="setMode(2)">2</button>
-                    <button id="mode3" class="flex-1 py-1.5 text-xs font-semibold rounded-md shadow-sm bg-white text-gray-900" onclick="setMode(3)">3</button>
-                    <button id="mode4" class="flex-1 py-1.5 text-xs font-semibold rounded-md text-gray-500" onclick="setMode(4)">4</button>
-                    <button id="mode5" class="flex-1 py-1.5 text-xs font-semibold rounded-md text-gray-500" onclick="setMode(5)">5</button>
+                <div class="flex bg-gray-100 dark:bg-dark-bg p-1 rounded-lg w-full border dark:border-dark-border">
+                    <button id="mode2" class="flex-1 py-1.5 text-xs font-semibold rounded-md text-gray-500 dark:text-gray-400 hover:text-gray-900" onclick="setMode(2)">2</button>
+                    <button id="mode3" class="flex-1 py-1.5 text-xs font-semibold rounded-md shadow-sm bg-white dark:bg-dark-surface text-gray-900 dark:text-white" onclick="setMode(3)">3</button>
+                    <button id="mode4" class="flex-1 py-1.5 text-xs font-semibold rounded-md text-gray-500 dark:text-gray-400 hover:text-gray-900" onclick="setMode(4)">4</button>
+                    <button id="mode5" class="flex-1 py-1.5 text-xs font-semibold rounded-md text-gray-500 dark:text-gray-400 hover:text-gray-900" onclick="setMode(5)">5</button>
                 </div>
 
-                <button onclick="generatePalette()" class="w-full py-3.5 bg-black text-white rounded-xl text-base font-semibold shadow-lg hover:bg-gray-800 active:scale-95 transition-all flex items-center justify-center gap-2 group">
-                    <i data-lucide="shuffle" class="w-4 h-4 group-hover:rotate-180 transition-transform duration-500"></i>
-                    Generate
-                </button>
+                <div class="relative w-full">
+                    <button id="btn-generate" onclick="generatePalette()" class="w-full py-3.5 bg-black dark:bg-white dark:text-black text-white rounded-xl text-base font-semibold shadow-lg hover:bg-gray-800 dark:hover:bg-gray-200 active:scale-95 transition-all flex items-center justify-center gap-2 group relative overflow-hidden">
+                        <i data-lucide="shuffle" class="w-4 h-4 group-hover:rotate-180 transition-transform duration-500"></i>
+                        <span>Generate</span>
+                    </button>
+                    <!-- Particles Container -->
+                    <div id="particle-container" class="absolute top-1/2 left-1/2 w-0 h-0 pointer-events-none"></div>
+                </div>
             </div>
 
             <!-- Harmony Rules -->
             <div class="space-y-2">
-                <label class="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Harmony Rule</label>
+                <label class="text-[10px] font-bold text-gray-400 dark:text-dark-muted uppercase tracking-wider">Harmony Rule</label>
                 <div class="relative">
-                    <select id="harmony-select" onchange="generatePalette()" class="w-full appearance-none bg-gray-50 border border-gray-200 text-gray-700 py-2.5 px-3 pr-8 rounded-lg text-xs font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
+                    <select id="harmony-select" onchange="generatePalette()" class="w-full appearance-none bg-gray-50 dark:bg-dark-bg border border-gray-200 dark:border-dark-border text-gray-700 dark:text-gray-200 py-2.5 px-3 pr-8 rounded-lg text-xs font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
                         <option value="random">🎲 Random Shuffle</option>
                         <option value="analogous">🎨 Analogous (유사색)</option>
                         <option value="monochromatic">🌗 Monochromatic (단색)</option>
@@ -182,43 +283,44 @@
 
             <!-- Presets Grid -->
             <div class="space-y-2">
-                <label class="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Style Presets</label>
-                <div class="grid grid-cols-2 gap-2 h-64 overflow-y-auto pr-1 scrollbar-thin">
-                    <button onclick="setPreset('corporate')" class="preset-btn py-2 px-3 rounded-lg border border-gray-100 bg-gray-50 hover:bg-white hover:border-gray-300 transition-all text-left flex items-center gap-2">
-                        <span class="w-2 h-2 rounded-full bg-slate-600"></span> <span class="text-xs font-medium text-gray-600">Corporate</span>
+                <label class="text-[10px] font-bold text-gray-400 dark:text-dark-muted uppercase tracking-wider">Style Presets</label>
+                <!-- UI FIX: Increased padding and removed potential overflow clip -->
+                <div class="grid grid-cols-2 gap-2 h-64 overflow-y-auto px-1 py-1 scrollbar-thin">
+                    <button onclick="setPreset('corporate')" class="preset-btn py-2 px-3 rounded-lg border border-gray-100 dark:border-dark-border bg-gray-50 dark:bg-dark-bg hover:bg-white dark:hover:bg-dark-surface hover:border-gray-300 transition-all text-left flex items-center gap-2">
+                        <span class="w-2 h-2 rounded-full bg-slate-600 shrink-0"></span> <span class="text-xs font-medium text-gray-600 dark:text-gray-300">Corporate</span>
                     </button>
-                    <button onclick="setPreset('luxury')" class="preset-btn py-2 px-3 rounded-lg border border-gray-100 bg-gray-50 hover:bg-white hover:border-gray-300 transition-all text-left flex items-center gap-2">
-                        <span class="w-2 h-2 rounded-full bg-yellow-600"></span> <span class="text-xs font-medium text-gray-600">Luxury</span>
+                    <button onclick="setPreset('luxury')" class="preset-btn py-2 px-3 rounded-lg border border-gray-100 dark:border-dark-border bg-gray-50 dark:bg-dark-bg hover:bg-white dark:hover:bg-dark-surface hover:border-gray-300 transition-all text-left flex items-center gap-2">
+                        <span class="w-2 h-2 rounded-full bg-yellow-600 shrink-0"></span> <span class="text-xs font-medium text-gray-600 dark:text-gray-300">Luxury</span>
                     </button>
-                    <button onclick="setPreset('pop')" class="preset-btn py-2 px-3 rounded-lg border border-gray-100 bg-gray-50 hover:bg-white hover:border-gray-300 transition-all text-left flex items-center gap-2">
-                        <span class="w-2 h-2 rounded-full bg-red-500"></span> <span class="text-xs font-medium text-gray-600">Pop/Playful</span>
+                    <button onclick="setPreset('pop')" class="preset-btn py-2 px-3 rounded-lg border border-gray-100 dark:border-dark-border bg-gray-50 dark:bg-dark-bg hover:bg-white dark:hover:bg-dark-surface hover:border-gray-300 transition-all text-left flex items-center gap-2">
+                        <span class="w-2 h-2 rounded-full bg-red-500 shrink-0"></span> <span class="text-xs font-medium text-gray-600 dark:text-gray-300">Pop/Playful</span>
                     </button>
-                    <button onclick="setPreset('wedding')" class="preset-btn py-2 px-3 rounded-lg border border-gray-100 bg-gray-50 hover:bg-white hover:border-gray-300 transition-all text-left flex items-center gap-2">
-                        <span class="w-2 h-2 rounded-full bg-pink-100 border border-gray-200"></span> <span class="text-xs font-medium text-gray-600">Wedding</span>
+                    <button onclick="setPreset('wedding')" class="preset-btn py-2 px-3 rounded-lg border border-gray-100 dark:border-dark-border bg-gray-50 dark:bg-dark-bg hover:bg-white dark:hover:bg-dark-surface hover:border-gray-300 transition-all text-left flex items-center gap-2">
+                        <span class="w-2 h-2 rounded-full bg-pink-100 border border-gray-200 shrink-0"></span> <span class="text-xs font-medium text-gray-600 dark:text-gray-300">Wedding</span>
                     </button>
-                    <button onclick="setPreset('vivid')" class="preset-btn py-2 px-3 rounded-lg border border-gray-100 bg-gray-50 hover:bg-white hover:border-gray-300 transition-all text-left flex items-center gap-2">
-                        <span class="w-2 h-2 rounded-full bg-blue-600"></span> <span class="text-xs font-medium text-gray-600">Vivid</span>
+                    <button onclick="setPreset('vivid')" class="preset-btn py-2 px-3 rounded-lg border border-gray-100 dark:border-dark-border bg-gray-50 dark:bg-dark-bg hover:bg-white dark:hover:bg-dark-surface hover:border-gray-300 transition-all text-left flex items-center gap-2">
+                        <span class="w-2 h-2 rounded-full bg-blue-600 shrink-0"></span> <span class="text-xs font-medium text-gray-600 dark:text-gray-300">Vivid</span>
                     </button>
-                    <button onclick="setPreset('pastel')" class="preset-btn py-2 px-3 rounded-lg border border-gray-100 bg-gray-50 hover:bg-white hover:border-gray-300 transition-all text-left flex items-center gap-2">
-                        <span class="w-2 h-2 rounded-full bg-pink-200"></span> <span class="text-xs font-medium text-gray-600">Pastel</span>
+                    <button onclick="setPreset('pastel')" class="preset-btn py-2 px-3 rounded-lg border border-gray-100 dark:border-dark-border bg-gray-50 dark:bg-dark-bg hover:bg-white dark:hover:bg-dark-surface hover:border-gray-300 transition-all text-left flex items-center gap-2">
+                        <span class="w-2 h-2 rounded-full bg-pink-200 shrink-0"></span> <span class="text-xs font-medium text-gray-600 dark:text-gray-300">Pastel</span>
                     </button>
-                    <button onclick="setPreset('dark')" class="preset-btn py-2 px-3 rounded-lg border border-gray-100 bg-gray-50 hover:bg-white hover:border-gray-300 transition-all text-left flex items-center gap-2">
-                        <span class="w-2 h-2 rounded-full bg-gray-800"></span> <span class="text-xs font-medium text-gray-600">Dark</span>
+                    <button onclick="setPreset('dark')" class="preset-btn py-2 px-3 rounded-lg border border-gray-100 dark:border-dark-border bg-gray-50 dark:bg-dark-bg hover:bg-white dark:hover:bg-dark-surface hover:border-gray-300 transition-all text-left flex items-center gap-2">
+                        <span class="w-2 h-2 rounded-full bg-gray-800 shrink-0"></span> <span class="text-xs font-medium text-gray-600 dark:text-gray-300">Dark</span>
                     </button>
-                    <button onclick="setPreset('warm')" class="preset-btn py-2 px-3 rounded-lg border border-gray-100 bg-gray-50 hover:bg-white hover:border-gray-300 transition-all text-left flex items-center gap-2">
-                        <span class="w-2 h-2 rounded-full bg-orange-400"></span> <span class="text-xs font-medium text-gray-600">Warm</span>
+                    <button onclick="setPreset('warm')" class="preset-btn py-2 px-3 rounded-lg border border-gray-100 dark:border-dark-border bg-gray-50 dark:bg-dark-bg hover:bg-white dark:hover:bg-dark-surface hover:border-gray-300 transition-all text-left flex items-center gap-2">
+                        <span class="w-2 h-2 rounded-full bg-orange-400 shrink-0"></span> <span class="text-xs font-medium text-gray-600 dark:text-gray-300">Warm</span>
                     </button>
-                    <button onclick="setPreset('nature')" class="preset-btn py-2 px-3 rounded-lg border border-gray-100 bg-gray-50 hover:bg-white hover:border-gray-300 transition-all text-left flex items-center gap-2">
-                        <span class="w-2 h-2 rounded-full bg-green-600"></span> <span class="text-xs font-medium text-gray-600">Nature</span>
+                    <button onclick="setPreset('nature')" class="preset-btn py-2 px-3 rounded-lg border border-gray-100 dark:border-dark-border bg-gray-50 dark:bg-dark-bg hover:bg-white dark:hover:bg-dark-surface hover:border-gray-300 transition-all text-left flex items-center gap-2">
+                        <span class="w-2 h-2 rounded-full bg-green-600 shrink-0"></span> <span class="text-xs font-medium text-gray-600 dark:text-gray-300">Nature</span>
                     </button>
-                    <button onclick="setPreset('neon')" class="preset-btn py-2 px-3 rounded-lg border border-gray-100 bg-gray-50 hover:bg-white hover:border-gray-300 transition-all text-left flex items-center gap-2">
-                        <span class="w-2 h-2 rounded-full bg-lime-400"></span> <span class="text-xs font-medium text-gray-600">Neon</span>
+                    <button onclick="setPreset('neon')" class="preset-btn py-2 px-3 rounded-lg border border-gray-100 dark:border-dark-border bg-gray-50 dark:bg-dark-bg hover:bg-white dark:hover:bg-dark-surface hover:border-gray-300 transition-all text-left flex items-center gap-2">
+                        <span class="w-2 h-2 rounded-full bg-lime-400 shrink-0"></span> <span class="text-xs font-medium text-gray-600 dark:text-gray-300">Neon</span>
                     </button>
-                    <button onclick="setPreset('retro')" class="preset-btn py-2 px-3 rounded-lg border border-gray-100 bg-gray-50 hover:bg-white hover:border-gray-300 transition-all text-left flex items-center gap-2">
-                        <span class="w-2 h-2 rounded-full bg-yellow-700"></span> <span class="text-xs font-medium text-gray-600">Retro</span>
+                    <button onclick="setPreset('retro')" class="preset-btn py-2 px-3 rounded-lg border border-gray-100 dark:border-dark-border bg-gray-50 dark:bg-dark-bg hover:bg-white dark:hover:bg-dark-surface hover:border-gray-300 transition-all text-left flex items-center gap-2">
+                        <span class="w-2 h-2 rounded-full bg-yellow-700 shrink-0"></span> <span class="text-xs font-medium text-gray-600 dark:text-gray-300">Retro</span>
                     </button>
-                    <button onclick="setPreset('mono')" class="preset-btn py-2 px-3 rounded-lg border border-gray-100 bg-gray-50 hover:bg-white hover:border-gray-300 transition-all text-left flex items-center gap-2">
-                        <span class="w-2 h-2 rounded-full bg-gray-400"></span> <span class="text-xs font-medium text-gray-600">Mono</span>
+                    <button onclick="setPreset('mono')" class="preset-btn py-2 px-3 rounded-lg border border-gray-100 dark:border-dark-border bg-gray-50 dark:bg-dark-bg hover:bg-white dark:hover:bg-dark-surface hover:border-gray-300 transition-all text-left flex items-center gap-2">
+                        <span class="w-2 h-2 rounded-full bg-gray-400 shrink-0"></span> <span class="text-xs font-medium text-gray-600 dark:text-gray-300">Mono</span>
                     </button>
                 </div>
             </div>
@@ -226,16 +328,24 @@
             <!-- Variability Slider -->
             <div class="space-y-2 pt-2" id="slider-container">
                 <div class="flex justify-between items-center">
-                    <label class="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Color Distance</label>
-                    <span id="variability-label" class="text-[10px] font-bold bg-gray-100 px-2 py-0.5 rounded text-gray-500">Medium</span>
+                    <label class="text-[10px] font-bold text-gray-400 dark:text-dark-muted uppercase tracking-wider">Color Distance</label>
+                    <span id="variability-label" class="text-[10px] font-bold bg-gray-100 dark:bg-dark-bg px-2 py-0.5 rounded text-gray-500 dark:text-gray-400">Medium</span>
                 </div>
                 <input type="range" id="variability" min="10" max="180" value="60" class="w-full">
             </div>
 
+            <!-- Grain Toggle -->
+            <div class="flex items-center justify-between py-2">
+                <label class="text-[10px] font-bold text-gray-400 dark:text-dark-muted uppercase tracking-wider">Grain Texture</label>
+                <button onclick="toggleGrain()" id="btn-grain" class="w-10 h-5 rounded-full bg-gray-200 dark:bg-dark-border relative transition-colors">
+                    <div class="w-3 h-3 bg-white rounded-full absolute top-1 left-1 transition-transform" id="grain-knob"></div>
+                </button>
+            </div>
+
             <!-- History -->
-            <div class="mt-auto pt-4 border-t border-gray-100">
+            <div class="mt-auto pt-4 border-t border-gray-100 dark:border-dark-border">
                 <div class="flex justify-between items-center mb-2">
-                    <label class="text-[10px] font-bold text-gray-400 uppercase tracking-wider">History</label>
+                    <label class="text-[10px] font-bold text-gray-400 dark:text-dark-muted uppercase tracking-wider">History</label>
                     <button onclick="clearHistory()" class="text-[10px] text-gray-400 hover:text-red-500 transition-colors">Clear</button>
                 </div>
                 <div id="history-container" class="grid grid-cols-6 gap-2"></div>
@@ -243,7 +353,7 @@
         </aside>
 
         <!-- Main Display Area -->
-        <div id="main-display" class="flex-1 relative w-full h-full bg-white overflow-y-auto overflow-x-hidden">
+        <div id="main-display" class="flex-1 relative w-full h-full bg-white dark:bg-dark-bg overflow-y-auto overflow-x-hidden transition-colors duration-300">
             
             <!-- 1. Palette View (Default) -->
             <div id="view-palette-content" class="w-full h-full flex flex-col md:flex-row"></div>
@@ -259,7 +369,7 @@
             </div>
 
             <!-- 3. Mockup View -->
-            <div id="view-mockup-content" class="hidden w-full h-full p-4 md:p-10 bg-gray-100 overflow-y-auto">
+            <div id="view-mockup-content" class="hidden w-full h-full p-4 md:p-10 bg-gray-100 dark:bg-dark-bg overflow-y-auto">
                 <div class="max-w-4xl mx-auto bg-white rounded-2xl shadow-xl overflow-hidden min-h-[800px] transition-colors duration-500" id="mock-bg">
                     <!-- Fake Nav -->
                     <div class="h-16 flex items-center justify-between px-8 border-b border-black/5" id="mock-nav">
@@ -297,30 +407,115 @@
         </div>
     </main>
 
+    <!-- Hidden Export Template (Offscreen) -->
+    <div id="export-container" class="fixed top-0 left-0 -z-50 opacity-0 pointer-events-none w-[1080px] h-[1080px] bg-white flex flex-col">
+        <div class="flex-1 flex" id="export-palette-area">
+            <!-- Colors injected here -->
+        </div>
+        <div class="h-32 bg-white flex items-center justify-between px-12 border-t border-gray-100">
+            <div>
+                <h2 class="text-3xl font-bold text-gray-900">ChromaZen</h2>
+                <p class="text-gray-500 mt-1">Palette Export</p>
+            </div>
+            <div class="flex gap-4 font-mono text-gray-600 font-medium" id="export-codes">
+                <!-- Hex codes injected here -->
+            </div>
+        </div>
+    </div>
+
     <!-- Toast Notification -->
-    <div id="toast" class="fixed bottom-8 left-1/2 transform -translate-x-1/2 px-4 py-3 rounded-full flex items-center gap-3 opacity-0 pointer-events-none transition-all duration-300 z-50 translate-y-4">
+    <div id="toast" class="fixed bottom-8 left-1/2 transform -translate-x-1/2 px-4 py-3 rounded-full flex items-center gap-3 opacity-0 pointer-events-none transition-all duration-300 z-50 translate-y-4 bg-black/90 dark:bg-white/90 text-white dark:text-black shadow-lg">
         <i data-lucide="check-circle" class="w-5 h-5 text-green-400"></i>
         <span class="text-sm font-medium" id="toast-message">Copied!</span>
     </div>
 
     <!-- CSS Export Modal -->
-    <div id="code-modal" class="fixed inset-0 z-50 hidden flex items-center justify-center p-4">
-        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden transform scale-95 transition-transform duration-200" id="modal-content">
-            <div class="flex justify-between items-center p-4 border-b border-gray-100">
-                <h3 class="font-bold text-gray-800">Export CSS</h3>
-                <button onclick="closeCSSModal()" class="text-gray-400 hover:text-gray-600"><i data-lucide="x" class="w-5 h-5"></i></button>
+    <div id="code-modal" class="fixed inset-0 z-50 hidden flex items-center justify-center p-4 modal-backdrop">
+        <div class="bg-white dark:bg-dark-surface rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden transform scale-95 transition-transform duration-200" id="modal-content">
+            <div class="flex justify-between items-center p-4 border-b border-gray-100 dark:border-dark-border">
+                <h3 class="font-bold text-gray-800 dark:text-white">Export CSS</h3>
+                <button onclick="closeCSSModal()" class="text-gray-400 hover:text-gray-600 dark:hover:text-white"><i data-lucide="x" class="w-5 h-5"></i></button>
             </div>
-            <div class="p-4 bg-gray-50">
-                <pre class="mono-font text-xs text-gray-600 bg-white p-4 rounded-lg border border-gray-200 overflow-x-auto select-all" id="css-output"></pre>
+            <div class="p-4 bg-gray-50 dark:bg-dark-bg">
+                <pre class="mono-font text-xs text-gray-600 dark:text-gray-300 bg-white dark:bg-dark-surface p-4 rounded-lg border border-gray-200 dark:border-dark-border overflow-x-auto select-all" id="css-output"></pre>
             </div>
-            <div class="p-4 bg-white flex justify-end gap-2">
-                <button onclick="closeCSSModal()" class="px-4 py-2 text-sm font-medium text-gray-500 hover:bg-gray-100 rounded-lg">Close</button>
-                <button onclick="copyCSS()" class="px-4 py-2 text-sm font-medium bg-black text-white rounded-lg hover:bg-gray-800 flex items-center gap-2">
+            <div class="p-4 bg-white dark:bg-dark-surface flex justify-end gap-2">
+                <button onclick="closeCSSModal()" class="px-4 py-2 text-sm font-medium text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-dark-bg rounded-lg">Close</button>
+                <button onclick="copyCSS()" class="px-4 py-2 text-sm font-medium bg-black dark:bg-white text-white dark:text-black rounded-lg hover:bg-gray-800 dark:hover:bg-gray-200 flex items-center gap-2">
                     <i data-lucide="copy" class="w-4 h-4"></i> Copy Code
                 </button>
             </div>
         </div>
     </div>
+
+    <!-- Fine Tuning Modal -->
+    <div id="tune-modal" class="fixed inset-0 z-50 hidden flex items-center justify-center p-4 modal-backdrop">
+        <div class="bg-white dark:bg-dark-surface rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden transform scale-95 transition-transform duration-200" id="tune-content">
+            <div class="p-6">
+                <h3 class="font-bold text-gray-800 dark:text-white text-lg mb-4">Edit Color</h3>
+                
+                <!-- Preview -->
+                <div id="tune-preview" class="w-full h-24 rounded-xl shadow-inner mb-6 flex items-center justify-center">
+                    <span id="tune-hex-display" class="font-mono text-white/90 font-bold text-xl mix-blend-overlay">#FFFFFF</span>
+                </div>
+
+                <!-- Hex Input -->
+                <div class="mb-5">
+                    <label class="block text-xs font-bold text-gray-400 mb-1">HEX CODE</label>
+                    <div class="flex gap-2">
+                        <span class="flex items-center justify-center w-8 h-10 bg-gray-100 dark:bg-dark-bg rounded-l-lg text-gray-500">#</span>
+                        <input type="text" id="tune-hex-input" class="flex-1 bg-gray-50 dark:bg-dark-bg border-none rounded-r-lg px-3 uppercase font-mono text-gray-800 dark:text-white focus:ring-2 focus:ring-indigo-500 outline-none" maxlength="6">
+                    </div>
+                </div>
+
+                <!-- HSL Sliders -->
+                <div class="space-y-4">
+                    <div>
+                        <div class="flex justify-between mb-1">
+                            <label class="text-xs font-bold text-gray-400">SATURATION</label>
+                            <span id="tune-s-val" class="text-xs font-mono text-gray-600 dark:text-gray-300">50%</span>
+                        </div>
+                        <input type="range" id="tune-s" min="0" max="100" class="w-full">
+                        <div class="h-1 w-full bg-gradient-to-r from-gray-300 to-blue-500 rounded-full mt-1 opacity-30"></div>
+                    </div>
+                    <div>
+                        <div class="flex justify-between mb-1">
+                            <label class="text-xs font-bold text-gray-400">LIGHTNESS</label>
+                            <span id="tune-l-val" class="text-xs font-mono text-gray-600 dark:text-gray-300">50%</span>
+                        </div>
+                        <input type="range" id="tune-l" min="0" max="100" class="w-full">
+                        <div class="h-1 w-full bg-gradient-to-r from-black via-gray-400 to-white rounded-full mt-1 opacity-30"></div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="p-4 bg-gray-50 dark:bg-dark-bg flex justify-end gap-2">
+                <button onclick="closeTuneModal()" class="px-4 py-2 text-sm font-medium text-gray-500 hover:bg-gray-100 dark:hover:bg-dark-surface rounded-lg">Cancel</button>
+                <button onclick="applyTune()" class="px-4 py-2 text-sm font-medium bg-black dark:bg-white text-white dark:text-black rounded-lg hover:bg-gray-800 dark:hover:bg-gray-200">
+                    Apply Changes
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Contrast Matrix Modal -->
+    <div id="contrast-modal" class="fixed inset-0 z-50 hidden flex items-center justify-center p-4 modal-backdrop">
+        <div class="bg-white dark:bg-dark-surface rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden transform scale-95 transition-transform duration-200" id="contrast-content">
+            <div class="flex justify-between items-center p-4 border-b border-gray-100 dark:border-dark-border">
+                <h3 class="font-bold text-gray-800 dark:text-white">Contrast Matrix</h3>
+                <button onclick="closeContrastModal()" class="text-gray-400 hover:text-gray-600 dark:hover:text-white"><i data-lucide="x" class="w-5 h-5"></i></button>
+            </div>
+            <div class="p-6 bg-white dark:bg-dark-surface">
+                <p class="text-sm text-gray-500 dark:text-gray-400 mb-4">
+                    Check legibility between colors. <strong class="text-green-500">AA</strong> (4.5:1) is good for normal text, <strong class="text-green-600">AAA</strong> (7:1) is excellent.
+                </p>
+                <div id="contrast-grid" class="grid gap-2">
+                    <!-- Matrix Injected Here -->
+                </div>
+            </div>
+        </div>
+    </div>
+
 
     <script>
         // --- State ---
@@ -331,10 +526,12 @@
             variability: 60,
             preset: 'none',
             harmony: 'random',
-            history: [], // Bottom bar history
-            actionHistory: [], // For Undo
-            redoStack: [], // For Redo
-            viewMode: 'palette' // palette, gradient, mockup
+            history: [], 
+            actionHistory: [],
+            redoStack: [],
+            viewMode: 'palette',
+            editingIndex: -1, // Currently editing color index
+            grain: false
         };
 
         // --- Constants ---
@@ -347,11 +544,10 @@
             neon: { sMin: 90, sMax: 100, lMin: 50, lMax: 60 },
             retro: { sMin: 30, sMax: 60, lMin: 50, lMax: 80, hRange: [20, 50] },
             mono: { sMin: 0, sMax: 0, lMin: 10, lMax: 90 },
-            // New Presets
-            corporate: { sMin: 10, sMax: 40, lMin: 20, lMax: 50, hRange: [200, 240] }, // Blue/Grey trust
-            luxury: { sMin: 20, sMax: 60, lMin: 10, lMax: 40, hRange: [30, 60] }, // Golds/Darks. Logic handled in generator for gold
-            pop: { sMin: 80, sMax: 100, lMin: 50, lMax: 60 }, // High sat
-            wedding: { sMin: 5, sMax: 30, lMin: 85, lMax: 98 } // Very light, romantic
+            corporate: { sMin: 10, sMax: 40, lMin: 20, lMax: 50, hRange: [200, 240] },
+            luxury: { sMin: 20, sMax: 60, lMin: 10, lMax: 40, hRange: [30, 60] },
+            pop: { sMin: 80, sMax: 100, lMin: 50, lMax: 60 },
+            wedding: { sMin: 5, sMax: 30, lMin: 85, lMax: 98 }
         };
 
         // --- Utils ---
@@ -440,12 +636,11 @@
             const p = getPresetParams();
             let h = hue ?? (p.hRange ? Math.floor(Math.random() * (p.hRange[1] - p.hRange[0]) + p.hRange[0]) : Math.floor(Math.random() * 360));
             
-            // Special Logic for Luxury (Gold/Dark mix)
             if (state.preset === 'luxury') {
-                if (Math.random() > 0.6) { // 40% chance of gold
+                if (Math.random() > 0.6) { 
                     h = Math.floor(Math.random() * 20) + 35; 
                     p.sMin = 60; p.sMax = 80; p.lMin = 50; p.lMax = 70;
-                } else { // Dark bg
+                } else {
                     p.lMax = 15; p.sMax = 20;
                 }
             }
@@ -456,13 +651,19 @@
         };
 
         const generatePalette = (addToUndo = true) => {
+            // Button Animation
+            const btn = document.getElementById('btn-generate');
+            btn.classList.remove('btn-pop');
+            void btn.offsetWidth; // trigger reflow
+            btn.classList.add('btn-pop');
+            createParticles();
+
             if (addToUndo) saveStateForUndo();
 
             const count = state.mode;
             let newColors = [...state.colors];
             while(newColors.length < 5) newColors.push(null);
 
-            // 1. Determine Base Color
             let baseColor;
             if (state.locked[0] && newColors[0]) {
                 baseColor = newColors[0].h ? newColors[0] : hexToHsl(newColors[0].hex);
@@ -471,7 +672,6 @@
             }
             newColors[0] = baseColor;
 
-            // 2. Rules
             const harmony = document.getElementById('harmony-select').value;
             const variability = parseInt(document.getElementById('variability').value);
             
@@ -481,7 +681,7 @@
                 let nextHue = baseColor.h, nextS = baseColor.s, nextL = baseColor.l;
 
                 if (harmony === 'analogous') nextHue = baseColor.h + (30 * i);
-                else if (harmony === 'complementary') nextHue = baseColor.h + (180 * (i % 2)); // Simple toggle
+                else if (harmony === 'complementary') nextHue = baseColor.h + (180 * (i % 2));
                 else if (harmony === 'triadic') nextHue = baseColor.h + (120 * i);
                 else if (harmony === 'monochromatic') {
                     nextHue = baseColor.h;
@@ -504,12 +704,34 @@
             }
 
             state.colors = newColors.slice(0, count);
-            
-            // Bottom history bar logic (distinct from Undo)
             addToHistoryBar();
-            
             render();
             updateSliderVisibility();
+        };
+
+        const createParticles = () => {
+            const container = document.getElementById('particle-container');
+            const colors = ['#EF4444', '#3B82F6', '#10B981', '#F59E0B', '#8B5CF6'];
+            
+            for(let i=0; i<12; i++) {
+                const p = document.createElement('div');
+                p.className = 'particle';
+                const color = colors[Math.floor(Math.random() * colors.length)];
+                p.style.backgroundColor = color;
+                
+                const angle = Math.random() * Math.PI * 2;
+                const velocity = Math.random() * 60 + 40;
+                const tx = Math.cos(angle) * velocity + 'px';
+                const ty = Math.sin(angle) * velocity + 'px';
+                
+                p.style.setProperty('--tx', tx);
+                p.style.setProperty('--ty', ty);
+                p.style.left = '50%';
+                p.style.top = '50%';
+                
+                container.appendChild(p);
+                setTimeout(() => p.remove(), 800);
+            }
         };
 
         // --- History Logic ---
@@ -521,12 +743,11 @@
                 locked: state.locked
             })));
             if (state.actionHistory.length > 20) state.actionHistory.shift();
-            state.redoStack = []; // Clear redo on new action
+            state.redoStack = []; 
         };
 
         const undo = () => {
             if (state.actionHistory.length === 0) return;
-            // Current state goes to Redo
             state.redoStack.push(JSON.parse(JSON.stringify({ 
                 colors: state.colors, 
                 mode: state.mode,
@@ -544,7 +765,6 @@
 
         const redo = () => {
             if (state.redoStack.length === 0) return;
-            // Current to Undo
             state.actionHistory.push(JSON.parse(JSON.stringify({ 
                 colors: state.colors, 
                 mode: state.mode,
@@ -562,9 +782,7 @@
 
         const addToHistoryBar = () => {
             const paletteSnapshot = state.colors.map(c => c.hex);
-            // Avoid dupe if same as last
             if (state.history.length > 0 && JSON.stringify(state.history[0]) === JSON.stringify(paletteSnapshot)) return;
-            
             state.history.unshift(paletteSnapshot);
             if(state.history.length > 18) state.history.pop();
             renderHistory();
@@ -577,7 +795,7 @@
             container.innerHTML = '';
             state.history.forEach(palette => {
                 const div = document.createElement('div');
-                div.className = 'w-full aspect-square rounded-lg overflow-hidden cursor-pointer hover:ring-2 ring-indigo-500 transition-all flex flex-col shadow-sm';
+                div.className = 'w-full aspect-square rounded-lg overflow-hidden cursor-pointer hover:ring-2 ring-indigo-500 transition-all flex flex-col shadow-sm border dark:border-gray-700';
                 div.onclick = () => loadFromHistory(palette);
                 palette.forEach(hex => {
                     const stripe = document.createElement('div');
@@ -590,11 +808,9 @@
         };
 
         const render = () => {
-            // Render depends on viewMode
             if (state.viewMode === 'palette') renderPaletteView();
             else if (state.viewMode === 'gradient') renderGradientView();
             else if (state.viewMode === 'mockup') renderMockupView();
-            
             lucide.createIcons();
         };
 
@@ -612,7 +828,6 @@
                 panel.style.color = textColor;
                 panel.draggable = true;
 
-                // Drag Events
                 panel.ondragstart = (e) => {
                     e.dataTransfer.setData('text/plain', index);
                     e.dataTransfer.effectAllowed = 'move';
@@ -626,12 +841,9 @@
                     const toIndex = index;
                     if (fromIndex !== toIndex) {
                         saveStateForUndo();
-                        // Swap logic
                         const temp = state.colors[fromIndex];
                         state.colors[fromIndex] = state.colors[toIndex];
                         state.colors[toIndex] = temp;
-                        // Also swap locks? User usually expects locks to stay with position or color?
-                        // Let's swap locks too to move the "slot"
                         const tempLock = state.locked[fromIndex];
                         state.locked[fromIndex] = state.locked[toIndex];
                         state.locked[toIndex] = tempLock;
@@ -640,12 +852,20 @@
                 };
 
                 panel.innerHTML = `
-                    <div class="absolute top-4 right-4 md:top-6 md:right-6">
+                    <div class="absolute top-4 right-4 md:top-6 md:right-6 flex flex-col gap-2">
                          <button onclick="event.stopPropagation(); toggleLock(${index})" 
                             class="p-2 rounded-full transition-all duration-200 ${isLocked ? 'bg-black/20 text-white' : 'opacity-0 group-hover:opacity-100 hover:bg-black/10'}">
                             <i data-lucide="${isLocked ? 'lock' : 'unlock'}" class="w-5 h-5"></i>
                         </button>
                     </div>
+
+                    <div class="absolute top-4 left-4 md:top-6 md:left-6 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button onclick="event.stopPropagation(); openTuneModal(${index})" 
+                            class="p-2 rounded-full hover:bg-black/10 transition-colors" title="Edit Color">
+                            <i data-lucide="sliders" class="w-5 h-5"></i>
+                        </button>
+                    </div>
+
                     ${isLocked ? `<div class="absolute top-4 right-4 md:hidden text-white/50"><i data-lucide="lock" class="w-4 h-4"></i></div>` : ''}
 
                     <div class="text-center transform transition-transform group-hover:scale-105 duration-300">
@@ -675,28 +895,17 @@
         };
 
         const renderMockupView = () => {
-            // Naive mapping: 
-            // Color 0: Background
-            // Color 1: Primary Text / Hero Text
-            // Color 2: Accent / Button
-            // Color 3: Secondary / Cards
-            // Color 4: Extra
-            
             const c = state.colors;
             const bg = c[0].hex;
             const text = getTextColor(bg) === '#FFFFFF' ? '#FFFFFF' : '#111111'; 
-            // If text is white, make everything light. If dark, make dark.
-            // Actually, let's try to find high contrast pairs.
-            
             const mainAcc = c[state.mode > 2 ? 2 : 1].hex;
-            const cardBg = c[state.mode > 3 ? 3 : 0].hex; // fallback to 0 if not enough
+            const cardBg = c[state.mode > 3 ? 3 : 0].hex; 
             
             const mockContainer = document.getElementById('mock-bg');
             mockContainer.style.backgroundColor = bg;
             mockContainer.style.color = text;
 
-            // Elements
-            document.getElementById('mock-nav').style.borderColor = text + '10'; // 10% opacity hex
+            document.getElementById('mock-nav').style.borderColor = text + '10';
             document.getElementById('mock-logo').style.color = text;
             
             const ctaLg = document.getElementById('mock-cta-lg');
@@ -707,10 +916,8 @@
             ctaSm.style.backgroundColor = text;
             ctaSm.style.color = bg;
 
-            const cards = ['mock-card-1', 'mock-card-2', 'mock-card-3'];
-            cards.forEach(id => {
+            ['mock-card-1', 'mock-card-2', 'mock-card-3'].forEach(id => {
                 const el = document.getElementById(id);
-                // Mix background with text color for card bg simulation
                 el.style.backgroundColor = text + '10'; 
                 if(state.mode >= 4) el.style.backgroundColor = c[3].hex;
                 el.style.color = state.mode >= 4 ? getTextColor(c[3].hex) : text;
@@ -719,26 +926,161 @@
             document.getElementById('mock-headline').style.color = text;
         };
 
+        // --- Fine Tuning ---
+
+        const openTuneModal = (index) => {
+            state.editingIndex = index;
+            const color = state.colors[index];
+            
+            // Populate inputs
+            document.getElementById('tune-hex-input').value = color.hex.replace('#','');
+            document.getElementById('tune-hex-display').innerText = color.hex;
+            document.getElementById('tune-preview').style.backgroundColor = color.hex;
+            
+            const sInput = document.getElementById('tune-s');
+            const lInput = document.getElementById('tune-l');
+            
+            sInput.value = color.s;
+            lInput.value = color.l;
+            
+            updateTuneLabels(color.s, color.l);
+
+            // Add live listeners
+            sInput.oninput = () => updateTunePreview();
+            lInput.oninput = () => updateTunePreview();
+            document.getElementById('tune-hex-input').oninput = (e) => updateTuneFromHex(e.target.value);
+
+            document.getElementById('tune-modal').classList.remove('hidden');
+            setTimeout(() => {
+                document.getElementById('tune-content').classList.remove('scale-95');
+                document.getElementById('tune-content').classList.add('scale-100');
+            }, 10);
+        };
+
+        const updateTuneLabels = (s, l) => {
+            document.getElementById('tune-s-val').innerText = s + '%';
+            document.getElementById('tune-l-val').innerText = l + '%';
+        }
+
+        const updateTunePreview = () => {
+            const h = state.colors[state.editingIndex].h;
+            const s = parseInt(document.getElementById('tune-s').value);
+            const l = parseInt(document.getElementById('tune-l').value);
+            const hex = hslToHex(h, s, l);
+            
+            document.getElementById('tune-preview').style.backgroundColor = hex;
+            document.getElementById('tune-hex-display').innerText = hex;
+            document.getElementById('tune-hex-input').value = hex.replace('#','');
+            updateTuneLabels(s, l);
+        };
+
+        const updateTuneFromHex = (val) => {
+            if(val.length === 6) {
+                const hex = '#' + val;
+                const rgb = hexToRgb(hex);
+                if(rgb) {
+                    const hsl = hexToHsl(hex);
+                    // Update state-like logic only for preview
+                    document.getElementById('tune-preview').style.backgroundColor = hex;
+                    document.getElementById('tune-hex-display').innerText = hex;
+                    document.getElementById('tune-s').value = hsl.s;
+                    document.getElementById('tune-l').value = hsl.l;
+                    updateTuneLabels(hsl.s, hsl.l);
+                }
+            }
+        }
+
+        const applyTune = () => {
+            const hex = document.getElementById('tune-hex-display').innerText;
+            const h = state.colors[state.editingIndex].h; // Keep hue roughly? No, re-calc from hex for consistency
+            const finalHsl = hexToHsl(hex);
+            
+            saveStateForUndo();
+            state.colors[state.editingIndex] = finalHsl;
+            render();
+            closeTuneModal();
+        };
+
+        const closeTuneModal = () => {
+            const content = document.getElementById('tune-content');
+            content.classList.remove('scale-100');
+            content.classList.add('scale-95');
+            setTimeout(() => {
+                document.getElementById('tune-modal').classList.add('hidden');
+            }, 200);
+        };
+
+        // --- Contrast Matrix ---
+        
+        const showContrastModal = () => {
+            const modal = document.getElementById('contrast-modal');
+            const grid = document.getElementById('contrast-grid');
+            grid.innerHTML = '';
+            
+            // Header Row
+            const headerRow = document.createElement('div');
+            headerRow.className = `grid gap-2 items-center`;
+            headerRow.style.gridTemplateColumns = `40px repeat(${state.mode}, 1fr)`;
+            headerRow.innerHTML = `<div></div>` + state.colors.map((c, i) => 
+                `<div class="h-6 rounded bg-[${c.hex}]" style="background:${c.hex}"></div>`
+            ).join('');
+            grid.appendChild(headerRow);
+
+            // Matrix
+            state.colors.forEach((rowC, rowI) => {
+                const row = document.createElement('div');
+                row.className = `grid gap-2 items-center`;
+                row.style.gridTemplateColumns = `40px repeat(${state.mode}, 1fr)`;
+                
+                let cells = `<div class="h-6 w-6 rounded-full" style="background:${rowC.hex}"></div>`;
+                
+                state.colors.forEach((colC, colI) => {
+                    if (rowI === colI) {
+                         cells += `<div class="bg-gray-100 dark:bg-gray-800 rounded p-2 text-center text-xs text-gray-400">-</div>`;
+                    } else {
+                        const ratio = getContrastRatio(rowC.hex, colC.hex).toFixed(2);
+                        let badge = '';
+                        if(ratio >= 7) badge = '<span class="text-green-600 font-bold">AAA</span>';
+                        else if(ratio >= 4.5) badge = '<span class="text-green-500 font-bold">AA</span>';
+                        else badge = '<span class="text-red-400">Fail</span>';
+                        
+                        cells += `<div class="bg-gray-50 dark:bg-dark-bg rounded p-2 text-center text-xs border dark:border-dark-border">
+                            <div class="font-mono mb-1">${ratio}</div>
+                            ${badge}
+                        </div>`;
+                    }
+                });
+                row.innerHTML = cells;
+                grid.appendChild(row);
+            });
+
+            modal.classList.remove('hidden');
+            setTimeout(() => {
+                document.getElementById('contrast-content').classList.remove('scale-95');
+                document.getElementById('contrast-content').classList.add('scale-100');
+            }, 10);
+        };
+
+        const closeContrastModal = () => {
+             document.getElementById('contrast-modal').classList.add('hidden');
+        };
+
         // --- Interaction ---
         
         const setViewMode = (mode) => {
             state.viewMode = mode;
-            // UI Toggle
             document.querySelectorAll('[id^="view-"]').forEach(el => {
-                el.classList.remove('bg-white', 'text-gray-900', 'shadow-sm');
-                el.classList.add('text-gray-500');
+                el.classList.remove('bg-white', 'dark:bg-dark-surface', 'text-gray-900', 'dark:text-white', 'shadow-sm');
+                el.classList.add('text-gray-500', 'dark:text-gray-400');
             });
             const activeBtn = document.getElementById(`view-${mode}`);
-            activeBtn.classList.add('bg-white', 'text-gray-900', 'shadow-sm');
-            activeBtn.classList.remove('text-gray-500');
+            activeBtn.classList.add('bg-white', 'dark:bg-dark-surface', 'text-gray-900', 'dark:text-white', 'shadow-sm');
+            activeBtn.classList.remove('text-gray-500', 'dark:text-gray-400');
 
-            // Content Toggle
             document.getElementById('view-palette-content').classList.add('hidden');
             document.getElementById('view-gradient-content').classList.add('hidden');
             document.getElementById('view-mockup-content').classList.add('hidden');
-            
             document.getElementById(`view-${mode}-content`).classList.remove('hidden');
-            
             render();
         };
 
@@ -750,21 +1092,20 @@
         };
 
         const setModeUI = (mode) => {
-            // Reset all buttons
             for(let i=2; i<=5; i++) {
                 const btn = document.getElementById(`mode${i}`);
-                btn.className = "flex-1 py-1.5 text-xs font-semibold rounded-md text-gray-500 hover:text-gray-900";
+                btn.className = "flex-1 py-1.5 text-xs font-semibold rounded-md text-gray-500 dark:text-gray-400 hover:text-gray-900";
             }
             const active = document.getElementById(`mode${mode}`);
-            active.className = "flex-1 py-1.5 text-xs font-semibold rounded-md shadow-sm bg-white text-gray-900";
+            active.className = "flex-1 py-1.5 text-xs font-semibold rounded-md shadow-sm bg-white dark:bg-dark-surface text-gray-900 dark:text-white";
         };
 
         const setPreset = (name) => {
             state.preset = name;
             document.querySelectorAll('.preset-btn').forEach(btn => {
-                btn.classList.remove('ring-2', 'ring-indigo-500', 'bg-white');
+                btn.classList.remove('ring-2', 'ring-indigo-500', 'bg-white', 'dark:bg-dark-surface');
                 if(btn.innerText.toLowerCase().includes(name)) {
-                    btn.classList.add('ring-2', 'ring-indigo-500', 'bg-white');
+                    btn.classList.add('ring-2', 'ring-indigo-500', 'bg-white', 'dark:bg-dark-surface');
                 }
             });
             generatePalette();
@@ -786,6 +1127,29 @@
         const clearHistory = () => {
             state.history = [];
             renderHistory();
+        }
+        
+        const toggleGrain = () => {
+            state.grain = !state.grain;
+            const layer = document.getElementById('noise-layer');
+            const knob = document.getElementById('grain-knob');
+            const btn = document.getElementById('btn-grain');
+            
+            if(state.grain) {
+                layer.style.display = 'block';
+                knob.style.transform = 'translateX(20px)';
+                btn.classList.replace('bg-gray-200', 'bg-indigo-500');
+                btn.classList.replace('dark:bg-dark-border', 'bg-indigo-500');
+            } else {
+                layer.style.display = 'none';
+                knob.style.transform = 'translateX(0)';
+                btn.classList.replace('bg-indigo-500', 'bg-gray-200');
+                btn.classList.add('dark:bg-dark-border'); // Re-add default dark class logic if removed
+            }
+        };
+
+        const toggleDarkMode = () => {
+            document.body.classList.toggle('dark');
         }
 
         const updateSliderVisibility = () => {
@@ -833,38 +1197,55 @@
             closeCSSModal();
         };
 
-        // Adobe ASE Export Implementation
-        const downloadASE = () => {
-            // Simplified ASE structure
-            // 1. Signature "ASEF" (4 bytes)
-            // 2. Version 1.0 (4 bytes: 00 01 00 00)
-            // 3. Block Count (4 bytes)
-            // 4. Blocks...
+        const exportImage = () => {
+            // Populate hidden container
+            const area = document.getElementById('export-palette-area');
+            const codeArea = document.getElementById('export-codes');
+            area.innerHTML = '';
+            codeArea.innerHTML = '';
             
+            state.colors.forEach(c => {
+                const div = document.createElement('div');
+                div.style.backgroundColor = c.hex;
+                div.className = 'flex-1 h-full';
+                area.appendChild(div);
+                
+                const code = document.createElement('span');
+                code.innerText = c.hex;
+                codeArea.appendChild(code);
+            });
+            
+            const container = document.getElementById('export-container');
+            
+            html2canvas(container).then(canvas => {
+                const link = document.createElement('a');
+                link.download = 'chromazen-palette.png';
+                link.href = canvas.toDataURL();
+                link.click();
+            });
+        };
+
+        const downloadASE = () => {
             const colors = state.colors;
             const buffer = [];
             
-            // Helper to push bytes
             const push32 = (val) => { buffer.push((val >> 24) & 0xFF, (val >> 16) & 0xFF, (val >> 8) & 0xFF, val & 0xFF); };
             const push16 = (val) => { buffer.push((val >> 8) & 0xFF, val & 0xFF); };
             const pushString = (str) => {
-                push16(str.length + 1); // length including null terminator
+                push16(str.length + 1);
                 for(let i=0; i<str.length; i++) push16(str.charCodeAt(i));
-                push16(0); // null terminator
+                push16(0);
             };
             const pushFloat = (val) => {
-                // IEEE 754 Float32 (Big Endian)
                 const view = new DataView(new ArrayBuffer(4));
-                view.setFloat32(0, val, false); // false = Big Endian
+                view.setFloat32(0, val, false);
                 for(let i=0; i<4; i++) buffer.push(view.getUint8(i));
             };
 
-            // Header
             buffer.push(0x41, 0x53, 0x45, 0x46); // ASEF
             push32(0x00010000); // Ver 1.0
-            push32(colors.length); // Count
+            push32(colors.length); 
 
-            // Color Blocks
             colors.forEach((c, i) => {
                 const rgb = hexToRgb(c.hex);
                 const r = rgb.r / 255;
@@ -872,19 +1253,8 @@
                 const b = rgb.b / 255;
                 const name = `Color ${i+1}`;
                 
-                push16(0xC001); // Color Entry Type
+                push16(0xC001); // Color Entry
                 
-                // Calculate Block Length: 
-                // NameLen(2) + NameData(len*2) + Model(4) + R(4)+G(4)+B(4) + Type(2)
-                const nameLenBytes = (name.length + 1) * 2;
-                const blockLen = 2 + nameLenBytes + 4 + 4 + 4 + 4 + 2;
-                
-                push32(blockLen - 4); // ASE spec excludes length field itself? Usually yes.
-                // Wait, logic check: 
-                // Block format: Type(2) + Len(4) + Data...
-                // Actually easier way: Just build data then calc len.
-                
-                // Let's restart block push with simple array construction for data
                 const data = [];
                 const dPush16 = (v) => data.push((v>>8)&0xFF, v&0xFF);
                 const dPushString = (s) => {
@@ -903,7 +1273,7 @@
                 dPushFloat(r); dPushFloat(g); dPushFloat(b);
                 dPush16(2); // Type Global
 
-                push32(data.length); // Length of data
+                push32(data.length); 
                 buffer.push(...data);
             });
 
