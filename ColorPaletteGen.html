@@ -104,7 +104,7 @@
         .select-items {
             position: absolute; background-color: #fff; top: 110%; left: 0; right: 0; z-index: 99;
             border: 1px solid #e5e7eb; border-radius: 8px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
-            overflow: hidden; display: none;
+            overflow: hidden; /* Removed display: none; to let select-hide control it */
         }
         .dark .select-items { background-color: #1e1e1e; border-color: #333; }
         .select-items div {
@@ -231,7 +231,7 @@
                          onmouseleave="App.ui.resetInfo()">
                         <div class="select-selected" onclick="App.ui.toggleDropdown(event)">
                             <span id="selected-harmony">🎲 Random Shuffle</span>
-                            <i data-lucide="chevron-down" class="w-4 h-4"></i>
+                            <i data-lucide="chevron-down" class="w-4 h-4 transition-transform duration-200"></i>
                         </div>
                         <div class="select-items select-hide" id="harmony-items">
                             <!-- JS injected -->
@@ -512,7 +512,12 @@
                         if(['1','2','3','4','5'].includes(e.key)) App.logic.toggleLock(parseInt(e.key)-1);
                     };
                     window.onclick = (e) => {
-                        if (!e.target.closest('#harmony-dropdown')) document.getElementById('harmony-items').classList.add('select-hide');
+                        // Logic to close dropdown if clicked outside
+                        if (!e.target.closest('#harmony-dropdown')) {
+                            document.getElementById('harmony-items').classList.add('select-hide');
+                            const arrow = document.querySelector('.select-selected i');
+                            if(arrow) arrow.classList.remove('select-arrow-active');
+                        }
                         document.getElementById('export-menu').classList.add('hidden');
                     };
                     window.addEventListener('paste', (e) => {
@@ -612,9 +617,13 @@
                     else { App.state.preset = name; }
                     App.ui.renderPresets(); App.logic.generate(); 
                 },
+                // Fixed selectHarmony logic
                 selectHarmony: (val, text) => {
                     App.state.harmony = val;
                     document.getElementById('selected-harmony').innerText = text;
+                    App.logic.generate(); // Trigger generation
+                    document.getElementById('harmony-items').classList.add('select-hide'); // Close dropdown
+                    document.querySelector('.select-selected i').classList.remove('select-arrow-active'); // Reset arrow
                 },
                 getRandomColor: () => {
                     const p = App.logic.getPresetConstraints();
