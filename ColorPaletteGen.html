@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ChromaZen - Pro Color Tool v5.2</title>
+    <title>ChromaZen - Pro Color Tool v5.7 (Fixed)</title>
     
     <!-- Dependencies -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -36,7 +36,7 @@
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
         @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&display=swap');
-        @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&display=swap');
         
         body {
             font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
@@ -44,11 +44,7 @@
             color: #1D1D1F;
             transition: background-color 0.3s, color 0.3s;
         }
-
-        body.dark {
-            background-color: #121212;
-            color: #EDEDED;
-        }
+        body.dark { background-color: #121212; color: #EDEDED; }
 
         /* UI Elements */
         input[type=range] { -webkit-appearance: none; background: transparent; }
@@ -66,25 +62,27 @@
         .color-panel { transition: background-color 0.6s cubic-bezier(0.16, 1, 0.3, 1), width 0.3s ease; }
         .panel-locked { box-shadow: inset 0 0 0 4px rgba(0,0,0,0.1); }
         .dark .panel-locked { box-shadow: inset 0 0 0 4px rgba(255,255,255,0.15); }
+        .panel-dragging { opacity: 0.5; transform: scale(0.98); z-index: 50; }
+
+        /* Contrast Badge */
+        .contrast-badge {
+            position: absolute; right: -12px; top: 50%; transform: translateY(-50%); z-index: 10;
+            background: white; color: black; border: 1px solid #eee; padding: 2px 6px; border-radius: 999px;
+            font-size: 10px; font-weight: bold; opacity: 0; transition: opacity 0.2s; pointer-events: none;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .color-panel:hover + .color-panel .contrast-badge,
+        .color-panel:hover .contrast-badge { opacity: 1; }
+        .dark .contrast-badge { background: #333; color: white; border-color: #444; }
 
         #toast { backdrop-filter: blur(12px); background: rgba(0,0,0,0.85); color: white; box-shadow: 0 10px 30px rgba(0,0,0,0.2); }
         .dark #toast { background: rgba(255,255,255,0.9); color: black; }
         .modal-backdrop { backdrop-filter: blur(5px); background: rgba(0,0,0,0.4); }
         .dark .modal-backdrop { background: rgba(0,0,0,0.8); }
 
-        .mono-font { font-family: 'JetBrains Mono', monospace; }
-        .serif-font { font-family: 'Playfair Display', serif; }
         .scrollbar-thin::-webkit-scrollbar { width: 4px; }
         .scrollbar-thin::-webkit-scrollbar-thumb { background-color: #DDD; border-radius: 2px; }
         .dark .scrollbar-thin::-webkit-scrollbar-thumb { background-color: #333; }
-
-        .dot-pattern {
-            background-image: radial-gradient(#cbd5e1 1px, transparent 1px);
-            background-size: 20px 20px;
-        }
-        .dark .dot-pattern {
-            background-image: radial-gradient(#334155 1px, transparent 1px);
-        }
 
         @keyframes pop {
             0% { transform: scale(1); } 40% { transform: scale(0.95); } 70% { transform: scale(1.05); } 100% { transform: scale(1); }
@@ -94,9 +92,48 @@
         /* Sidebar Transition */
         aside { transition: width 0.3s ease, padding 0.3s ease, opacity 0.3s ease; }
         .sidebar-closed { width: 0; padding: 0; opacity: 0; overflow: hidden; }
+
+        /* Custom Dropdown */
+        .custom-select { position: relative; width: 100%; }
+        .select-selected {
+            background-color: transparent; color: inherit; padding: 10px 12px; border: 1px solid #e5e7eb;
+            border-radius: 8px; cursor: pointer; user-select: none; font-size: 0.75rem; font-weight: 500;
+            display: flex; justify-content: space-between; align-items: center; background-color: #f9fafb;
+        }
+        .dark .select-selected { background-color: #121212; border-color: #333; color: #e5e7eb; }
+        .select-items {
+            position: absolute; background-color: #fff; top: 110%; left: 0; right: 0; z-index: 99;
+            border: 1px solid #e5e7eb; border-radius: 8px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+            overflow: hidden; display: none;
+        }
+        .dark .select-items { background-color: #1e1e1e; border-color: #333; }
+        .select-items div {
+            color: #374151; padding: 8px 12px; cursor: pointer; user-select: none; font-size: 0.75rem;
+        }
+        .dark .select-items div { color: #e5e7eb; }
+        .select-items div:hover { background-color: #f3f4f6; }
+        .dark .select-items div:hover { background-color: #333; }
+        .select-hide { display: none; }
+        .select-arrow-active { transform: rotate(180deg); }
+
+        /* Accessibility Filters */
+        .filter-protanopia { filter: url(#protanopia); }
+        .filter-deuteranopia { filter: url(#deuteranopia); }
+        .filter-tritanopia { filter: url(#tritanopia); }
+        .filter-achromatopsia { filter: url(#achromatopsia); }
     </style>
 </head>
 <body class="h-screen w-full flex flex-col overflow-hidden select-none transition-colors duration-300">
+
+    <!-- SVG Filters for Color Blindness -->
+    <svg style="display: none">
+        <defs>
+            <filter id="protanopia"><feColorMatrix type="matrix" values="0.567, 0.433, 0, 0, 0 0.558, 0.442, 0, 0, 0 0, 0.242, 0.758, 0, 0 0, 0, 0, 1, 0"/></filter>
+            <filter id="deuteranopia"><feColorMatrix type="matrix" values="0.625, 0.375, 0, 0, 0 0.7, 0.3, 0, 0, 0 0, 0.3, 0.7, 0, 0 0, 0, 0, 1, 0"/></filter>
+            <filter id="tritanopia"><feColorMatrix type="matrix" values="0.95, 0.05, 0, 0, 0 0, 0.433, 0.567, 0, 0 0, 0.475, 0.525, 0, 0 0, 0, 0, 1, 0"/></filter>
+            <filter id="achromatopsia"><feColorMatrix type="matrix" values="0.299, 0.587, 0.114, 0, 0 0.299, 0.587, 0.114, 0, 0 0.299, 0.587, 0.114, 0, 0 0, 0, 0, 1, 0"/></filter>
+        </defs>
+    </svg>
 
     <!-- Header -->
     <header class="h-16 flex items-center justify-between px-4 md:px-6 bg-white dark:bg-dark-surface border-b border-gray-200 dark:border-dark-border z-20 shrink-0 transition-colors">
@@ -108,7 +145,7 @@
                 <div class="w-8 h-8 rounded-lg bg-gradient-to-tr from-indigo-500 to-purple-500 flex items-center justify-center text-white shadow-md">
                     <i data-lucide="palette" class="w-4 h-4"></i>
                 </div>
-                <h1 class="text-lg font-bold tracking-tight text-gray-900 dark:text-white leading-none hidden md:block">ChromaZen <span class="text-[10px] font-medium text-gray-400 dark:text-gray-500 ml-1">v5.2</span></h1>
+                <h1 class="text-lg font-bold tracking-tight text-gray-900 dark:text-white leading-none hidden md:block">ChromaZen <span class="text-[10px] font-medium text-gray-400 dark:text-gray-500 ml-1">v5.7</span></h1>
             </div>
         </div>
         
@@ -140,9 +177,15 @@
                 </div>
             </div>
 
+            <!-- Color Blindness Toggle -->
+            <button onclick="App.ui.toggleColorBlindness()" id="btn-blindness" class="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors relative" title="Color Blindness Simulator">
+                <i data-lucide="eye" class="w-5 h-5"></i>
+                <span id="blindness-indicator" class="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full hidden"></span>
+            </button>
+
             <!-- Sound Toggle -->
             <button onclick="App.ui.toggleSound()" id="btn-sound" class="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors" title="Toggle Sound">
-                <i data-lucide="volume-2" class="w-5 h-5"></i>
+                <i data-lucide="volume-x" class="w-5 h-5"></i>
             </button>
 
             <!-- Shortcuts -->
@@ -157,7 +200,7 @@
         </div>
     </header>
 
-    <main class="flex-1 flex flex-col md:flex-row relative overflow-hidden bg-gray-50 dark:bg-dark-bg transition-colors">
+    <main class="flex-1 flex flex-col md:flex-row relative overflow-hidden bg-gray-50 dark:bg-dark-bg transition-colors" id="app-main">
         
         <!-- Sidebar -->
         <aside id="sidebar" class="w-full md:w-80 bg-white dark:bg-dark-surface border-r border-gray-200 dark:border-dark-border p-5 flex flex-col gap-6 z-10 overflow-y-auto scrollbar-thin shrink-0">
@@ -180,17 +223,19 @@
 
             <!-- Controls -->
             <div class="space-y-4">
-                <div onmouseenter="App.ui.updateInfo(App.logic.getInfoText('harmony'))" onmouseleave="App.ui.resetInfo()">
+                <div>
                     <label class="text-[10px] font-bold text-gray-400 dark:text-dark-muted uppercase tracking-wider mb-2 block">Harmony Rule</label>
-                    <div class="relative">
-                        <select id="harmony-select" onchange="App.logic.generate()" class="w-full appearance-none bg-gray-50 dark:bg-dark-bg border border-gray-200 dark:border-dark-border text-gray-700 dark:text-gray-200 py-2.5 px-3 pr-8 rounded-lg text-xs font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                            <option value="random">🎲 Random Shuffle</option>
-                            <option value="analogous">🎨 Analogous</option>
-                            <option value="monochromatic">🌗 Monochromatic</option>
-                            <option value="complementary">☯️ Complementary</option>
-                            <option value="triadic">🔺 Triadic</option>
-                        </select>
-                        <i data-lucide="chevron-down" class="absolute right-3 top-3 w-4 h-4 text-gray-400 pointer-events-none"></i>
+                    <!-- Custom Select for Hover Tips -->
+                    <div class="custom-select" id="harmony-dropdown" 
+                         onmouseenter="App.ui.updateInfo(App.logic.getInfoText(App.state.harmony))" 
+                         onmouseleave="App.ui.resetInfo()">
+                        <div class="select-selected" onclick="App.ui.toggleDropdown(event)">
+                            <span id="selected-harmony">🎲 Random Shuffle</span>
+                            <i data-lucide="chevron-down" class="w-4 h-4"></i>
+                        </div>
+                        <div class="select-items select-hide" id="harmony-items">
+                            <!-- JS injected -->
+                        </div>
                     </div>
                 </div>
                 <div onmouseenter="App.ui.updateInfo(App.logic.getInfoText('spread'))" onmouseleave="App.ui.resetInfo()">
@@ -246,16 +291,21 @@
         <div id="main-display" class="flex-1 relative w-full h-full bg-white dark:bg-dark-bg overflow-y-auto overflow-x-hidden">
             <div id="view-palette-content" class="w-full h-full flex flex-col md:flex-row"></div>
             
-            <div id="view-gradient-content" class="hidden w-full h-full flex items-center justify-center p-10">
-                <div id="gradient-box" class="w-full max-w-4xl h-64 md:h-96 rounded-3xl shadow-2xl flex items-center justify-center text-white/90">
-                    <p class="font-mono text-xs md:text-sm bg-black/20 backdrop-blur-md px-4 py-2 rounded-lg cursor-pointer hover:bg-black/40 transition-colors" id="gradient-css" onclick="App.utils.copy(this.innerText)">Code</p>
+            <div id="view-gradient-content" class="hidden w-full h-full flex flex-col items-center justify-center p-10 gap-6">
+                <div id="gradient-box" class="w-full max-w-4xl h-64 md:h-96 rounded-3xl shadow-2xl transition-all duration-300"></div>
+                <!-- Gradient Angle Control -->
+                <div class="flex items-center gap-4 bg-white dark:bg-dark-surface p-4 rounded-xl shadow-sm border border-gray-100 dark:border-dark-border">
+                    <span class="text-xs font-bold uppercase text-gray-400">Angle</span>
+                    <input type="range" min="0" max="360" value="90" class="w-32" oninput="App.ui.updateGradientAngle(this.value)">
+                    <span class="text-xs font-mono w-8 text-right" id="grad-angle-val">90°</span>
                 </div>
+                <p class="font-mono text-xs md:text-sm bg-black/5 dark:bg-white/10 backdrop-blur-md px-4 py-2 rounded-lg cursor-pointer hover:bg-black/10 dark:hover:bg-white/20 transition-colors text-gray-600 dark:text-gray-300" id="gradient-css" onclick="App.utils.copy(this.innerText)">Code</p>
             </div>
 
             <!-- Sticky Remix Header for Mockup -->
             <div id="view-mockup-content" class="hidden w-full h-full relative">
                 <div class="sticky top-0 z-30 w-full flex justify-end p-4 pointer-events-none">
-                    <button id="btn-remix-mockup" onclick="App.logic.remix()" class="pointer-events-auto px-5 py-2.5 rounded-full shadow-lg font-bold flex items-center gap-2 transition-all hover:scale-105 active:scale-95 border-2">
+                    <button id="btn-remix-mockup" onclick="App.logic.remix()" class="pointer-events-auto px-5 py-2.5 rounded-full shadow-lg font-bold flex items-center gap-2 transition-all hover:scale-105 active:scale-95 border-2 bg-white/80 backdrop-blur-sm dark:bg-black/80">
                         <i data-lucide="refresh-cw" class="w-4 h-4"></i> Remix Colors
                     </button>
                 </div>
@@ -275,7 +325,7 @@
                             </div>
                             <div class="absolute right-0 top-0 w-full h-full md:w-1/2 opacity-30 pointer-events-none" id="mock-shapes"></div>
                         </div>
-                        <!-- Cards with more padding -->
+                        <!-- Cards -->
                         <div class="md:col-span-4 p-10 rounded-3xl flex flex-col justify-between transition-colors" id="mock-card-1">
                             <div class="w-12 h-12 rounded-full flex items-center justify-center bg-black/10 mb-6"><i data-lucide="zap" class="w-6 h-6"></i></div>
                             <div><h3 class="text-2xl font-bold mb-2">Fast</h3><p class="opacity-70 text-sm">Lightning quick color generation.</p></div>
@@ -306,7 +356,7 @@
                         <button onclick="App.ui.setFont('mono')" class="px-3 py-1.5 text-xs font-bold rounded-md hover:bg-gray-100 dark:hover:bg-dark-bg font-mono" id="font-mono">Mono</button>
                     </div>
                     
-                    <button id="btn-remix-typo" onclick="App.logic.remix()" class="pointer-events-auto px-5 py-2.5 rounded-full shadow-lg font-bold flex items-center gap-2 transition-all hover:scale-105 active:scale-95 border-2">
+                    <button id="btn-remix-typo" onclick="App.logic.remix()" class="pointer-events-auto px-5 py-2.5 rounded-full shadow-lg font-bold flex items-center gap-2 transition-all hover:scale-105 active:scale-95 border-2 bg-white/80 backdrop-blur-sm dark:bg-black/80">
                         <i data-lucide="refresh-cw" class="w-4 h-4"></i> Remix Colors
                     </button>
                 </div>
@@ -334,17 +384,45 @@
     </div>
 
     <script>
+        // Fixed NAMED_COLORS with correct object syntax
         const NAMED_COLORS = [
             {r:255,g:255,b:255,n:"White"},{r:0,g:0,b:0,n:"Black"},{r:255,g:0,b:0,n:"Red"},{r:0,g:255,b:0,n:"Lime"},{r:0,g:0,b:255,n:"Blue"},
             {r:255,g:255,b:0,n:"Yellow"},{r:0,g:255,b:255,n:"Cyan"},{r:255,g:0,b:255,n:"Magenta"},{r:192,g:192,b:192,n:"Silver"},{r:128,g:128,b:128,n:"Gray"},
             {r:128,g:0,b:0,n:"Maroon"},{r:128,g:128,b:0,n:"Olive"},{r:0,g:128,b:0,n:"Green"},{r:128,g:0,b:128,n:"Purple"},{r:0,g:128,b:128,n:"Teal"},
             {r:0,g:0,b:128,n:"Navy"},{r:255,g:165,b:0,n:"Orange"},{r:255,g:99,b:71,n:"Tomato"},{r:255,g:69,b:0,n:"Red Orange"},{r:255,g:215,b:0,n:"Gold"},
-            {r:184,g:134,b:11,n:"Dark Goldenrod"},{r:218,g:165,b:32,n:"Goldenrod"},{r:240,g:230,b:140,n:"Khaki"},{r:238,g:130,b:238,n:"Violet"},{r:75,g:0,b:130,n:"Indigo"},
-            {r:60,g:179,b:113,n:"Sea Green"},{r:32,g:178,b:170,n:"Light Sea Green"},{r:0,g:191,b:255,n:"Deep Sky Blue"},{r:70,g:130,b:180,n:"Steel Blue"},{r:135,g:206,b:235,n:"Sky Blue"},
-            {r:25,g:25,b:112,n:"Midnight Blue"},{r:220,g:20,b:60,n:"Crimson"},{r:255,g:20,b:147,n:"Deep Pink"},{r:255,g:182,b:193,n:"Light Pink"},{r:255,g:140,b:0,n:"Dark Orange"},
-            {r:255,g:127,b:80,n:"Coral"},{r:233,g:150,b:122,n:"Dark Salmon"},{r:245,g:222,b:179,n:"Wheat"},{r:210,g:105,b:30,n:"Chocolate"},{r:139,g:69,b:19,n:"Saddle Brown"},
-            {r:160,g:82,b:45,n:"Sienna"},{r:255,g:250,b:240,n:"Floral White"},{r:240,g:248,b:255,n:"Alice Blue"},{r:240,g:255,b:240,n:"Honeydew"},{r:255,g:250,b:205,n:"Lemon Chiffon"},
-            {r:47,g:79,b:79,n:"Dark Slate Gray"},{r:112,g:128,b:144,n:"Slate Gray"},{r:105,g:105,b:105,n:"Dim Gray"},{r:255,g:228,b:181,n:"Moccasin"},{r:255,g:228,b:196,n:"Bisque"}
+            {r:218,g:165,b:32,n:"Goldenrod"},{r:75,g:0,b:130,n:"Indigo"},{r:60,g:179,b:113,n:"Sea Green"},{r:32,g:178,b:170,n:"Light Sea Green"},{r:0,g:191,b:255,n:"Deep Sky Blue"},
+            {r:70,g:130,b:180,n:"Steel Blue"},{r:135,g:206,b:235,n:"Sky Blue"},{r:25,g:25,b:112,n:"Midnight Blue"},{r:220,g:20,b:60,n:"Crimson"},{r:255,g:20,b:147,n:"Deep Pink"},
+            {r:255,g:182,b:193,n:"Light Pink"},{r:255,g:140,b:0,n:"Dark Orange"},{r:255,g:127,b:80,n:"Coral"},{r:233,g:150,b:122,n:"Dark Salmon"},{r:245,g:222,b:179,n:"Wheat"},
+            {r:210,g:105,b:30,n:"Chocolate"},{r:139,g:69,b:19,n:"Saddle Brown"},{r:160,g:82,b:45,n:"Sienna"},{r:240,g:248,b:255,n:"Alice Blue"},{r:47,g:79,b:79,n:"Dark Slate Gray"},
+            {r:112,g:128,b:144,n:"Slate Gray"},{r:105,g:105,b:105,n:"Dim Gray"},{r:255,g:228,b:181,n:"Moccasin"},{r:255,g:228,b:196,n:"Bisque"},
+            {r:250,g:128,b:114,n:"Salmon"},{r:255,g:160,b:122,n:"Light Salmon"},{r:255,g:218,b:185,n:"Peach Puff"},{r:255,g:222,b:173,n:"Navajo White"},{r:255,g:228,b:225,n:"Misty Rose"},
+            {r:255,g:240,b:245,n:"Lavender Blush"},{r:255,g:250,b:250,n:"Snow"},{r:248,g:248,b:255,n:"Ghost White"},{r:245,g:245,b:245,n:"White Smoke"},{r:220,g:220,b:220,n:"Gainsboro"},
+            {r:211,g:211,b:211,n:"Light Gray"},{r:169,g:169,b:169,n:"Dark Gray"},{r:255,g:255,b:224,n:"Light Yellow"},{r:255,g:255,b:240,n:"Ivory"},{r:255,g:239,b:213,n:"Papaya Whip"},
+            {r:255,g:235,b:205,n:"Blanched Almond"},{r:188,g:143,b:143,n:"Rosy Brown"},{r:205,g:92,b:92,n:"Indian Red"},{r:165,g:42,b:42,n:"Brown"},{r:178,g:34,b:34,n:"Firebrick"},
+            {r:139,g:0,b:0,n:"Dark Red"},{r:154,g:205,b:50,n:"Yellow Green"},{r:85,g:107,b:47,n:"Dark Olive Green"},{r:107,g:142,b:35,n:"Olive Drab"},{r:124,g:252,b:0,n:"Lawn Green"},
+            {r:127,g:255,b:0,n:"Chartreuse"},{r:173,g:255,b:47,n:"Green Yellow"},{r:50,g:205,b:50,n:"Lime Green"},{r:144,g:238,b:144,n:"Light Green"},{r:152,g:251,b:152,n:"Pale Green"},
+            {r:0,g:250,b:154,n:"Medium Spring Green"},{r:0,g:255,b:127,n:"Spring Green"},{r:46,g:139,b:87,n:"Sea Green"},{r:34,g:139,b:34,n:"Forest Green"},{r:0,g:128,b:0,n:"Green"},
+            {r:0,g:100,b:0,n:"Dark Green"},{r:102,g:205,b:170,n:"Medium Aquamarine"},{r:0,g:255,b:255,n:"Aqua"},{r:224,g:255,b:255,n:"Light Cyan"},{r:175,g:238,b:238,n:"Pale Turquoise"},
+            {r:127,g:255,b:212,n:"Aquamarine"},{r:64,g:224,b:208,n:"Turquoise"},{r:72,g:209,b:204,n:"Medium Turquoise"},{r:0,g:206,b:209,n:"Dark Turquoise"},{r:95,g:158,b:160,n:"Cadet Blue"},
+            {r:176,g:196,b:222,n:"Light Steel Blue"},{r:173,g:216,b:230,n:"Light Blue"},{r:135,g:206,b:250,n:"Light Sky Blue"},{r:30,g:144,b:255,n:"Dodger Blue"},{r:100,g:149,b:237,n:"Cornflower Blue"},
+            {r:65,g:105,b:225,n:"Royal Blue"},{r:0,g:0,b:205,n:"Medium Blue"},{r:0,g:0,b:139,n:"Dark Blue"},{r:0,g:0,b:128,n:"Navy"},{r:138,g:43,b:226,n:"Blue Violet"},{r:72,g:61,b:139,n:"Dark Slate Blue"},
+            {r:106,g:90,b:205,n:"Slate Blue"},{r:123,g:104,b:238,n:"Medium Slate Blue"},{r:147,g:112,b:219,n:"Medium Purple"},{r:153,g:50,b:204,n:"Dark Orchid"},{r:148,g:0,b:211,n:"Dark Violet"},
+            {r:186,g:85,b:211,n:"Medium Orchid"},{r:216,g:191,b:216,n:"Thistle"},{r:221,g:160,b:221,n:"Plum"},{r:218,g:112,b:214,n:"Orchid"},{r:199,g:21,b:133,n:"Medium Violet Red"},
+            {r:219,g:112,b:147,n:"Pale Violet Red"},{r:255,g:105,b:180,n:"Hot Pink"},{r:54,g:69,b:79,n:"Charcoal"},{r:42,g:52,b:57,n:"Gunmetal"},{r:10,g:10,b:10,n:"Jet Black"},
+            {r:255,g:250,b:240,n:"Floral White"},{r:253,g:245,b:230,n:"Old Lace"},{r:250,g:240,b:230,n:"Linen"},{r:250,g:235,b:215,n:"Antique White"},{r:255,g:228,b:181,n:"Moccasin"},
+            {r:240,g:128,b:128,n:"Light Coral"},{r:233,g:150,b:122,n:"Dark Salmon"},{r:205,g:92,b:92,n:"Indian Red"},{r:220,g:20,b:60,n:"Crimson"},{r:176,g:224,b:230,n:"Powder Blue"},
+            {r:135,g:206,b:235,n:"Sky Blue"},{r:135,g:206,b:250,n:"Light Sky Blue"},{r:70,g:130,b:180,n:"Steel Blue"},{r:25,g:25,b:112,n:"Midnight Blue"},{r:128,g:0,b:0,n:"Maroon"},
+            {r:139,g:69,b:19,n:"Saddle Brown"},{r:160,g:82,b:45,n:"Sienna"},{r:210,g:105,b:30,n:"Chocolate"},{r:205,g:133,b:63,n:"Peru"},{r:244,g:164,b:96,n:"Sandy Brown"},
+            {r:222,g:184,b:135,n:"Burlywood"},{r:210,g:180,b:140,n:"Tan"},{r:188,g:143,b:143,n:"Rosy Brown"},{r:245,g:245,b:220,n:"Beige"},{r:255,g:240,b:245,n:"Lavender Blush"},
+            {r:255,g:228,b:225,n:"Misty Rose"},{r:255,g:245,b:238,n:"Seashell"},{r:255,g:250,b:250,n:"Snow"},{r:248,g:248,b:255,n:"Ghost White"},{r:240,g:248,b:255,n:"Alice Blue"},
+            {r:240,g:255,b:255,n:"Azure"},{r:245,g:255,b:250,n:"Mint Cream"},{r:255,g:255,b:240,n:"Ivory"},{r:250,g:235,b:215,n:"Antique White"},{r:250,g:240,b:230,n:"Linen"},
+            {r:253,g:245,b:230,n:"Old Lace"},{r:255,g:250,b:240,n:"Floral White"},{r:255,g:228,b:196,n:"Bisque"},{r:255,g:218,b:185,n:"Peach Puff"},{r:255,g:222,b:173,n:"Navajo White"},
+            {r:255,g:228,b:181,n:"Moccasin"},{r:255,g:248,b:220,n:"Cornsilk"},{r:255,g:250,b:205,n:"Lemon Chiffon"},{r:250,g:250,b:210,n:"Light Goldenrod Yellow"},{r:255,g:255,b:224,n:"Light Yellow"},
+            {r:255,g:255,b:0,n:"Yellow"},{r:128,g:128,b:0,n:"Olive"},{r:107,g:142,b:35,n:"Olive Drab"},{r:85,g:107,b:47,n:"Dark Olive Green"},{r:154,g:205,b:50,n:"Yellow Green"},
+            {r:127,g:255,b:0,n:"Chartreuse"},{r:124,g:252,b:0,n:"Lawn Green"},{r:0,g:255,b:0,n:"Lime"},{r:50,g:205,b:50,n:"Lime Green"},{r:0,g:255,b:127,n:"Spring Green"},
+            {r:0,g:250,b:154,n:"Medium Spring Green"},{r:64,g:224,b:208,n:"Turquoise"},{r:72,g:209,b:204,n:"Medium Turquoise"},{r:32,g:178,b:170,n:"Light Sea Green"},{r:0,g:139,b:139,n:"Dark Cyan"},
+            {r:0,g:128,b:128,n:"Teal"},{r:0,g:255,b:255,n:"Aqua"},{r:0,g:255,b:255,n:"Cyan"},{r:224,g:255,b:255,n:"Light Cyan"},{r:175,g:238,b:238,n:"Pale Turquoise"},
+            {r:127,g:255,b:212,n:"Aquamarine"},{r:240,g:255,b:255,n:"Azure"},{r:245,g:255,b:250,n:"Mint Cream"},{r:255,g:255,b:255,n:"White"}
         ];
 
         const App = {
@@ -352,7 +430,8 @@
                 mode: 3, colors: [], locked: [false,false,false,false,false], variability: 30, preset: 'none', harmony: 'random',
                 history: [], library: JSON.parse(localStorage.getItem('chromazen_library') || '[]'),
                 undoStack: [], redoStack: [], viewMode: 'palette', grain: false, darkMode: false, editingIndex: -1,
-                colorOffset: 0, typoFont: 'sans', sidebarOpen: true, activeTab: 'presets', soundEnabled: true
+                colorOffset: 0, typoFont: 'sans', sidebarOpen: true, activeTab: 'presets', soundEnabled: false, // Default Mute
+                gradientAngle: 90, blindnessMode: 0
             },
             utils: {
                 hslToHex: (h, s, l) => {
@@ -381,6 +460,11 @@
                         return a[0] * 0.2126 + a[1] * 0.7152 + a[2] * 0.0722;
                     };
                     const l1 = lum(hex1), l2 = lum(hex2); return (Math.max(l1, l2) + 0.05) / (Math.min(l1, l2) + 0.05);
+                },
+                getContrastBadge: (r) => {
+                    if(r >= 7) return `<span class="contrast-badge text-green-600 bg-green-50 border-green-200">AAA ${r.toFixed(1)}</span>`;
+                    if(r >= 4.5) return `<span class="contrast-badge text-blue-600 bg-blue-50 border-blue-200">AA ${r.toFixed(1)}</span>`;
+                    return `<span class="contrast-badge text-red-500 bg-red-50 border-red-200">Fail ${r.toFixed(1)}</span>`;
                 },
                 getTextColor: (bgColor) => { return App.utils.getContrast(bgColor, '#FFFFFF') > App.utils.getContrast(bgColor, '#000000') ? '#F8FAFC' : '#0F172A'; },
                 copy: (text) => { navigator.clipboard.writeText(text).then(() => App.ui.showToast(`${text} copied!`)); },
@@ -418,7 +502,7 @@
                     if (localStorage.getItem('chromazen_dark') === 'true' || (!('chromazen_dark' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
                         App.state.darkMode = true; document.body.classList.add('dark');
                     }
-                    App.ui.renderPresets(); App.ui.renderLibrary(); App.logic.setMode(3); App.logic.generate(false);
+                    App.ui.renderPresets(); App.ui.renderLibrary(); App.ui.initHarmonyDropdown(); App.logic.setMode(3); App.logic.generate(false);
                     document.body.onkeyup = (e) => {
                         if(document.activeElement.tagName === 'INPUT') return;
                         if(e.key === ' ' || e.code === 'Space') { e.preventDefault(); App.logic.generate(true, e); }
@@ -427,7 +511,10 @@
                         if(e.key === '?') App.ui.showShortcuts();
                         if(['1','2','3','4','5'].includes(e.key)) App.logic.toggleLock(parseInt(e.key)-1);
                     };
-                    window.onclick = () => document.getElementById('export-menu').classList.add('hidden');
+                    window.onclick = (e) => {
+                        if (!e.target.closest('#harmony-dropdown')) document.getElementById('harmony-items').classList.add('select-hide');
+                        document.getElementById('export-menu').classList.add('hidden');
+                    };
                     window.addEventListener('paste', (e) => {
                         if (e.clipboardData && e.clipboardData.items) {
                             for (let i = 0; i < e.clipboardData.items.length; i++) {
@@ -466,7 +553,7 @@
                     while(newColors.length < 5) newColors.push(null);
                     let base = (App.state.locked[0] && newColors[0]) ? newColors[0] : App.logic.getRandomColor();
                     
-                    if (!isSmart) newColors[0] = base; // Normal gen logic for base if not smart (smart handles logic below)
+                    if (!isSmart) newColors[0] = base; 
 
                     const spread = App.state.variability * 0.6; 
                     const rule = App.state.harmony;
@@ -477,14 +564,9 @@
                         let h, s, l;
                         
                         if (isSmart && newColors[i]) {
-                            // Smart Shuffle: Keep Tone (S, L), Change Hue
-                            h = Math.floor(Math.random() * 360);
-                            s = newColors[i].s;
-                            l = newColors[i].l;
+                            h = Math.floor(Math.random() * 360); s = newColors[i].s; l = newColors[i].l;
                         } else {
-                            // Standard Logic
                             if (i === 0) {
-                                // Base color re-gen if not locked
                                 let rc = App.logic.getRandomColor();
                                 h = rc.h; s = rc.s; l = rc.l;
                             } else {
@@ -492,15 +574,25 @@
                                 h = b.h; s = b.s; l = b.l;
                                 
                                 if (rule === 'analogous') h += spread * i;
-                                else if (rule === 'monochromatic') { l = (b.l + (spread * 0.8 * i)) % 95; if(l < 10) l += 20; } 
+                                else if (rule === 'monochromatic') {
+                                    let lStep = (90 - b.l) / (App.state.mode); 
+                                    if(b.l > 50) l = b.l - (i * 12); // Darken if light
+                                    else l = b.l + (i * 12); // Lighten if dark
+                                    l = Math.max(5, Math.min(95, l));
+                                    s = Math.max(0, s - (i*5));
+                                } 
                                 else if (rule === 'complementary') h += 180 + ((Math.random()-0.5)*spread);
                                 else if (rule === 'triadic') h += 120 * i + ((Math.random()-0.5)*spread/2);
                                 else { h += (spread + 10) * i; let rc = App.logic.getRandomColor(); s = rc.s; l = rc.l; }
                                 
-                                if(rule !== 'random' && rule !== 'monochromatic') {
+                                if(rule !== 'random') {
                                     const p = App.logic.getPresetConstraints();
-                                    s = Math.max(p.sMin, Math.min(p.sMax, s + (Math.random()-0.5)*20));
-                                    l = Math.max(p.lMin, Math.min(p.lMax, l + (Math.random()-0.5)*20));
+                                    if (rule === 'monochromatic') {
+                                        if(p.sMax > 0) s = Math.max(p.sMin, Math.min(p.sMax, s));
+                                    } else {
+                                        s = Math.max(p.sMin, Math.min(p.sMax, s + (Math.random()-0.5)*20));
+                                        l = Math.max(p.lMin, Math.min(p.lMax, l + (Math.random()-0.5)*20));
+                                    }
                                 }
                             }
                         }
@@ -515,18 +607,15 @@
                     App.state.colorOffset = (App.state.colorOffset + 1) % App.state.mode;
                     App.ui.render();
                 },
-                
                 togglePreset: (name) => {
-                    if (App.state.preset === name) {
-                        App.state.preset = 'none'; 
-                        App.ui.showToast('Preset cleared (Random mode)');
-                    } else {
-                        App.state.preset = name; 
-                    }
-                    App.ui.renderPresets(); 
-                    App.logic.generate(); 
+                    if (App.state.preset === name) { App.state.preset = 'none'; App.ui.showToast('Preset cleared'); } 
+                    else { App.state.preset = name; }
+                    App.ui.renderPresets(); App.logic.generate(); 
                 },
-
+                selectHarmony: (val, text) => {
+                    App.state.harmony = val;
+                    document.getElementById('selected-harmony').innerText = text;
+                },
                 getRandomColor: () => {
                     const p = App.logic.getPresetConstraints();
                     const h = p.hRange ? p.hRange[0] + Math.random()*(p.hRange[1]-p.hRange[0]) : Math.floor(Math.random()*360);
@@ -540,31 +629,24 @@
                         dark: { sMin: 20, sMax: 60, lMin: 10, lMax: 30 }, warm: { sMin: 50, sMax: 90, lMin: 40, lMax: 80, hRange: [0, 60] },
                         nature: { sMin: 20, sMax: 60, lMin: 30, lMax: 70, hRange: [70, 160] }, neon: { sMin: 90, sMax: 100, lMin: 50, lMax: 60 },
                         retro: { sMin: 30, sMax: 60, lMin: 50, lMax: 80, hRange: [20, 50] }, corporate: { sMin: 10, sMax: 40, lMin: 20, lMax: 50, hRange: [200, 240] },
-                        luxury: { sMin: 20, sMax: 60, lMin: 10, lMax: 40, hRange: [30, 60] }, wedding: { sMin: 5, sMax: 30, lMin: 85, lMax: 98 },
+                        luxury: { sMin: 20, sMax: 60, lMin: 10, lMax: 40, hRange: [30, 60] }, wedding: { sMin: 10, sMax: 40, lMin: 40, lMax: 98 }, 
+                        grayscale: { sMin: 0, sMax: 0, lMin: 10, lMax: 90 }, cyberpunk: { sMin: 80, sMax: 100, lMin: 40, lMax: 70 },
                         none: { sMin: 20, sMax: 95, lMin: 10, lMax: 90 }
                     };
                     return sets[App.state.preset] || sets.none;
                 },
-                
                 getInfoText: (key) => {
                     const map = {
-                        'vivid': '채도가 높고 에너지가 넘치는 강렬한 배색',
-                        'pastel': '부드럽고 편안한 느낌의 밝은 배색',
-                        'dark': '무게감 있고 세련된 다크 모드 스타일',
-                        'warm': '난색 계열의 따뜻하고 포근한 분위기',
-                        'nature': '자연에서 영감을 얻은 숲, 대지, 식물 색상',
-                        'neon': '사이버펑크 느낌의 고채도 형광 컬러',
-                        'retro': '빛 바랜 사진 같은 빈티지 감성',
-                        'corporate': '신뢰감을 주는 블루/그레이 비즈니스 톤',
-                        'luxury': '고급스러운 골드, 블랙, 딥 컬러 조합',
-                        'wedding': '로맨틱하고 순수한 화이트/핑크 무드',
-                        'spread': '색상 간의 거리(Spread)를 조절합니다.',
-                        'harmony': '유사색, 보색 등 색채 이론 규칙을 설정합니다.',
-                        'imagematch': '이미지를 업로드하거나 붙여넣어(Ctrl+V) 주요 색상을 추출합니다.'
+                        'vivid': 'High saturation, energetic', 'pastel': 'Soft, soothing light colors', 'dark': 'Sophisticated dark themes',
+                        'warm': 'Cozy reds, oranges, yellows', 'nature': 'Earth tones and greens', 'neon': 'Cyberpunk/Nightlife vibes',
+                        'retro': 'Vintage, muted nostalgia', 'corporate': 'Trustworthy blues and greys', 'luxury': 'Gold, black, deep tones',
+                        'wedding': 'Romantic whites with elegant deep tones', 'grayscale': 'Monochromatic ink/wireframe', 'cyberpunk': 'High contrast neon dark',
+                        'spread': 'Controls color distance', 'harmony': 'Color theory rules', 'imagematch': 'Extract from image (Ctrl+V)',
+                        'random': 'Completely random hues', 'analogous': 'Colors adjacent on the color wheel', 'monochromatic': 'Variations of a single hue',
+                        'complementary': 'Opposite colors on the wheel', 'triadic': 'Three colors equally spaced'
                     };
                     return map[key] || 'Hover over controls for details.';
                 },
-
                 toggleLock: (idx) => { if(idx >= App.state.mode) return; App.state.locked[idx] = !App.state.locked[idx]; App.ui.render(); },
                 saveState: () => {
                     const snap = JSON.stringify({ colors: App.state.colors, mode: App.state.mode, locked: App.state.locked });
@@ -642,12 +724,28 @@
                         App.state.history = []; 
                         App.ui.renderHistory();
                     } else {
-                        // If not on history tab, maybe reset app logic? 
-                        // The user button says "Reset App" in the design so maybe clear all state
-                        // But original request was 'clear history'. Let's stick to clear history but make sure UI updates.
                         App.state.history = [];
                         App.ui.showToast("History Cleared");
                     }
+                },
+                handleDragStart: (e, idx) => {
+                    e.dataTransfer.setData('text/plain', idx);
+                    e.dataTransfer.effectAllowed = 'move';
+                    e.target.classList.add('panel-dragging');
+                },
+                handleDrop: (e, toIndex) => {
+                    e.preventDefault();
+                    const fromIndex = parseInt(e.dataTransfer.getData('text/plain'));
+                    if (fromIndex === toIndex) return;
+                    App.logic.saveState();
+                    const cols = [...App.state.colors];
+                    const locks = [...App.state.locked];
+                    // Swap
+                    [cols[fromIndex], cols[toIndex]] = [cols[toIndex], cols[fromIndex]];
+                    [locks[fromIndex], locks[toIndex]] = [locks[toIndex], locks[fromIndex]];
+                    App.state.colors = cols;
+                    App.state.locked = locks;
+                    App.ui.render();
                 }
             },
             ui: {
@@ -660,17 +758,11 @@
                     document.getElementById(`view-${mode}`).classList.add('bg-white','dark:bg-dark-surface','text-gray-900','dark:text-white','shadow-sm');
                     document.getElementById(`view-${mode}`).classList.remove('text-gray-500','dark:text-gray-400');
                     
-                    // Toggle Views
                     const views = ['palette','gradient','mockup','typography'];
                     views.forEach(v => {
                         const el = document.getElementById(`view-${v}-content`);
-                        if(v === mode) {
-                            el.classList.remove('hidden');
-                        } else {
-                            el.classList.add('hidden');
-                        }
+                        if(v === mode) el.classList.remove('hidden'); else el.classList.add('hidden');
                     });
-
                     App.ui.render();
                 },
                 toggleSidebar: () => {
@@ -688,7 +780,22 @@
                     lucide.createIcons();
                     App.ui.showToast(App.state.soundEnabled ? 'Sound On' : 'Sound Off');
                 },
-                // Removed toggleHistory since it's now a tab
+                toggleColorBlindness: () => {
+                    const modes = ['normal', 'protanopia', 'deuteranopia', 'tritanopia', 'achromatopsia'];
+                    App.state.blindnessMode = (App.state.blindnessMode + 1) % modes.length;
+                    const mode = modes[App.state.blindnessMode];
+                    
+                    const main = document.getElementById('app-main');
+                    main.classList.remove('filter-protanopia', 'filter-deuteranopia', 'filter-tritanopia', 'filter-achromatopsia');
+                    if(mode !== 'normal') main.classList.add(`filter-${mode}`);
+                    
+                    const indicator = document.getElementById('blindness-indicator');
+                    if(mode !== 'normal') indicator.classList.remove('hidden');
+                    else indicator.classList.add('hidden');
+                    
+                    const labels = ['Normal View', 'Protanopia (Red-Blind)', 'Deuteranopia (Green-Blind)', 'Tritanopia (Blue-Blind)', 'Achromatopsia (Monochrome)'];
+                    App.ui.showToast(`Simulating: ${labels[App.state.blindnessMode]}`);
+                },
                 render: () => {
                     const mode = App.state.viewMode;
                     if(mode === 'palette') App.ui.renderPalette();
@@ -711,22 +818,39 @@
                     App.state.colors.forEach((c, i) => {
                         const txt = App.utils.getTextColor(c.hex); const isLocked = App.state.locked[i];
                         const name = App.utils.getColorName(c.hex);
+                        const nextColor = App.state.colors[i+1];
+                        const contrastBadge = nextColor ? App.utils.getContrastBadge(App.utils.getContrast(c.hex, nextColor.hex)) : '';
+
                         const div = document.createElement('div');
+                        div.draggable = true;
                         div.className = `color-panel flex-1 relative flex flex-col justify-center items-center group cursor-pointer p-4 ${isLocked?'panel-locked':''}`;
                         div.style.backgroundColor = c.hex; div.style.color = txt;
+                        
+                        div.ondragstart = (e) => App.logic.handleDragStart(e, i);
+                        div.ondragover = (e) => e.preventDefault();
+                        div.ondrop = (e) => App.logic.handleDrop(e, i);
+                        div.ondragend = (e) => e.target.classList.remove('panel-dragging');
+
                         div.innerHTML = `
                             <div class="absolute top-6 right-6"><button onclick="event.stopPropagation(); App.logic.toggleLock(${i})" class="p-2 rounded-full transition-all ${isLocked ? 'bg-black/20 text-white' : 'opacity-0 group-hover:opacity-100 hover:bg-black/10'}"><i data-lucide="${isLocked?'lock':'unlock'}" class="w-5 h-5"></i></button></div>
                             <h2 onclick="event.stopPropagation(); App.ui.openTuneModal(${i})" class="text-3xl font-black uppercase font-mono hover:opacity-70 transition-opacity" title="Edit">${c.hex}</h2>
-                            <p class="text-xs opacity-60 font-medium tracking-widest mt-1">${name}</p>
+                            <p class="text-xs opacity-60 font-medium tracking-widest mt-1 text-center">${name}</p>
                             <button onclick="event.stopPropagation(); App.utils.copy('${c.hex}')" class="absolute bottom-10 opacity-0 group-hover:opacity-100 transition-opacity px-4 py-2 rounded-full border border-current bg-white/10 backdrop-blur-sm text-xs font-bold flex items-center gap-2"><i data-lucide="copy" class="w-3 h-3"></i> COPY</button>
+                            ${contrastBadge}
                         `;
                         container.appendChild(div);
                     });
                 },
                 renderGradient: () => {
-                    const css = `linear-gradient(to right, ${App.state.colors.map(c=>c.hex).join(', ')})`;
+                    const angle = App.state.gradientAngle || 90;
+                    const css = `linear-gradient(${angle}deg, ${App.state.colors.map(c=>c.hex).join(', ')})`;
                     document.getElementById('gradient-box').style.background = css;
                     document.getElementById('gradient-css').innerText = css;
+                },
+                updateGradientAngle: (val) => {
+                    App.state.gradientAngle = val;
+                    document.getElementById('grad-angle-val').innerText = val + '°';
+                    App.ui.renderGradient();
                 },
                 renderMockup: () => {
                     const rawColors = App.state.colors;
@@ -737,16 +861,20 @@
                     const el = (id) => document.getElementById(id);
                     el('mock-container').style.backgroundColor = bg; el('mock-hero').style.backgroundColor = bg; el('mock-hero').style.color = txt;
                     el('mock-badge').style.backgroundColor = txt + '15'; el('mock-badge').style.color = txt;
-                    el('mock-title').style.color = txt; el('mock-subtitle').style.color = txt;
+                    el('mock-title').style.background = `linear-gradient(to right, ${txt}, ${acc})`;
+                    el('mock-title').style.webkitBackgroundClip = 'text';
+                    el('mock-title').style.webkitTextFillColor = 'transparent';
+                    el('mock-subtitle').style.color = txt;
                     el('mock-btn-primary').style.backgroundColor = acc; el('mock-btn-primary').style.color = accTxt;
                     el('mock-btn-secondary').style.borderColor = txt + '40'; el('mock-btn-secondary').style.color = txt;
-                    const s1 = c[2]?.hex || acc; const s2 = c[3]?.hex || bg; const s3 = c[4]?.hex || acc;
-                    el('mock-shapes').innerHTML = `<svg viewBox="0 0 200 200" fill="none"><circle cx="150" cy="50" r="40" fill="${s1}"/><rect x="120" y="100" width="60" height="60" rx="30" fill="${s3}"/><path d="M0 150 L50 200 L0 250 Z" fill="${s2}"/></svg>`;
-                    const cardBg = c[1]?.hex || bg; const cardTxt = App.utils.getTextColor(cardBg);
-                    el('mock-card-1').style.backgroundColor = cardBg; el('mock-card-1').style.color = cardTxt;
-                    const borderCol = c[2]?.hex || txt; el('mock-card-2').style.borderColor = borderCol; el('mock-card-2').style.color = txt;
-                    const darkCard = c[3]?.hex || '#000'; el('mock-card-3').style.backgroundColor = darkCard; el('mock-card-3').style.color = App.utils.getTextColor(darkCard);
-                    el('mock-footer').style.backgroundColor = bg; el('mock-footer').style.color = txt;
+                    const s1 = c[2]?.hex || acc; const s2 = c[3]?.hex || bg; 
+                    el('mock-shapes').innerHTML = `<svg viewBox="0 0 400 400" fill="none" style="transform: rotate(-15deg);"><circle cx="300" cy="100" r="80" fill="${s1}" fill-opacity="0.2" /><rect x="200" y="200" width="120" height="120" rx="20" fill="${s2}" fill-opacity="0.2" /></svg>`;
+                    const glassStyle = `background: ${txt}08; backdrop-filter: blur(12px); border: 1px solid ${txt}10; color: ${txt};`;
+                    el('mock-card-1').setAttribute('style', glassStyle);
+                    el('mock-card-2').setAttribute('style', glassStyle);
+                    el('mock-card-3').style.background = `linear-gradient(135deg, ${c[2]?.hex}, ${c[3]?.hex})`;
+                    el('mock-card-3').style.color = App.utils.getTextColor(c[2]?.hex);
+                    el('mock-footer').style.color = txt;
                 },
                 renderTypography: () => {
                     const rawColors = App.state.colors;
@@ -754,80 +882,60 @@
                     const c = rawColors.map((_, i) => rawColors[(i + offset) % rawColors.length]);
                     const container = document.getElementById('typo-inject-area');
                     const getColor = (i) => c[i % c.length].hex;
-                    const getTxt = (hex) => App.utils.getTextColor(hex);
-                    const sub1 = { text: c[0].hex, stroke: c[1] ? c[1].hex : '#000' };
-                    const sub2 = { text: getTxt(c[0].hex), bg: c[0].hex };
-                    const shadowCol = c[2] ? c[2].hex : '#000';
-
-                    const strokeBg = `linear-gradient(135deg, ${c[0].hex}, ${c[1]?c[1].hex:c[0].hex})`;
-                    const labelBg = c[2] ? c[2].hex : '#eee';
-                    
                     const fontClass = App.state.typoFont === 'serif' ? 'serif-font' : App.state.typoFont === 'mono' ? 'mono-font' : 'font-sans';
-                    container.className = fontClass; 
-
+                    container.className = fontClass + " bg-white dark:bg-dark-surface p-16 rounded-xl shadow-sm min-h-[800px]";
                     container.innerHTML = `
-                            <section class="bg-white dark:bg-dark-surface p-8 rounded-2xl shadow-sm border border-gray-100 dark:border-dark-border dot-pattern">
-                                <h3 class="text-xs font-bold text-gray-400 uppercase mb-6 bg-white/80 dark:bg-black/80 inline-block px-2 rounded">Subtitle & Legibility Showcase</h3>
-                                <div class="grid md:grid-cols-2 gap-8">
-                                    <div class="space-y-2">
-                                        <div class="h-32 rounded-xl flex items-center justify-center relative overflow-hidden transition-all duration-500 dot-pattern" style="background: ${strokeBg}">
-                                            <!-- Simple Dot Pattern Background for clarity -->
-                                            <h2 class="text-5xl font-black relative z-10" style="color: ${sub1.text}; -webkit-text-stroke: 2px ${sub1.stroke};">SUBTITLE</h2>
-                                        </div>
-                                        <p class="text-xs font-mono text-gray-500">Standard Stroke: Fill ${sub1.text} / Stroke ${sub1.stroke}</p>
-                                    </div>
-                                    <div class="space-y-2">
-                                        <div class="h-32 rounded-xl flex items-center justify-center relative overflow-hidden transition-all duration-500 dot-pattern" style="background: ${labelBg}">
-                                            <span class="text-2xl font-bold px-4 py-2 rounded relative z-10" style="background-color: ${sub2.bg}; color: ${sub2.text}; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
-                                                Background Label Style
-                                            </span>
-                                        </div>
-                                        <p class="text-xs font-mono text-gray-500">Label: Bg ${sub2.bg} / Text ${sub2.text}</p>
-                                    </div>
-                                    <div class="space-y-2">
-                                        <div class="h-32 rounded-xl flex items-center justify-center bg-white dark:bg-dark-bg border border-dashed border-gray-300 dark:border-gray-700 dot-pattern">
-                                            <h2 class="text-5xl font-black" style="color: ${getColor(1)}; text-shadow: 2px 2px 0px ${shadowCol};">POP ART</h2>
-                                        </div>
-                                        <p class="text-xs font-mono text-gray-500">Hard Shadow: Text ${getColor(1)} / Shadow ${shadowCol} (2px)</p>
-                                    </div>
-                                    <div class="space-y-2">
-                                        <div class="h-32 rounded-xl flex items-center justify-center bg-[#1a1a1a]">
-                                            <h2 class="text-5xl font-bold" style="color: #fff; text-shadow: 0 0 10px ${getColor(2)}, 0 0 20px ${getColor(2)};">NEON</h2>
-                                        </div>
-                                        <p class="text-xs font-mono text-gray-500">Soft Glow: White Text / Glow ${getColor(2)}</p>
-                                    </div>
+                        <article class="max-w-3xl mx-auto">
+                            <div class="flex items-center justify-between border-b-2 pb-8 mb-12" style="border-color:${getColor(0)}">
+                                <span class="text-sm font-bold tracking-[0.2em] uppercase" style="color:${getColor(2)}">Brand Guideline</span>
+                                <span class="text-sm font-mono opacity-60" style="color:${getColor(0)}">v1.0</span>
+                            </div>
+                            <h1 class="text-7xl font-black mb-8 leading-tight" style="color:${getColor(0)}">Visual<br>Harmony.</h1>
+                            <div class="grid md:grid-cols-12 gap-8 mb-16">
+                                <div class="md:col-span-8">
+                                    <p class="text-2xl font-medium leading-relaxed mb-6" style="color:${getColor(1)}">Color creates emotion. It is the silent ambassador of your brand.</p>
+                                    <p class="text-lg opacity-70 leading-relaxed" style="color:${getColor(0)}">A well-chosen palette not only looks good but also enhances usability and user experience.</p>
                                 </div>
-                            </section>
-                            
-                            <section>
-                                <h3 class="text-xs font-bold text-gray-400 uppercase mb-4 ml-1">Color Surfaces & Legibility</h3>
-                                <div class="grid grid-cols-1 md:grid-cols-${Math.min(c.length, 3)} gap-4">
-                                    ${c.map((color, i) => `<div class="p-6 rounded-xl h-40 flex flex-col justify-between transition-all hover:scale-[1.02]" style="background:${color.hex}; color:${getTxt(color.hex)}"><div class="flex justify-between items-start"><span class="text-xs font-bold opacity-60">Color ${i+1}</span><span class="text-xs font-mono opacity-60">${color.hex}</span></div><div><h4 class="text-2xl font-bold">Surface ${i+1}</h4><p class="text-sm opacity-80">Text contrast check.</p></div></div>`).join('')}
+                                <div class="md:col-span-4 p-6 rounded-lg" style="background:${getColor(3)}15">
+                                    <span class="block text-xs font-bold uppercase mb-2 opacity-50" style="color:${getColor(0)}">Accent</span>
+                                    <div class="h-2 w-12 mb-4" style="background:${getColor(3)}"></div>
+                                    <p class="text-sm font-mono" style="color:${getColor(0)}">${getColor(3)}</p>
                                 </div>
-                            </section>
-                            
-                            <section class="bg-white dark:bg-dark-surface p-8 rounded-2xl shadow-sm border border-gray-100 dark:border-dark-border">
-                                <h3 class="text-xs font-bold text-gray-400 uppercase mb-6">UI Components</h3>
-                                <div class="flex flex-wrap gap-4">
-                                    ${c.map((color, i) => `<button class="px-6 py-3 rounded-lg font-bold shadow-sm transition-transform active:scale-95" style="background:${color.hex}; color:${getTxt(color.hex)}">Button ${i+1}</button>`).join('')}
-                                    <div class="w-full h-px bg-gray-100 dark:bg-dark-border my-2"></div>
-                                    ${c.map((color, i) => `<button class="px-6 py-3 rounded-lg font-bold border-2" style="border-color:${color.hex}; color:${color.hex}">Ghost ${i+1}</button>`).join('')}
+                            </div>
+                            <div class="grid grid-cols-2 md:grid-cols-5 gap-0 mb-16 rounded-xl overflow-hidden shadow-lg">
+                                ${c.map(col => `<div class="h-32 flex items-end p-4" style="background:${col.hex}"><span class="text-xs font-mono bg-white/20 px-2 py-1 rounded backdrop-blur-sm" style="color:${App.utils.getTextColor(col.hex)}">${col.hex}</span></div>`).join('')}
+                            </div>
+                            <div class="p-10 rounded-xl mb-12" style="background:${getColor(4)}; color:${App.utils.getTextColor(getColor(4))}">
+                                <h3 class="text-2xl font-bold mb-4">"Design is intelligence made visible."</h3>
+                                <div class="flex gap-4 mt-6">
+                                    <button class="px-6 py-3 rounded-lg font-bold bg-black/20 hover:bg-black/30 transition-colors">Primary Action</button>
+                                    <button class="px-6 py-3 rounded-lg font-bold border-2 border-current opacity-70 hover:opacity-100 transition-opacity">Secondary</button>
                                 </div>
-                            </section>
-
-                            <!-- Headings & Hierarchy Moved to Bottom -->
-                            <section class="bg-white dark:bg-dark-surface p-8 rounded-2xl shadow-sm border border-gray-100 dark:border-dark-border">
-                                <h3 class="text-xs font-bold text-gray-400 uppercase mb-6">Headings & Hierarchy</h3>
-                                <div class="space-y-4">
-                                    <h1 class="text-5xl font-black" style="color:${getColor(0)}">Display Heading (Color 1)</h1>
-                                    <h2 class="text-3xl font-bold" style="color:${getColor(1)}">Section Title (Color 2)</h2>
-                                    <h3 class="text-xl font-medium" style="color:${getColor(2)}">Subheading (Color 3)</h3>
-                                    <p class="text-base leading-relaxed" style="color:${getTxt('#FFFFFF')}">
-                                        Standard body text on white. <span class="font-bold" style="color:${getColor(3)}">Bold Emphasis (Color 4)</span> and <a href="#" class="underline decoration-2" style="color:${getColor(4)}">Hyperlinks (Color 5)</a>.
-                                    </p>
-                                </div>
-                            </section>
+                            </div>
+                        </article>
                     `;
+                },
+                initHarmonyDropdown: () => {
+                    const dd = document.getElementById('harmony-items');
+                    const opts = [
+                        {v:'random', t:'🎲 Random Shuffle', i:'완전 무작위 배색'},
+                        {v:'analogous', t:'🎨 Analogous', i:'유사색: 인접한 색상들의 조화'},
+                        {v:'monochromatic', t:'🌗 Monochromatic', i:'단색: 명도 차이를 이용한 톤온톤'},
+                        {v:'complementary', t:'☯️ Complementary', i:'보색: 서로 반대되는 강렬한 대비'},
+                        {v:'triadic', t:'🔺 Triadic', i:'삼각조화: 균형 잡힌 3색 배합'}
+                    ];
+                    dd.innerHTML = opts.map(o => `
+                        <div onclick="App.logic.selectHarmony('${o.v}', '${o.t}')" 
+                             onmouseenter="App.ui.updateInfo('${o.i}')" 
+                             onmouseleave="App.ui.resetInfo()">
+                            ${o.t}
+                        </div>
+                    `).join('');
+                },
+                toggleDropdown: (e) => {
+                    e.stopPropagation();
+                    document.getElementById('harmony-items').classList.toggle('select-hide');
+                    document.querySelector('.select-selected i').classList.toggle('select-arrow-active');
                 },
                 renderHistory: () => {
                     const container = document.getElementById('history-container'); container.innerHTML = '';
@@ -847,12 +955,12 @@
                 },
                 renderPresets: () => {
                     const grid = document.getElementById('presets-grid');
-                    grid.innerHTML = ['vivid','pastel','dark','warm','nature','neon','retro','corporate','luxury','wedding'].map(p => {
+                    const presets = ['vivid','pastel','dark','warm','nature','neon','retro','corporate','luxury','wedding', 'grayscale', 'cyberpunk'];
+                    grid.innerHTML = presets.map(p => {
                         const isActive = App.state.preset === p;
                         const activeClass = isActive 
                             ? 'bg-gray-900 text-white dark:bg-gray-100 dark:text-black border-transparent shadow-md' 
                             : 'bg-gray-50 dark:bg-dark-bg border-gray-100 dark:border-dark-border text-gray-600 dark:text-gray-300 hover:border-gray-300';
-                        // Added onmouseenter/leave for info panel
                         return `
                         <button 
                             onmouseenter="App.ui.updateInfo(App.logic.getInfoText('${p}'))" 
@@ -976,6 +1084,22 @@
                         : '<i data-lucide="volume-x" class="w-5 h-5"></i>';
                     lucide.createIcons();
                     App.ui.showToast(App.state.soundEnabled ? 'Sound On' : 'Sound Off');
+                },
+                toggleColorBlindness: () => {
+                    const modes = ['normal', 'protanopia', 'deuteranopia', 'tritanopia', 'achromatopsia'];
+                    App.state.blindnessMode = (App.state.blindnessMode + 1) % modes.length;
+                    const mode = modes[App.state.blindnessMode];
+                    
+                    const main = document.getElementById('app-main');
+                    main.classList.remove('filter-protanopia', 'filter-deuteranopia', 'filter-tritanopia', 'filter-achromatopsia');
+                    if(mode !== 'normal') main.classList.add(`filter-${mode}`);
+                    
+                    const indicator = document.getElementById('blindness-indicator');
+                    if(mode !== 'normal') indicator.classList.remove('hidden');
+                    else indicator.classList.add('hidden');
+                    
+                    const labels = ['Normal View', 'Protanopia (Red-Blind)', 'Deuteranopia (Green-Blind)', 'Tritanopia (Blue-Blind)', 'Achromatopsia (Monochrome)'];
+                    App.ui.showToast(`Simulating: ${labels[App.state.blindnessMode]}`);
                 },
             },
             exports: {
