@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ChromaZen - Pro Color Tool v6.1 (Fixed)</title>
+    <title>ChromaZen - Pro Color Tool v6.3</title>
     
     <!-- Dependencies -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -90,8 +90,8 @@
         .btn-pop { animation: pop 0.3s ease-in-out; }
         
         /* Sidebar Transition */
-        aside { transition: width 0.3s ease, padding 0.3s ease, opacity 0.3s ease; }
-        .sidebar-closed { width: 0; padding: 0; opacity: 0; overflow: hidden; }
+        aside { transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1), padding 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease; }
+        .sidebar-closed { width: 0; padding: 0; opacity: 0; overflow: hidden; border-right: none; }
 
         /* Custom Dropdown */
         .custom-select { position: relative; width: 100%; }
@@ -115,33 +115,9 @@
         .dark .select-items div:hover { background-color: #333; }
         .select-hide { display: none; }
         .select-arrow-active { transform: rotate(180deg); }
-
-        /* Accessibility Filters */
-        .filter-protanopia { filter: url(#protanopia); }
-        .filter-deuteranopia { filter: url(#deuteranopia); }
-        .filter-tritanopia { filter: url(#tritanopia); }
-        .filter-achromatopsia { filter: url(#achromatopsia); }
-
-        .dot-pattern {
-            background-image: radial-gradient(#cbd5e1 1px, transparent 1px);
-            background-size: 20px 20px;
-        }
-        .dark .dot-pattern {
-            background-image: radial-gradient(#334155 1px, transparent 1px);
-        }
     </style>
 </head>
 <body class="h-screen w-full flex flex-col overflow-hidden select-none transition-colors duration-300">
-
-    <!-- SVG Filters -->
-    <svg style="display: none">
-        <defs>
-            <filter id="protanopia"><feColorMatrix type="matrix" values="0.567, 0.433, 0, 0, 0 0.558, 0.442, 0, 0, 0 0, 0.242, 0.758, 0, 0 0, 0, 0, 1, 0"/></filter>
-            <filter id="deuteranopia"><feColorMatrix type="matrix" values="0.625, 0.375, 0, 0, 0 0.7, 0.3, 0, 0, 0 0, 0.3, 0.7, 0, 0 0, 0, 0, 1, 0"/></filter>
-            <filter id="tritanopia"><feColorMatrix type="matrix" values="0.95, 0.05, 0, 0, 0 0, 0.433, 0.567, 0, 0 0, 0.475, 0.525, 0, 0 0, 0, 0, 1, 0"/></filter>
-            <filter id="achromatopsia"><feColorMatrix type="matrix" values="0.299, 0.587, 0.114, 0, 0 0.299, 0.587, 0.114, 0, 0 0.299, 0.587, 0.114, 0, 0 0, 0, 0, 1, 0"/></filter>
-        </defs>
-    </svg>
 
     <!-- Header -->
     <header class="h-16 flex items-center justify-between px-4 md:px-6 bg-white dark:bg-dark-surface border-b border-gray-200 dark:border-dark-border z-20 shrink-0 transition-colors">
@@ -149,11 +125,11 @@
             <button onclick="App.ui.toggleSidebar()" class="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-dark-bg text-gray-500 transition-colors" title="Toggle Sidebar (Zen Mode)">
                 <i data-lucide="menu" class="w-5 h-5"></i>
             </button>
-            <div class="flex items-center gap-2">
+            <div class="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity" onclick="window.location.reload()" title="Reload App">
                 <div class="w-8 h-8 rounded-lg bg-gradient-to-tr from-indigo-500 to-purple-500 flex items-center justify-center text-white shadow-md">
                     <i data-lucide="palette" class="w-4 h-4"></i>
                 </div>
-                <h1 class="text-lg font-bold tracking-tight text-gray-900 dark:text-white leading-none hidden md:block">ChromaZen <span class="text-[10px] font-medium text-gray-400 dark:text-gray-500 ml-1">v6.1</span></h1>
+                <h1 class="text-lg font-bold tracking-tight text-gray-900 dark:text-white leading-none hidden md:block">ChromaZen <span class="text-[10px] font-medium text-gray-400 dark:text-gray-500 ml-1">v6.3</span></h1>
             </div>
         </div>
         
@@ -225,7 +201,7 @@
                     <button data-mode="5" class="mode-btn flex-1 py-1.5 text-xs font-semibold rounded-md text-gray-500" onclick="App.logic.setMode(5)">5</button>
                 </div>
                 <button id="btn-generate" onclick="App.logic.generate(true, event)" 
-                    onmouseenter="App.ui.updateInfo('Tip: Shift + Click for Smart Shuffle (Keep Tone, Change Hue)')" 
+                    onmouseenter="App.ui.updateInfo('Tip: Shift + Click for Smart Shuffle (톤 유지, 색조 변경)')" 
                     onmouseleave="App.ui.resetInfo()"
                     class="w-full py-3.5 bg-black dark:bg-white dark:text-black text-white rounded-xl text-base font-bold shadow-lg hover:shadow-xl active:scale-95 transition-all flex items-center justify-center gap-2 group">
                     <i data-lucide="shuffle" class="w-4 h-4 group-hover:rotate-180 transition-transform duration-500"></i> Generate
@@ -422,7 +398,7 @@
                 history: [], library: JSON.parse(localStorage.getItem('chromazen_library') || '[]'),
                 undoStack: [], redoStack: [], viewMode: 'palette', grain: false, darkMode: false, editingIndex: -1,
                 colorOffset: 0, typoFont: 'sans', sidebarOpen: true, activeTab: 'presets', soundEnabled: false,
-                gradientAngle: 90, grayscaleMode: false
+                gradientAngle: 90, grayscaleMode: false, helpLang: 'ko', lastHelpTab: 'shortcuts'
             },
             utils: {
                 hslToHex: (h, s, l) => {
@@ -613,7 +589,7 @@
                     App.state.colors = newColors.slice(0, App.state.mode);
                     App.ui.render();
                     if(pushHistory) App.ui.addToHistory();
-                    if(isSmart) App.ui.showToast("Smart Shuffle: Tones kept, Hues changed");
+                    if(isSmart) App.ui.showToast("Smart Shuffle: 톤은 유지되고 색조만 변경됨");
                 },
                 remix: () => { App.state.colorOffset = (App.state.colorOffset + 1) % App.state.mode; App.ui.render(); },
                 togglePreset: (name) => {
@@ -649,15 +625,15 @@
                 },
                 getInfoText: (key) => {
                     const map = {
-                        'vivid': 'High saturation, energetic', 'pastel': 'Soft, soothing light colors', 'dark': 'Sophisticated dark themes',
-                        'warm': 'Cozy reds, oranges, yellows', 'nature': 'Earth tones and greens', 'neon': 'Cyberpunk/Nightlife vibes',
-                        'retro': 'Vintage, muted nostalgia', 'corporate': 'Trustworthy blues and greys', 'luxury': 'Gold, black, deep tones',
-                        'wedding': 'Romantic whites with elegant deep tones', 'grayscale': 'Monochromatic ink/wireframe', 'cyberpunk': 'High contrast neon dark',
-                        'spread': 'Controls color distance', 'harmony': 'Color theory rules', 'imagematch': 'Extract from image (Ctrl+V)',
-                        'random': 'Completely random hues', 'analogous': 'Colors adjacent on the color wheel', 'monochromatic': 'Variations of a single hue',
-                        'complementary': 'Opposite colors on the wheel', 'triadic': 'Three colors equally spaced'
+                        'vivid': '높은 채도의 에너지 넘치는 색상', 'pastel': '부드럽고 차분한 파스텔 톤', 'dark': '세련되고 무게감 있는 어두운 테마',
+                        'warm': '따뜻한 빨강, 주황, 노랑 계열', 'nature': '자연에서 영감을 받은 흙과 숲의 색', 'neon': '사이버펑크/나이트라이프 네온 스타일',
+                        'retro': '빛바랜 빈티지 감성', 'corporate': '신뢰감을 주는 블루/그레이 톤', 'luxury': '골드, 블랙, 깊이 있는 고급스러움',
+                        'wedding': '로맨틱한 화이트와 우아한 톤', 'grayscale': '무채색/와이어프레임 스타일', 'cyberpunk': '고대비 네온 다크 모드',
+                        'spread': '색상 간의 거리를 조절합니다', 'harmony': '색채 조화 규칙 선택', 'imagematch': '이미지 붙여넣기(Ctrl+V)로 색상 추출',
+                        'random': '완전 무작위 배색', 'analogous': '인접한 색상들의 조화 (유사색)', 'monochromatic': '한 가지 색상의 명도 변화 (단색)',
+                        'complementary': '강렬한 대비를 이루는 보색', 'triadic': '균형 잡힌 3색 조화'
                     };
-                    return map[key] || 'Hover over controls for details.';
+                    return map[key] || '컨트롤이나 프리셋 위에 마우스를 올려보세요.';
                 },
                 toggleLock: (idx) => { if(idx >= App.state.mode) return; App.state.locked[idx] = !App.state.locked[idx]; App.ui.render(); },
                 saveState: () => {
@@ -684,7 +660,7 @@
                     App.state.library.unshift({ colors: App.state.colors.map(c => c.hex), date: new Date().toLocaleDateString() });
                     localStorage.setItem('chromazen_library', JSON.stringify(App.state.library));
                     App.ui.switchSidebarTab('library'); App.ui.renderLibrary();
-                    App.ui.showToast('Palette saved to Library'); 
+                    App.ui.showToast('라이브러리에 저장되었습니다.'); 
                 },
                 deleteSaved: (idx) => {
                     App.state.library.splice(idx, 1); localStorage.setItem('chromazen_library', JSON.stringify(App.state.library)); App.ui.renderLibrary();
@@ -725,7 +701,7 @@
                             App.logic.saveState();
                             App.state.colors = finalColors;
                             while(App.state.colors.length < App.state.mode) App.state.colors.push(App.logic.getRandomColor());
-                            App.ui.render(); App.ui.addToHistory(); App.ui.showToast('Smart extracted distinct colors');
+                            App.ui.render(); App.ui.addToHistory(); App.ui.showToast('이미지에서 색상을 추출했습니다.');
                         };
                         img.src = e.target.result;
                     };
@@ -733,7 +709,7 @@
                 },
                 clearHistory: () => { 
                     if(App.state.activeTab === 'history') { App.state.history = []; App.ui.renderHistory(); } 
-                    else { App.state.history = []; App.ui.showToast("History Cleared"); }
+                    else { App.state.history = []; App.ui.showToast("히스토리가 삭제되었습니다."); }
                 },
                 handleDragStart: (e, idx) => {
                     e.dataTransfer.setData('text/plain', idx);
@@ -786,7 +762,7 @@
                     const btn = document.getElementById('btn-sound');
                     btn.innerHTML = App.state.soundEnabled ? '<i data-lucide="volume-2" class="w-5 h-5"></i>' : '<i data-lucide="volume-x" class="w-5 h-5"></i>';
                     lucide.createIcons();
-                    App.ui.showToast(App.state.soundEnabled ? 'Sound On' : 'Sound Off');
+                    App.ui.showToast(App.state.soundEnabled ? '사운드 켜짐' : '사운드 꺼짐');
                 },
                 toggleGrayscale: () => {
                     App.state.grayscaleMode = !App.state.grayscaleMode;
@@ -795,7 +771,7 @@
                     const btn = document.getElementById('btn-grayscale');
                     btn.innerHTML = App.state.grayscaleMode ? '<i data-lucide="eye-off" class="w-5 h-5 text-blue-500"></i>' : '<i data-lucide="eye" class="w-5 h-5"></i>';
                     lucide.createIcons();
-                    App.ui.showToast(App.state.grayscaleMode ? 'Grayscale On' : 'Grayscale Off');
+                    App.ui.showToast(App.state.grayscaleMode ? '흑백 모드 켜짐' : '흑백 모드 꺼짐');
                 },
                 render: () => {
                     const mode = App.state.viewMode;
@@ -930,7 +906,7 @@
                 },
                 renderHistory: () => {
                     const container = document.getElementById('history-container'); container.innerHTML = '';
-                    if(App.state.history.length === 0) { container.innerHTML = '<p class="text-xs text-gray-400 col-span-4 text-center mt-4">History is empty.</p>'; return; }
+                    if(App.state.history.length === 0) { container.innerHTML = '<p class="text-xs text-gray-400 col-span-4 text-center mt-4">히스토리가 비어있습니다.</p>'; return; }
                     App.state.history.forEach(palette => {
                         const div = document.createElement('div');
                         div.className = 'w-full aspect-square rounded-lg overflow-hidden cursor-pointer hover:ring-2 ring-indigo-500 transition-all flex flex-col border dark:border-gray-700';
@@ -964,7 +940,7 @@
                 },
                 renderLibrary: () => {
                     const container = document.getElementById('library-container');
-                    if(App.state.library.length === 0) { container.innerHTML = '<p class="text-xs text-gray-400 text-center mt-8">No saved palettes.</p>'; return; }
+                    if(App.state.library.length === 0) { container.innerHTML = '<p class="text-xs text-gray-400 text-center mt-8">저장된 팔레트가 없습니다.</p>'; return; }
                     container.innerHTML = App.state.library.map((item, idx) => `
                         <div class="bg-gray-50 dark:bg-dark-bg p-2 rounded-lg border border-gray-100 dark:border-dark-border flex items-center justify-between group">
                             <div class="flex-1 flex h-8 rounded overflow-hidden cursor-pointer mr-3" onclick="App.logic.loadSaved(${idx})">${item.colors.map(c => `<div style="background:${c}" class="flex-1 h-full"></div>`).join('')}</div>
@@ -1023,40 +999,81 @@
                 showModal: (html) => {
                     const container = document.getElementById('modal-container'); container.innerHTML = html; container.classList.remove('hidden'); requestAnimationFrame(() => container.classList.remove('opacity-0'));
                 },
-                showHelp: () => {
+                toggleHelpLang: () => {
+                    App.state.helpLang = App.state.helpLang === 'ko' ? 'en' : 'ko';
+                    App.ui.showHelp(App.state.lastHelpTab);
+                },
+                showHelp: (initialTab = 'shortcuts') => {
+                    App.state.lastHelpTab = initialTab;
+                    const isKo = App.state.helpLang === 'ko';
+                    
                     const content = `
-                        <div class="bg-white dark:bg-dark-surface rounded-2xl shadow-2xl w-full max-w-md p-6 transform scale-100 transition-transform overflow-hidden">
-                            <div class="flex border-b border-gray-100 dark:border-dark-border">
-                                <button class="flex-1 py-3 text-sm font-bold border-b-2 border-black dark:border-white" onclick="App.ui.switchHelpTab('shortcuts', this)">Shortcuts</button>
-                                <button class="flex-1 py-3 text-sm font-bold border-b-2 border-transparent text-gray-400" onclick="App.ui.switchHelpTab('features', this)">Features</button>
-                                <button class="flex-1 py-3 text-sm font-bold border-b-2 border-transparent text-gray-400" onclick="App.ui.switchHelpTab('tips', this)">Tips</button>
+                        <div class="bg-white dark:bg-dark-surface rounded-2xl shadow-2xl w-full max-w-md p-6 transform scale-100 transition-transform overflow-hidden relative">
+                            <button onclick="App.ui.toggleHelpLang()" class="absolute top-6 right-6 z-10 text-[10px] font-bold border border-gray-200 dark:border-gray-600 rounded px-2 py-1 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors uppercase tracking-widest text-gray-500 dark:text-gray-400">
+                                ${isKo ? 'EN' : 'KR'}
+                            </button>
+                            <div class="flex border-b border-gray-100 dark:border-dark-border pr-12">
+                                <button class="flex-1 py-3 text-sm font-bold border-b-2 ${initialTab==='shortcuts'?'border-black dark:border-white text-black dark:text-white':'border-transparent text-gray-400'}" onclick="App.ui.showHelp('shortcuts')">${isKo ? '단축키' : 'Shortcuts'}</button>
+                                <button class="flex-1 py-3 text-sm font-bold border-b-2 ${initialTab==='features'?'border-black dark:border-white text-black dark:text-white':'border-transparent text-gray-400'}" onclick="App.ui.showHelp('features')">${isKo ? '기능' : 'Features'}</button>
+                                <button class="flex-1 py-3 text-sm font-bold border-b-2 ${initialTab==='tips'?'border-black dark:border-white text-black dark:text-white':'border-transparent text-gray-400'}" onclick="App.ui.showHelp('tips')">${isKo ? '팁' : 'Tips'}</button>
                             </div>
-                            <div class="p-6 h-64 overflow-y-auto" id="help-content">
-                                <div class="space-y-3 text-sm text-gray-600 dark:text-gray-300">
-                                    <div class="flex justify-between"><span>Generate</span> <span class="font-mono bg-gray-100 dark:bg-dark-bg px-2 py-0.5 rounded">Space</span></div>
-                                    <div class="flex justify-between"><span>Smart Shuffle</span> <span class="font-mono bg-gray-100 dark:bg-dark-bg px-2 py-0.5 rounded">Shift + Click</span></div>
-                                    <div class="flex justify-between"><span>Undo</span> <span class="font-mono bg-gray-100 dark:bg-dark-bg px-2 py-0.5 rounded">Ctrl + Z</span></div>
-                                    <div class="flex justify-between"><span>Redo</span> <span class="font-mono bg-gray-100 dark:bg-dark-bg px-2 py-0.5 rounded">Ctrl + Y</span></div>
-                                    <div class="flex justify-between"><span>Lock 1-5</span> <span class="font-mono bg-gray-100 dark:bg-dark-bg px-2 py-0.5 rounded">1 ... 5</span></div>
-                                </div>
+                            <div class="p-6 h-80 overflow-y-auto scrollbar-thin" id="help-content">
+                                ${App.ui.getHelpContent(initialTab, isKo)}
                             </div>
                             <div class="p-4 border-t border-gray-100 dark:border-dark-border flex justify-end">
-                                <button onclick="App.ui.closeModal()" class="px-4 py-2 text-sm font-bold bg-black dark:bg-white text-white dark:text-black rounded-lg">Close</button>
+                                <button onclick="App.ui.closeModal()" class="px-4 py-2 text-sm font-bold bg-black dark:bg-white text-white dark:text-black rounded-lg">${isKo ? '닫기' : 'Close'}</button>
                             </div>
                         </div>
                     `;
                     App.ui.showModal(content);
                 },
-                switchHelpTab: (tab, btn) => {
-                    btn.parentElement.querySelectorAll('button').forEach(b => { b.className = 'flex-1 py-3 text-sm font-bold border-b-2 border-transparent text-gray-400'; });
-                    btn.className = 'flex-1 py-3 text-sm font-bold border-b-2 border-black dark:border-white text-black dark:text-white';
-                    const content = document.getElementById('help-content');
+                getHelpContent: (tab, isKo) => {
                     if(tab === 'shortcuts') {
-                        content.innerHTML = `<div class="space-y-3 text-sm text-gray-600 dark:text-gray-300"><div class="flex justify-between"><span>Generate</span> <span class="font-mono bg-gray-100 dark:bg-dark-bg px-2 py-0.5 rounded">Space</span></div><div class="flex justify-between"><span>Smart Shuffle</span> <span class="font-mono bg-gray-100 dark:bg-dark-bg px-2 py-0.5 rounded">Shift + Click</span></div><div class="flex justify-between"><span>Undo</span> <span class="font-mono bg-gray-100 dark:bg-dark-bg px-2 py-0.5 rounded">Ctrl + Z</span></div><div class="flex justify-between"><span>Redo</span> <span class="font-mono bg-gray-100 dark:bg-dark-bg px-2 py-0.5 rounded">Ctrl + Y</span></div><div class="flex justify-between"><span>Lock 1-5</span> <span class="font-mono bg-gray-100 dark:bg-dark-bg px-2 py-0.5 rounded">1 ... 5</span></div></div>`;
+                        return `
+                            <div class="space-y-3 text-sm text-gray-600 dark:text-gray-300">
+                                <div class="flex justify-between"><span>${isKo?'색상 생성':'Generate'}</span> <span class="font-mono bg-gray-100 dark:bg-dark-bg px-2 py-0.5 rounded">Space</span></div>
+                                <div class="flex justify-between"><span>${isKo?'스마트 셔플 (톤 유지)':'Smart Shuffle (Keep Tone)'}</span> <span class="font-mono bg-gray-100 dark:bg-dark-bg px-2 py-0.5 rounded">Shift + Click</span></div>
+                                <div class="flex justify-between"><span>${isKo?'실행 취소':'Undo'}</span> <span class="font-mono bg-gray-100 dark:bg-dark-bg px-2 py-0.5 rounded">Ctrl + Z</span></div>
+                                <div class="flex justify-between"><span>${isKo?'다시 실행':'Redo'}</span> <span class="font-mono bg-gray-100 dark:bg-dark-bg px-2 py-0.5 rounded">Ctrl + Y</span></div>
+                                <div class="flex justify-between"><span>${isKo?'색상 잠금':'Lock Color'}</span> <span class="font-mono bg-gray-100 dark:bg-dark-bg px-2 py-0.5 rounded">1 ... 5</span></div>
+                                <div class="flex justify-between"><span>${isKo?'단축키 도움말':'Help'}</span> <span class="font-mono bg-gray-100 dark:bg-dark-bg px-2 py-0.5 rounded">?</span></div>
+                            </div>`;
                     } else if(tab === 'features') {
-                        content.innerHTML = `<div class="space-y-4 text-sm text-gray-600 dark:text-gray-300"><div><h4 class="font-bold text-black dark:text-white mb-1">🖼️ Image Match</h4><p>Paste any image (Ctrl+V) or upload to extract its palette.</p></div><div><h4 class="font-bold text-black dark:text-white mb-1">⚡ Smart Shuffle</h4><p>Hold Shift while generating to keep the current tone but change hue.</p></div><div><h4 class="font-bold text-black dark:text-white mb-1">🔄 Remix</h4><p>In Mockup/Typo view, click 'Remix' to shuffle color positions.</p></div><div><h4 class="font-bold text-black dark:text-white mb-1">💾 Library</h4><p>Save your favorite palettes to local storage to use later.</p></div></div>`;
+                        return isKo ? `
+                            <div class="space-y-4 text-sm text-gray-600 dark:text-gray-300">
+                                <div><h4 class="font-bold text-black dark:text-white mb-1">🖼️ 이미지 매칭</h4><p>이미지를 붙여넣기(Ctrl+V)하거나 업로드하여 주요 색상을 자동으로 추출하세요.</p></div>
+                                <div><h4 class="font-bold text-black dark:text-white mb-1">⚡ 스마트 셔플</h4><p>Shift 키를 누른 채 Generate 버튼을 누르면, 현재 색상의 톤(명도/채도)은 유지한 채 색조만 변경합니다.</p></div>
+                                <div><h4 class="font-bold text-black dark:text-white mb-1">🔄 리믹스</h4><p>Mockup 또는 Typography 뷰에서 'Remix' 버튼을 눌러 현재 팔레트 내에서 색상 위치를 재배치해보세요.</p></div>
+                                <div><h4 class="font-bold text-black dark:text-white mb-1">💾 라이브러리</h4><p>마음에 드는 팔레트는 하트 아이콘을 눌러 로컬 저장소에 영구 보관할 수 있습니다.</p></div>
+                            </div>` : `
+                            <div class="space-y-4 text-sm text-gray-600 dark:text-gray-300">
+                                <div><h4 class="font-bold text-black dark:text-white mb-1">🖼️ Image Match</h4><p>Paste (Ctrl+V) or upload an image to extract its dominant colors automatically.</p></div>
+                                <div><h4 class="font-bold text-black dark:text-white mb-1">⚡ Smart Shuffle</h4><p>Hold Shift while clicking Generate to change hues while keeping the current tone (saturation/lightness).</p></div>
+                                <div><h4 class="font-bold text-black dark:text-white mb-1">🔄 Remix</h4><p>Click 'Remix' in Mockup or Typography view to shuffle color positions within your current palette.</p></div>
+                                <div><h4 class="font-bold text-black dark:text-white mb-1">💾 Library</h4><p>Save your favorite palettes to local storage by clicking the heart icon.</p></div>
+                            </div>`;
                     } else if(tab === 'tips') {
-                        content.innerHTML = `<div class="space-y-4 text-sm text-gray-600 dark:text-gray-300"><p>💡 <strong>60-30-10 Rule:</strong> Use 60% dominant color, 30% secondary, and 10% accent color for balance.</p><p>💡 <strong>Contrast:</strong> Check the WCAG badges between colors to ensure text readability.</p><p>💡 <strong>Monochromatic:</strong> Best for clean, professional corporate branding.</p></div>`;
+                        return isKo ? `
+                            <div class="space-y-4 text-sm text-gray-600 dark:text-gray-300">
+                                <p>💡 <strong>60-30-10 Rule:</strong> 주조색 60%, 보조색 30%, 강조색 10%의 비율로 균형을 맞추세요.</p>
+                                <p>💡 <strong>Contrast (대비):</strong> WCAG 배지를 확인하여 텍스트 가독성을 확보하세요.</p>
+                                <p>💡 <strong>Monochromatic (단색):</strong> 깔끔하고 전문적인 느낌을 주기에 가장 안전한 선택입니다.</p>
+                                <hr class="border-gray-100 dark:border-dark-border">
+                                <p>✨ <strong>Warm vs Cool:</strong> 난색(빨강, 노랑)은 활기차고, 한색(파랑, 초록)은 차분한 느낌을 줍니다.</p>
+                                <p>✨ <strong>Saturation (채도):</strong> 채도가 높은 색은 행동 유도(CTA) 버튼에, 낮은 색은 배경에 사용하세요.</p>
+                                <p>✨ <strong>Nature's Palette:</strong> 자연 사진에서 색을 추출하면 언제나 조화로운 배색이 나옵니다.</p>
+                                <p>✨ <strong>Dark Mode:</strong> 다크 모드에서는 완전한 검정(#000)보다 짙은 회색(#121212)이 눈이 편안합니다.</p>
+                            </div>` : `
+                            <div class="space-y-4 text-sm text-gray-600 dark:text-gray-300">
+                                <p>💡 <strong>60-30-10 Rule:</strong> Balance colors: 60% dominant, 30% secondary, and 10% accent.</p>
+                                <p>💡 <strong>Contrast:</strong> Check WCAG badges to ensure text readability and accessibility.</p>
+                                <p>💡 <strong>Monochromatic:</strong> Safest bet for a clean, professional, and consistent look.</p>
+                                <hr class="border-gray-100 dark:border-dark-border">
+                                <p>✨ <strong>Warm vs Cool:</strong> Warm colors (red, yellow) energize; cool colors (blue, green) calm.</p>
+                                <p>✨ <strong>Saturation:</strong> Use high saturation for CTAs and low saturation for backgrounds.</p>
+                                <p>✨ <strong>Nature's Palette:</strong> Extracting colors from nature photos always yields harmonious results.</p>
+                                <p>✨ <strong>Dark Mode:</strong> Use dark grey (#121212) instead of pure black (#000) to reduce eye strain.</p>
+                            </div>`;
                     }
                 },
                 closeModal: () => {
@@ -1089,7 +1106,7 @@
                         ? '<i data-lucide="volume-2" class="w-5 h-5"></i>' 
                         : '<i data-lucide="volume-x" class="w-5 h-5"></i>';
                     lucide.createIcons();
-                    App.ui.showToast(App.state.soundEnabled ? 'Sound On' : 'Sound Off');
+                    App.ui.showToast(App.state.soundEnabled ? '사운드 켜짐' : '사운드 꺼짐');
                 },
                 toggleGrayscale: () => {
                     App.state.grayscaleMode = !App.state.grayscaleMode;
@@ -1098,7 +1115,7 @@
                     const btn = document.getElementById('btn-grayscale');
                     btn.innerHTML = App.state.grayscaleMode ? '<i data-lucide="eye-off" class="w-5 h-5 text-blue-500"></i>' : '<i data-lucide="eye" class="w-5 h-5"></i>';
                     lucide.createIcons();
-                    App.ui.showToast(App.state.grayscaleMode ? 'Grayscale On' : 'Grayscale Off');
+                    App.ui.showToast(App.state.grayscaleMode ? '흑백 모드 켜짐' : '흑백 모드 꺼짐');
                 },
             },
             exports: {
