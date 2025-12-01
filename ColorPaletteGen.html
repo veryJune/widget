@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ChromaZen - Pro Color Tool v2.1</title>
+    <title>ChromaZen - Pro Color Tool v2.2</title>
     
     <!-- Dependencies -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -140,7 +140,7 @@
                 <div class="w-8 h-8 rounded-lg bg-gradient-to-tr from-indigo-500 to-purple-500 flex items-center justify-center text-white shadow-md">
                     <i data-lucide="palette" class="w-4 h-4"></i>
                 </div>
-                <h1 class="text-lg font-bold tracking-tight text-gray-900 dark:text-white leading-none hidden md:block">ChromaZen <span class="text-[10px] font-medium text-gray-400 dark:text-gray-500 ml-1">v2.1</span></h1>
+                <h1 class="text-lg font-bold tracking-tight text-gray-900 dark:text-white leading-none hidden md:block">ChromaZen <span class="text-[10px] font-medium text-gray-400 dark:text-gray-500 ml-1">v2.2</span></h1>
             </div>
         </div>
         
@@ -403,6 +403,19 @@
             {r:127,g:255,b:212,n:"Aquamarine"},{r:240,g:255,b:255,n:"Azure"},{r:245,g:255,b:250,n:"Mint Cream"},{r:255,g:255,b:255,n:"White"}
         ];
 
+        // Magic Numbers Refactored
+        const CONFIG = {
+            SPREAD_MULTIPLIER: 0.6,
+            BASE_OFFSET: 10,
+            MONO_L_STEP: 12, // Monochromatic lightness step
+            MONO_S_STEP: 5,  // Monochromatic saturation step
+            MONO_L_LIMIT_LOW: 5,
+            MONO_L_LIMIT_HIGH: 95,
+            COMPLEMENTARY_HUE_SHIFT: 180,
+            TRIADIC_HUE_SHIFT: 120,
+            RANDOM_NOISE: 20
+        };
+
         const App = {
             state: {
                 mode: 3, colors: [], locked: [false,false,false,false,false], variability: 30, preset: 'none', harmony: 'random',
@@ -478,6 +491,12 @@
                     const colors = App.state.colors.map(c => c.hex.replace('#', '')).join('-');
                     const url = window.location.href.split('#')[0] + '#' + colors;
                     navigator.clipboard.writeText(url).then(() => App.ui.showToast('URL copied to clipboard!'));
+                },
+                updateHash: () => {
+                    if(App.state.colors.length === 0) return;
+                    const hash = App.state.colors.map(c => c.hex.replace('#', '')).join('-');
+                    // Update URL without reloading or creating history spam (optional: use pushState for history support)
+                    window.history.replaceState(null, null, '#' + hash);
                 },
                 parseUrl: () => {
                     const hash = window.location.hash.substring(1);
@@ -555,7 +574,7 @@
                     
                     if (!isSmart) newColors[0] = base; 
 
-                    const spread = App.state.variability * 0.6; 
+                    const spread = App.state.variability * CONFIG.SPREAD_MULTIPLIER; 
                     const rule = App.state.harmony;
 
                     for(let i=0; i<App.state.mode; i++) {
@@ -576,21 +595,21 @@
                                 if (rule === 'analogous') h += spread * i;
                                 else if (rule === 'monochromatic') {
                                     let lStep = (90 - b.l) / (App.state.mode); 
-                                    if(b.l > 50) l = b.l - (i * 12); else l = b.l + (i * 12);
-                                    l = Math.max(5, Math.min(95, l));
-                                    s = Math.max(0, s - (i*5));
+                                    if(b.l > 50) l = b.l - (i * CONFIG.MONO_L_STEP); else l = b.l + (i * CONFIG.MONO_L_STEP);
+                                    l = Math.max(CONFIG.MONO_L_LIMIT_LOW, Math.min(CONFIG.MONO_L_LIMIT_HIGH, l));
+                                    s = Math.max(0, s - (i * CONFIG.MONO_S_STEP));
                                 } 
-                                else if (rule === 'complementary') h += 180 + ((Math.random()-0.5)*spread);
-                                else if (rule === 'triadic') h += 120 * i + ((Math.random()-0.5)*spread/2);
-                                else { h += (spread + 10) * i; let rc = App.logic.getRandomColor(); s = rc.s; l = rc.l; }
+                                else if (rule === 'complementary') h += CONFIG.COMPLEMENTARY_HUE_SHIFT + ((Math.random()-0.5)*spread);
+                                else if (rule === 'triadic') h += CONFIG.TRIADIC_HUE_SHIFT * i + ((Math.random()-0.5)*spread/2);
+                                else { h += (spread + CONFIG.BASE_OFFSET) * i; let rc = App.logic.getRandomColor(); s = rc.s; l = rc.l; }
                                 
                                 if(rule !== 'random') {
                                     const p = App.logic.getPresetConstraints();
                                     if (rule === 'monochromatic') {
                                         if(p.sMax > 0) s = Math.max(p.sMin, Math.min(p.sMax, s));
                                     } else {
-                                        s = Math.max(p.sMin, Math.min(p.sMax, s + (Math.random()-0.5)*20));
-                                        l = Math.max(p.lMin, Math.min(p.lMax, l + (Math.random()-0.5)*20));
+                                        s = Math.max(p.sMin, Math.min(p.sMax, s + (Math.random()-0.5)*CONFIG.RANDOM_NOISE));
+                                        l = Math.max(p.lMin, Math.min(p.lMax, l + (Math.random()-0.5)*CONFIG.RANDOM_NOISE));
                                     }
                                 }
                             }
@@ -794,6 +813,7 @@
                     if(mode === 'typography') App.ui.renderTypography();
                     App.ui.updateRemixButtons();
                     lucide.createIcons();
+                    App.utils.updateHash(); // URL 업데이트
                 },
                 updateRemixButtons: () => {
                     const c = App.state.colors; if(!c.length) return;
@@ -1067,25 +1087,59 @@
                             </div>`;
                     } else if(tab === 'tips') {
                         return isKo ? `
-                            <div class="space-y-4 text-sm text-gray-600 dark:text-gray-300">
-                                <p>💡 <strong>60-30-10 Rule:</strong> 주조색 60%, 보조색 30%, 강조색 10%의 비율로 균형을 맞추세요.</p>
-                                <p>💡 <strong>Contrast (대비):</strong> WCAG 배지를 확인하여 텍스트 가독성을 확보하세요.</p>
-                                <p>💡 <strong>Monochromatic (단색):</strong> 깔끔하고 전문적인 느낌을 주기에 가장 안전한 선택입니다.</p>
+                            <div class="space-y-5 text-sm text-gray-600 dark:text-gray-300">
+                                <div>
+                                    <h4 class="font-bold text-black dark:text-white mb-2 text-xs uppercase tracking-wider">기본 규칙 (Rules)</h4>
+                                    <p class="mb-1">💡 <strong>60-30-10 Rule:</strong> 주조색 60%(배경), 보조색 30%(콘텐츠), 강조색 10%(CTA 버튼)의 비율로 균형을 맞추세요.</p>
+                                    <p class="mb-1">💡 <strong>Monochromatic:</strong> 단색 배색은 실패 확률이 낮고, 깔끔하고 전문적인 느낌을 줍니다. 명도 차이만으로 계층을 만드세요.</p>
+                                </div>
                                 <hr class="border-gray-100 dark:border-dark-border">
-                                <p>✨ <strong>Warm vs Cool:</strong> 난색(빨강, 노랑)은 활기차고, 한색(파랑, 초록)은 차분한 느낌을 줍니다.</p>
-                                <p>✨ <strong>Saturation (채도):</strong> 채도가 높은 색은 행동 유도(CTA) 버튼에, 낮은 색은 배경에 사용하세요.</p>
-                                <p>✨ <strong>Nature's Palette:</strong> 자연 사진에서 색을 추출하면 언제나 조화로운 배색이 나옵니다.</p>
-                                <p>✨ <strong>Dark Mode:</strong> 다크 모드에서는 완전한 검정(#000)보다 짙은 회색(#121212)이 눈이 편안합니다.</p>
+                                <div>
+                                    <h4 class="font-bold text-black dark:text-white mb-2 text-xs uppercase tracking-wider">접근성 (Accessibility)</h4>
+                                    <p class="mb-1">✨ <strong>Contrast:</strong> 텍스트 가독성을 위해 배경과 글자의 명암비(Contrast Ratio)가 최소 4.5:1 이상인지 확인하세요. (WCAG AA 기준)</p>
+                                    <p class="mb-1">✨ <strong>Color Blindness:</strong> 'Grayscale' 버튼을 눌러 색상을 뺐을 때도 정보가 명확히 구분되는지 테스트해보세요.</p>
+                                </div>
+                                <hr class="border-gray-100 dark:border-dark-border">
+                                <div>
+                                    <h4 class="font-bold text-black dark:text-white mb-2 text-xs uppercase tracking-wider">색채 심리 (Psychology)</h4>
+                                    <p class="mb-1">🎨 <strong>Warm vs Cool:</strong> 빨강/노랑(난색)은 에너지와 긴박함을, 파랑/초록(한색)은 신뢰와 차분함을 줍니다.</p>
+                                    <p class="mb-1">🎨 <strong>Blue:</strong> 전 세계적으로 가장 선호도가 높으며, 금융/기술 기업에서 신뢰의 상징으로 자주 쓰입니다.</p>
+                                    <p class="mb-1">🎨 <strong>Green:</strong> 성장, 건강, 금전을 상징하며 눈이 가장 편안한 색상입니다.</p>
+                                </div>
+                                <hr class="border-gray-100 dark:border-dark-border">
+                                <div>
+                                    <h4 class="font-bold text-black dark:text-white mb-2 text-xs uppercase tracking-wider">UI 디자인 팁</h4>
+                                    <p class="mb-1">🖌️ <strong>Dark Mode:</strong> 완전한 검정(#000000)보다는 짙은 회색(#121212)을 배경으로 사용해야 눈의 피로(Smearing 현상)를 줄일 수 있습니다.</p>
+                                    <p class="mb-1">🖌️ <strong>Saturation:</strong> 채도가 높은 색은 '행동 유도 버튼(CTA)'에만 제한적으로 사용하고, 넓은 면적에는 채도를 낮춘 색을 쓰세요.</p>
+                                    <p class="mb-1">🖌️ <strong>Nature's Palette:</strong> 자연 사진에서 색을 추출하면 인공적이지 않고 눈에 자연스러운 조화로운 배색을 얻을 수 있습니다.</p>
+                                </div>
                             </div>` : `
-                            <div class="space-y-4 text-sm text-gray-600 dark:text-gray-300">
-                                <p>💡 <strong>60-30-10 Rule:</strong> Balance colors: 60% dominant, 30% secondary, and 10% accent.</p>
-                                <p>💡 <strong>Contrast:</strong> Check WCAG badges to ensure text readability and accessibility.</p>
-                                <p>💡 <strong>Monochromatic:</strong> Safest bet for a clean, professional, and consistent look.</p>
+                            <div class="space-y-5 text-sm text-gray-600 dark:text-gray-300">
+                                <div>
+                                    <h4 class="font-bold text-black dark:text-white mb-2 text-xs uppercase tracking-wider">Core Rules</h4>
+                                    <p class="mb-1">💡 <strong>60-30-10 Rule:</strong> Use 60% dominant color (bg), 30% secondary (content), and 10% accent (buttons) for balance.</p>
+                                    <p class="mb-1">💡 <strong>Monochromatic:</strong> Safest bet for a clean look. Use variations in lightness of a single hue.</p>
+                                </div>
                                 <hr class="border-gray-100 dark:border-dark-border">
-                                <p>✨ <strong>Warm vs Cool:</strong> Warm colors (red, yellow) energize; cool colors (blue, green) calm.</p>
-                                <p>✨ <strong>Saturation:</strong> Use high saturation for CTAs and low saturation for backgrounds.</p>
-                                <p>✨ <strong>Nature's Palette:</strong> Extracting colors from nature photos always yields harmonious results.</p>
-                                <p>✨ <strong>Dark Mode:</strong> Use dark grey (#121212) instead of pure black (#000) to reduce eye strain.</p>
+                                <div>
+                                    <h4 class="font-bold text-black dark:text-white mb-2 text-xs uppercase tracking-wider">Accessibility</h4>
+                                    <p class="mb-1">✨ <strong>Contrast:</strong> Ensure a contrast ratio of at least 4.5:1 for text readability (WCAG AA standard).</p>
+                                    <p class="mb-1">✨ <strong>Testing:</strong> Use the 'Grayscale' toggle to check if your design works without color cues.</p>
+                                </div>
+                                <hr class="border-gray-100 dark:border-dark-border">
+                                <div>
+                                    <h4 class="font-bold text-black dark:text-white mb-2 text-xs uppercase tracking-wider">Psychology</h4>
+                                    <p class="mb-1">🎨 <strong>Warm vs Cool:</strong> Warm colors (red, yellow) excite; Cool colors (blue, green) calm.</p>
+                                    <p class="mb-1">🎨 <strong>Blue:</strong> Represents trust and stability, widely used in finance and tech.</p>
+                                    <p class="mb-1">🎨 <strong>Green:</strong> Symbolizes growth and health, and is the easiest color on the eyes.</p>
+                                </div>
+                                <hr class="border-gray-100 dark:border-dark-border">
+                                <div>
+                                    <h4 class="font-bold text-black dark:text-white mb-2 text-xs uppercase tracking-wider">UI Tips</h4>
+                                    <p class="mb-1">🖌️ <strong>Dark Mode:</strong> Use dark grey (#121212) instead of pure black (#000) to prevent OLED smearing and eye strain.</p>
+                                    <p class="mb-1">🖌️ <strong>Saturation:</strong> Reserve high saturation for CTAs. Use desaturated colors for backgrounds to reduce visual noise.</p>
+                                    <p class="mb-1">🖌️ <strong>Nature:</strong> Extract palettes from nature photos for naturally harmonious results.</p>
+                                </div>
                             </div>`;
                     }
                 },
