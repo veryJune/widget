@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ChromaZen - Pro Color Tool v6.3</title>
+    <title>ChromaZen - Pro Color Tool v2.1</title>
     
     <!-- Dependencies -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -89,9 +89,20 @@
         }
         .btn-pop { animation: pop 0.3s ease-in-out; }
         
-        /* Sidebar Transition */
-        aside { transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1), padding 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease; }
-        .sidebar-closed { width: 0; padding: 0; opacity: 0; overflow: hidden; border-right: none; }
+        /* Sidebar Transition - Fixed for Fullscreen Toggle */
+        aside { 
+            transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1), padding 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease; 
+            will-change: width, padding;
+        }
+        .sidebar-closed { 
+            width: 0 !important; 
+            padding: 0 !important; 
+            opacity: 0 !important; 
+            overflow: hidden !important; 
+            border-right: none !important; 
+            border: none !important;
+            margin: 0 !important;
+        }
 
         /* Custom Dropdown */
         .custom-select { position: relative; width: 100%; }
@@ -129,7 +140,7 @@
                 <div class="w-8 h-8 rounded-lg bg-gradient-to-tr from-indigo-500 to-purple-500 flex items-center justify-center text-white shadow-md">
                     <i data-lucide="palette" class="w-4 h-4"></i>
                 </div>
-                <h1 class="text-lg font-bold tracking-tight text-gray-900 dark:text-white leading-none hidden md:block">ChromaZen <span class="text-[10px] font-medium text-gray-400 dark:text-gray-500 ml-1">v6.3</span></h1>
+                <h1 class="text-lg font-bold tracking-tight text-gray-900 dark:text-white leading-none hidden md:block">ChromaZen <span class="text-[10px] font-medium text-gray-400 dark:text-gray-500 ml-1">v2.1</span></h1>
             </div>
         </div>
         
@@ -760,7 +771,9 @@
                 toggleSound: () => {
                     App.state.soundEnabled = !App.state.soundEnabled;
                     const btn = document.getElementById('btn-sound');
-                    btn.innerHTML = App.state.soundEnabled ? '<i data-lucide="volume-2" class="w-5 h-5"></i>' : '<i data-lucide="volume-x" class="w-5 h-5"></i>';
+                    btn.innerHTML = App.state.soundEnabled 
+                        ? '<i data-lucide="volume-2" class="w-5 h-5"></i>' 
+                        : '<i data-lucide="volume-x" class="w-5 h-5"></i>';
                     lucide.createIcons();
                     App.ui.showToast(App.state.soundEnabled ? '사운드 켜짐' : '사운드 꺼짐');
                 },
