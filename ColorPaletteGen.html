@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ChromaZen - Pro Color Tool v5.7 (Fixed)</title>
+    <title>ChromaZen - Pro Color Tool v6.1 (Fixed)</title>
     
     <!-- Dependencies -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -104,7 +104,7 @@
         .select-items {
             position: absolute; background-color: #fff; top: 110%; left: 0; right: 0; z-index: 99;
             border: 1px solid #e5e7eb; border-radius: 8px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
-            overflow: hidden; /* Removed display: none; to let select-hide control it */
+            overflow: hidden; display: none;
         }
         .dark .select-items { background-color: #1e1e1e; border-color: #333; }
         .select-items div {
@@ -121,11 +121,19 @@
         .filter-deuteranopia { filter: url(#deuteranopia); }
         .filter-tritanopia { filter: url(#tritanopia); }
         .filter-achromatopsia { filter: url(#achromatopsia); }
+
+        .dot-pattern {
+            background-image: radial-gradient(#cbd5e1 1px, transparent 1px);
+            background-size: 20px 20px;
+        }
+        .dark .dot-pattern {
+            background-image: radial-gradient(#334155 1px, transparent 1px);
+        }
     </style>
 </head>
 <body class="h-screen w-full flex flex-col overflow-hidden select-none transition-colors duration-300">
 
-    <!-- SVG Filters for Color Blindness -->
+    <!-- SVG Filters -->
     <svg style="display: none">
         <defs>
             <filter id="protanopia"><feColorMatrix type="matrix" values="0.567, 0.433, 0, 0, 0 0.558, 0.442, 0, 0, 0 0, 0.242, 0.758, 0, 0 0, 0, 0, 1, 0"/></filter>
@@ -145,7 +153,7 @@
                 <div class="w-8 h-8 rounded-lg bg-gradient-to-tr from-indigo-500 to-purple-500 flex items-center justify-center text-white shadow-md">
                     <i data-lucide="palette" class="w-4 h-4"></i>
                 </div>
-                <h1 class="text-lg font-bold tracking-tight text-gray-900 dark:text-white leading-none hidden md:block">ChromaZen <span class="text-[10px] font-medium text-gray-400 dark:text-gray-500 ml-1">v5.7</span></h1>
+                <h1 class="text-lg font-bold tracking-tight text-gray-900 dark:text-white leading-none hidden md:block">ChromaZen <span class="text-[10px] font-medium text-gray-400 dark:text-gray-500 ml-1">v6.1</span></h1>
             </div>
         </div>
         
@@ -163,6 +171,10 @@
             <button onclick="App.logic.savePalette()" class="p-2 rounded-lg border border-gray-200 dark:border-dark-border text-gray-500 hover:text-red-500 hover:bg-red-50 dark:hover:bg-dark-bg transition-colors" title="Save to Library">
                 <i data-lucide="heart" class="w-4 h-4"></i>
             </button>
+            
+            <button onclick="App.utils.shareUrl()" class="p-2 rounded-lg border border-gray-200 dark:border-dark-border text-gray-500 hover:text-indigo-500 hover:bg-indigo-50 dark:hover:bg-dark-bg transition-colors" title="Share URL">
+                <i data-lucide="link" class="w-4 h-4"></i>
+            </button>
 
             <!-- Export -->
             <div class="relative z-50">
@@ -177,10 +189,9 @@
                 </div>
             </div>
 
-            <!-- Color Blindness Toggle -->
-            <button onclick="App.ui.toggleColorBlindness()" id="btn-blindness" class="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors relative" title="Color Blindness Simulator">
+            <!-- Grayscale Toggle -->
+            <button onclick="App.ui.toggleGrayscale()" id="btn-grayscale" class="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors relative" title="Toggle Grayscale">
                 <i data-lucide="eye" class="w-5 h-5"></i>
-                <span id="blindness-indicator" class="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full hidden"></span>
             </button>
 
             <!-- Sound Toggle -->
@@ -188,8 +199,8 @@
                 <i data-lucide="volume-x" class="w-5 h-5"></i>
             </button>
 
-            <!-- Shortcuts -->
-            <button onclick="App.ui.showShortcuts()" class="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors" title="Shortcuts">
+            <!-- Help/Shortcuts -->
+            <button onclick="App.ui.showHelp()" class="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors" title="Help & Shortcuts">
                 <i data-lucide="help-circle" class="w-5 h-5"></i>
             </button>
 
@@ -325,7 +336,7 @@
                             </div>
                             <div class="absolute right-0 top-0 w-full h-full md:w-1/2 opacity-30 pointer-events-none" id="mock-shapes"></div>
                         </div>
-                        <!-- Cards -->
+                        <!-- Cards with more padding -->
                         <div class="md:col-span-4 p-10 rounded-3xl flex flex-col justify-between transition-colors" id="mock-card-1">
                             <div class="w-12 h-12 rounded-full flex items-center justify-center bg-black/10 mb-6"><i data-lucide="zap" class="w-6 h-6"></i></div>
                             <div><h3 class="text-2xl font-bold mb-2">Fast</h3><p class="opacity-70 text-sm">Lightning quick color generation.</p></div>
@@ -384,7 +395,6 @@
     </div>
 
     <script>
-        // Fixed NAMED_COLORS with correct object syntax
         const NAMED_COLORS = [
             {r:255,g:255,b:255,n:"White"},{r:0,g:0,b:0,n:"Black"},{r:255,g:0,b:0,n:"Red"},{r:0,g:255,b:0,n:"Lime"},{r:0,g:0,b:255,n:"Blue"},
             {r:255,g:255,b:0,n:"Yellow"},{r:0,g:255,b:255,n:"Cyan"},{r:255,g:0,b:255,n:"Magenta"},{r:192,g:192,b:192,n:"Silver"},{r:128,g:128,b:128,n:"Gray"},
@@ -402,26 +412,7 @@
             {r:139,g:0,b:0,n:"Dark Red"},{r:154,g:205,b:50,n:"Yellow Green"},{r:85,g:107,b:47,n:"Dark Olive Green"},{r:107,g:142,b:35,n:"Olive Drab"},{r:124,g:252,b:0,n:"Lawn Green"},
             {r:127,g:255,b:0,n:"Chartreuse"},{r:173,g:255,b:47,n:"Green Yellow"},{r:50,g:205,b:50,n:"Lime Green"},{r:144,g:238,b:144,n:"Light Green"},{r:152,g:251,b:152,n:"Pale Green"},
             {r:0,g:250,b:154,n:"Medium Spring Green"},{r:0,g:255,b:127,n:"Spring Green"},{r:46,g:139,b:87,n:"Sea Green"},{r:34,g:139,b:34,n:"Forest Green"},{r:0,g:128,b:0,n:"Green"},
-            {r:0,g:100,b:0,n:"Dark Green"},{r:102,g:205,b:170,n:"Medium Aquamarine"},{r:0,g:255,b:255,n:"Aqua"},{r:224,g:255,b:255,n:"Light Cyan"},{r:175,g:238,b:238,n:"Pale Turquoise"},
-            {r:127,g:255,b:212,n:"Aquamarine"},{r:64,g:224,b:208,n:"Turquoise"},{r:72,g:209,b:204,n:"Medium Turquoise"},{r:0,g:206,b:209,n:"Dark Turquoise"},{r:95,g:158,b:160,n:"Cadet Blue"},
-            {r:176,g:196,b:222,n:"Light Steel Blue"},{r:173,g:216,b:230,n:"Light Blue"},{r:135,g:206,b:250,n:"Light Sky Blue"},{r:30,g:144,b:255,n:"Dodger Blue"},{r:100,g:149,b:237,n:"Cornflower Blue"},
-            {r:65,g:105,b:225,n:"Royal Blue"},{r:0,g:0,b:205,n:"Medium Blue"},{r:0,g:0,b:139,n:"Dark Blue"},{r:0,g:0,b:128,n:"Navy"},{r:138,g:43,b:226,n:"Blue Violet"},{r:72,g:61,b:139,n:"Dark Slate Blue"},
-            {r:106,g:90,b:205,n:"Slate Blue"},{r:123,g:104,b:238,n:"Medium Slate Blue"},{r:147,g:112,b:219,n:"Medium Purple"},{r:153,g:50,b:204,n:"Dark Orchid"},{r:148,g:0,b:211,n:"Dark Violet"},
-            {r:186,g:85,b:211,n:"Medium Orchid"},{r:216,g:191,b:216,n:"Thistle"},{r:221,g:160,b:221,n:"Plum"},{r:218,g:112,b:214,n:"Orchid"},{r:199,g:21,b:133,n:"Medium Violet Red"},
-            {r:219,g:112,b:147,n:"Pale Violet Red"},{r:255,g:105,b:180,n:"Hot Pink"},{r:54,g:69,b:79,n:"Charcoal"},{r:42,g:52,b:57,n:"Gunmetal"},{r:10,g:10,b:10,n:"Jet Black"},
-            {r:255,g:250,b:240,n:"Floral White"},{r:253,g:245,b:230,n:"Old Lace"},{r:250,g:240,b:230,n:"Linen"},{r:250,g:235,b:215,n:"Antique White"},{r:255,g:228,b:181,n:"Moccasin"},
-            {r:240,g:128,b:128,n:"Light Coral"},{r:233,g:150,b:122,n:"Dark Salmon"},{r:205,g:92,b:92,n:"Indian Red"},{r:220,g:20,b:60,n:"Crimson"},{r:176,g:224,b:230,n:"Powder Blue"},
-            {r:135,g:206,b:235,n:"Sky Blue"},{r:135,g:206,b:250,n:"Light Sky Blue"},{r:70,g:130,b:180,n:"Steel Blue"},{r:25,g:25,b:112,n:"Midnight Blue"},{r:128,g:0,b:0,n:"Maroon"},
-            {r:139,g:69,b:19,n:"Saddle Brown"},{r:160,g:82,b:45,n:"Sienna"},{r:210,g:105,b:30,n:"Chocolate"},{r:205,g:133,b:63,n:"Peru"},{r:244,g:164,b:96,n:"Sandy Brown"},
-            {r:222,g:184,b:135,n:"Burlywood"},{r:210,g:180,b:140,n:"Tan"},{r:188,g:143,b:143,n:"Rosy Brown"},{r:245,g:245,b:220,n:"Beige"},{r:255,g:240,b:245,n:"Lavender Blush"},
-            {r:255,g:228,b:225,n:"Misty Rose"},{r:255,g:245,b:238,n:"Seashell"},{r:255,g:250,b:250,n:"Snow"},{r:248,g:248,b:255,n:"Ghost White"},{r:240,g:248,b:255,n:"Alice Blue"},
-            {r:240,g:255,b:255,n:"Azure"},{r:245,g:255,b:250,n:"Mint Cream"},{r:255,g:255,b:240,n:"Ivory"},{r:250,g:235,b:215,n:"Antique White"},{r:250,g:240,b:230,n:"Linen"},
-            {r:253,g:245,b:230,n:"Old Lace"},{r:255,g:250,b:240,n:"Floral White"},{r:255,g:228,b:196,n:"Bisque"},{r:255,g:218,b:185,n:"Peach Puff"},{r:255,g:222,b:173,n:"Navajo White"},
-            {r:255,g:228,b:181,n:"Moccasin"},{r:255,g:248,b:220,n:"Cornsilk"},{r:255,g:250,b:205,n:"Lemon Chiffon"},{r:250,g:250,b:210,n:"Light Goldenrod Yellow"},{r:255,g:255,b:224,n:"Light Yellow"},
-            {r:255,g:255,b:0,n:"Yellow"},{r:128,g:128,b:0,n:"Olive"},{r:107,g:142,b:35,n:"Olive Drab"},{r:85,g:107,b:47,n:"Dark Olive Green"},{r:154,g:205,b:50,n:"Yellow Green"},
-            {r:127,g:255,b:0,n:"Chartreuse"},{r:124,g:252,b:0,n:"Lawn Green"},{r:0,g:255,b:0,n:"Lime"},{r:50,g:205,b:50,n:"Lime Green"},{r:0,g:255,b:127,n:"Spring Green"},
-            {r:0,g:250,b:154,n:"Medium Spring Green"},{r:64,g:224,b:208,n:"Turquoise"},{r:72,g:209,b:204,n:"Medium Turquoise"},{r:32,g:178,b:170,n:"Light Sea Green"},{r:0,g:139,b:139,n:"Dark Cyan"},
-            {r:0,g:128,b:128,n:"Teal"},{r:0,g:255,b:255,n:"Aqua"},{r:0,g:255,b:255,n:"Cyan"},{r:224,g:255,b:255,n:"Light Cyan"},{r:175,g:238,b:238,n:"Pale Turquoise"},
+            {r:0,g:100,b:0,n:"Dark Green"},{r:102,g:205,b:170,n:"Medium Aquamarine"},{r:0,g:255,b:255,n:"Aqua"},{r:0,g:255,b:255,n:"Cyan"},{r:224,g:255,b:255,n:"Light Cyan"},{r:175,g:238,b:238,n:"Pale Turquoise"},
             {r:127,g:255,b:212,n:"Aquamarine"},{r:240,g:255,b:255,n:"Azure"},{r:245,g:255,b:250,n:"Mint Cream"},{r:255,g:255,b:255,n:"White"}
         ];
 
@@ -430,8 +421,8 @@
                 mode: 3, colors: [], locked: [false,false,false,false,false], variability: 30, preset: 'none', harmony: 'random',
                 history: [], library: JSON.parse(localStorage.getItem('chromazen_library') || '[]'),
                 undoStack: [], redoStack: [], viewMode: 'palette', grain: false, darkMode: false, editingIndex: -1,
-                colorOffset: 0, typoFont: 'sans', sidebarOpen: true, activeTab: 'presets', soundEnabled: false, // Default Mute
-                gradientAngle: 90, blindnessMode: 0
+                colorOffset: 0, typoFont: 'sans', sidebarOpen: true, activeTab: 'presets', soundEnabled: false,
+                gradientAngle: 90, grayscaleMode: false
             },
             utils: {
                 hslToHex: (h, s, l) => {
@@ -495,6 +486,22 @@
                     gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.15);
                     osc.start();
                     osc.stop(ctx.currentTime + 0.15);
+                },
+                shareUrl: () => {
+                    const colors = App.state.colors.map(c => c.hex.replace('#', '')).join('-');
+                    const url = window.location.href.split('#')[0] + '#' + colors;
+                    navigator.clipboard.writeText(url).then(() => App.ui.showToast('URL copied to clipboard!'));
+                },
+                parseUrl: () => {
+                    const hash = window.location.hash.substring(1);
+                    if (!hash) return;
+                    const hexes = hash.split('-');
+                    if (hexes.length >= 2) {
+                        App.state.colors = hexes.map(hex => App.utils.hexToHsl('#' + hex));
+                        App.state.mode = hexes.length;
+                        App.logic.setMode(hexes.length, false);
+                        App.ui.render();
+                    }
                 }
             },
             logic: {
@@ -502,7 +509,9 @@
                     if (localStorage.getItem('chromazen_dark') === 'true' || (!('chromazen_dark' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
                         App.state.darkMode = true; document.body.classList.add('dark');
                     }
-                    App.ui.renderPresets(); App.ui.renderLibrary(); App.ui.initHarmonyDropdown(); App.logic.setMode(3); App.logic.generate(false);
+                    App.ui.renderPresets(); App.ui.renderLibrary(); App.ui.initHarmonyDropdown();
+                    if(window.location.hash) App.utils.parseUrl(); else { App.logic.setMode(3); App.logic.generate(false); }
+
                     document.body.onkeyup = (e) => {
                         if(document.activeElement.tagName === 'INPUT') return;
                         if(e.key === ' ' || e.code === 'Space') { e.preventDefault(); App.logic.generate(true, e); }
@@ -512,11 +521,10 @@
                         if(['1','2','3','4','5'].includes(e.key)) App.logic.toggleLock(parseInt(e.key)-1);
                     };
                     window.onclick = (e) => {
-                        // Logic to close dropdown if clicked outside
                         if (!e.target.closest('#harmony-dropdown')) {
-                            document.getElementById('harmony-items').classList.add('select-hide');
-                            const arrow = document.querySelector('.select-selected i');
-                            if(arrow) arrow.classList.remove('select-arrow-active');
+                             document.getElementById('harmony-items').style.display = 'none';
+                             const arrow = document.querySelector('.select-selected i');
+                             if(arrow) arrow.classList.remove('select-arrow-active');
                         }
                         document.getElementById('export-menu').classList.add('hidden');
                     };
@@ -581,8 +589,7 @@
                                 if (rule === 'analogous') h += spread * i;
                                 else if (rule === 'monochromatic') {
                                     let lStep = (90 - b.l) / (App.state.mode); 
-                                    if(b.l > 50) l = b.l - (i * 12); // Darken if light
-                                    else l = b.l + (i * 12); // Lighten if dark
+                                    if(b.l > 50) l = b.l - (i * 12); else l = b.l + (i * 12);
                                     l = Math.max(5, Math.min(95, l));
                                     s = Math.max(0, s - (i*5));
                                 } 
@@ -608,22 +615,18 @@
                     if(pushHistory) App.ui.addToHistory();
                     if(isSmart) App.ui.showToast("Smart Shuffle: Tones kept, Hues changed");
                 },
-                remix: () => {
-                    App.state.colorOffset = (App.state.colorOffset + 1) % App.state.mode;
-                    App.ui.render();
-                },
+                remix: () => { App.state.colorOffset = (App.state.colorOffset + 1) % App.state.mode; App.ui.render(); },
                 togglePreset: (name) => {
                     if (App.state.preset === name) { App.state.preset = 'none'; App.ui.showToast('Preset cleared'); } 
                     else { App.state.preset = name; }
                     App.ui.renderPresets(); App.logic.generate(); 
                 },
-                // Fixed selectHarmony logic
                 selectHarmony: (val, text) => {
                     App.state.harmony = val;
                     document.getElementById('selected-harmony').innerText = text;
-                    App.logic.generate(); // Trigger generation
-                    document.getElementById('harmony-items').classList.add('select-hide'); // Close dropdown
-                    document.querySelector('.select-selected i').classList.remove('select-arrow-active'); // Reset arrow
+                    App.logic.generate();
+                    document.getElementById('harmony-items').style.display = 'none';
+                    document.querySelector('.select-selected i').classList.remove('select-arrow-active');
                 },
                 getRandomColor: () => {
                     const p = App.logic.getPresetConstraints();
@@ -680,8 +683,8 @@
                 savePalette: () => {
                     App.state.library.unshift({ colors: App.state.colors.map(c => c.hex), date: new Date().toLocaleDateString() });
                     localStorage.setItem('chromazen_library', JSON.stringify(App.state.library));
-                    if(App.state.activeTab === 'library') App.ui.renderLibrary();
-                    App.ui.showToast('Palette saved to Library'); App.ui.switchSidebarTab('library');
+                    App.ui.switchSidebarTab('library'); App.ui.renderLibrary();
+                    App.ui.showToast('Palette saved to Library'); 
                 },
                 deleteSaved: (idx) => {
                     App.state.library.splice(idx, 1); localStorage.setItem('chromazen_library', JSON.stringify(App.state.library)); App.ui.renderLibrary();
@@ -729,13 +732,8 @@
                     reader.readAsDataURL(file);
                 },
                 clearHistory: () => { 
-                    if(App.state.activeTab === 'history') {
-                        App.state.history = []; 
-                        App.ui.renderHistory();
-                    } else {
-                        App.state.history = [];
-                        App.ui.showToast("History Cleared");
-                    }
+                    if(App.state.activeTab === 'history') { App.state.history = []; App.ui.renderHistory(); } 
+                    else { App.state.history = []; App.ui.showToast("History Cleared"); }
                 },
                 handleDragStart: (e, idx) => {
                     e.dataTransfer.setData('text/plain', idx);
@@ -749,11 +747,17 @@
                     App.logic.saveState();
                     const cols = [...App.state.colors];
                     const locks = [...App.state.locked];
-                    // Swap
-                    [cols[fromIndex], cols[toIndex]] = [cols[toIndex], cols[fromIndex]];
-                    [locks[fromIndex], locks[toIndex]] = [locks[toIndex], locks[fromIndex]];
-                    App.state.colors = cols;
-                    App.state.locked = locks;
+                    const movedCol = cols.splice(fromIndex, 1)[0];
+                    const movedLock = locks.splice(fromIndex, 1)[0];
+                    cols.splice(toIndex, 0, movedCol);
+                    locks.splice(toIndex, 0, movedLock);
+                    App.state.colors = cols; App.state.locked = locks; App.ui.render();
+                },
+                adjustShade: (idx, amount) => {
+                    App.logic.saveState();
+                    const c = App.state.colors[idx];
+                    c.l = Math.max(0, Math.min(100, c.l + amount));
+                    c.hex = App.utils.hslToHex(c.h, c.s, c.l);
                     App.ui.render();
                 }
             },
@@ -766,9 +770,7 @@
                     });
                     document.getElementById(`view-${mode}`).classList.add('bg-white','dark:bg-dark-surface','text-gray-900','dark:text-white','shadow-sm');
                     document.getElementById(`view-${mode}`).classList.remove('text-gray-500','dark:text-gray-400');
-                    
-                    const views = ['palette','gradient','mockup','typography'];
-                    views.forEach(v => {
+                    ['palette','gradient','mockup','typography'].forEach(v => {
                         const el = document.getElementById(`view-${v}-content`);
                         if(v === mode) el.classList.remove('hidden'); else el.classList.add('hidden');
                     });
@@ -777,33 +779,23 @@
                 toggleSidebar: () => {
                     App.state.sidebarOpen = !App.state.sidebarOpen;
                     const sb = document.getElementById('sidebar');
-                    if(App.state.sidebarOpen) sb.classList.remove('sidebar-closed');
-                    else sb.classList.add('sidebar-closed');
+                    if(App.state.sidebarOpen) sb.classList.remove('sidebar-closed'); else sb.classList.add('sidebar-closed');
                 },
                 toggleSound: () => {
                     App.state.soundEnabled = !App.state.soundEnabled;
                     const btn = document.getElementById('btn-sound');
-                    btn.innerHTML = App.state.soundEnabled 
-                        ? '<i data-lucide="volume-2" class="w-5 h-5"></i>' 
-                        : '<i data-lucide="volume-x" class="w-5 h-5"></i>';
+                    btn.innerHTML = App.state.soundEnabled ? '<i data-lucide="volume-2" class="w-5 h-5"></i>' : '<i data-lucide="volume-x" class="w-5 h-5"></i>';
                     lucide.createIcons();
                     App.ui.showToast(App.state.soundEnabled ? 'Sound On' : 'Sound Off');
                 },
-                toggleColorBlindness: () => {
-                    const modes = ['normal', 'protanopia', 'deuteranopia', 'tritanopia', 'achromatopsia'];
-                    App.state.blindnessMode = (App.state.blindnessMode + 1) % modes.length;
-                    const mode = modes[App.state.blindnessMode];
-                    
+                toggleGrayscale: () => {
+                    App.state.grayscaleMode = !App.state.grayscaleMode;
                     const main = document.getElementById('app-main');
-                    main.classList.remove('filter-protanopia', 'filter-deuteranopia', 'filter-tritanopia', 'filter-achromatopsia');
-                    if(mode !== 'normal') main.classList.add(`filter-${mode}`);
-                    
-                    const indicator = document.getElementById('blindness-indicator');
-                    if(mode !== 'normal') indicator.classList.remove('hidden');
-                    else indicator.classList.add('hidden');
-                    
-                    const labels = ['Normal View', 'Protanopia (Red-Blind)', 'Deuteranopia (Green-Blind)', 'Tritanopia (Blue-Blind)', 'Achromatopsia (Monochrome)'];
-                    App.ui.showToast(`Simulating: ${labels[App.state.blindnessMode]}`);
+                    if (App.state.grayscaleMode) main.classList.add('grayscale'); else main.classList.remove('grayscale');
+                    const btn = document.getElementById('btn-grayscale');
+                    btn.innerHTML = App.state.grayscaleMode ? '<i data-lucide="eye-off" class="w-5 h-5 text-blue-500"></i>' : '<i data-lucide="eye" class="w-5 h-5"></i>';
+                    lucide.createIcons();
+                    App.ui.showToast(App.state.grayscaleMode ? 'Grayscale On' : 'Grayscale Off');
                 },
                 render: () => {
                     const mode = App.state.viewMode;
@@ -811,7 +803,6 @@
                     if(mode === 'gradient') App.ui.renderGradient();
                     if(mode === 'mockup') App.ui.renderMockup();
                     if(mode === 'typography') App.ui.renderTypography();
-                    
                     App.ui.updateRemixButtons();
                     lucide.createIcons();
                 },
@@ -829,21 +820,24 @@
                         const name = App.utils.getColorName(c.hex);
                         const nextColor = App.state.colors[i+1];
                         const contrastBadge = nextColor ? App.utils.getContrastBadge(App.utils.getContrast(c.hex, nextColor.hex)) : '';
-
                         const div = document.createElement('div');
                         div.draggable = true;
                         div.className = `color-panel flex-1 relative flex flex-col justify-center items-center group cursor-pointer p-4 ${isLocked?'panel-locked':''}`;
                         div.style.backgroundColor = c.hex; div.style.color = txt;
-                        
                         div.ondragstart = (e) => App.logic.handleDragStart(e, i);
                         div.ondragover = (e) => e.preventDefault();
                         div.ondrop = (e) => App.logic.handleDrop(e, i);
                         div.ondragend = (e) => e.target.classList.remove('panel-dragging');
-
+                        // Updated Quick Shade UI: Split Button Bar
                         div.innerHTML = `
                             <div class="absolute top-6 right-6"><button onclick="event.stopPropagation(); App.logic.toggleLock(${i})" class="p-2 rounded-full transition-all ${isLocked ? 'bg-black/20 text-white' : 'opacity-0 group-hover:opacity-100 hover:bg-black/10'}"><i data-lucide="${isLocked?'lock':'unlock'}" class="w-5 h-5"></i></button></div>
                             <h2 onclick="event.stopPropagation(); App.ui.openTuneModal(${i})" class="text-3xl font-black uppercase font-mono hover:opacity-70 transition-opacity" title="Edit">${c.hex}</h2>
                             <p class="text-xs opacity-60 font-medium tracking-widest mt-1 text-center">${name}</p>
+                            <div class="flex items-center justify-center mt-6 opacity-0 group-hover:opacity-100 transition-opacity w-32 bg-black/10 backdrop-blur-sm rounded-full p-1">
+                                <button onclick="event.stopPropagation(); App.logic.adjustShade(${i}, 5)" class="flex-1 py-1 rounded-l-full hover:bg-white/20 flex justify-center" title="Lighter"><i data-lucide="plus" class="w-4 h-4"></i></button>
+                                <div class="w-px h-4 bg-white/20"></div>
+                                <button onclick="event.stopPropagation(); App.logic.adjustShade(${i}, -5)" class="flex-1 py-1 rounded-r-full hover:bg-white/20 flex justify-center" title="Darker"><i data-lucide="minus" class="w-4 h-4"></i></button>
+                            </div>
                             <button onclick="event.stopPropagation(); App.utils.copy('${c.hex}')" class="absolute bottom-10 opacity-0 group-hover:opacity-100 transition-opacity px-4 py-2 rounded-full border border-current bg-white/10 backdrop-blur-sm text-xs font-bold flex items-center gap-2"><i data-lucide="copy" class="w-3 h-3"></i> COPY</button>
                             ${contrastBadge}
                         `;
@@ -857,9 +851,7 @@
                     document.getElementById('gradient-css').innerText = css;
                 },
                 updateGradientAngle: (val) => {
-                    App.state.gradientAngle = val;
-                    document.getElementById('grad-angle-val').innerText = val + '°';
-                    App.ui.renderGradient();
+                    App.state.gradientAngle = val; document.getElementById('grad-angle-val').innerText = val + '°'; App.ui.renderGradient();
                 },
                 renderMockup: () => {
                     const rawColors = App.state.colors;
@@ -871,18 +863,15 @@
                     el('mock-container').style.backgroundColor = bg; el('mock-hero').style.backgroundColor = bg; el('mock-hero').style.color = txt;
                     el('mock-badge').style.backgroundColor = txt + '15'; el('mock-badge').style.color = txt;
                     el('mock-title').style.background = `linear-gradient(to right, ${txt}, ${acc})`;
-                    el('mock-title').style.webkitBackgroundClip = 'text';
-                    el('mock-title').style.webkitTextFillColor = 'transparent';
+                    el('mock-title').style.webkitBackgroundClip = 'text'; el('mock-title').style.webkitTextFillColor = 'transparent';
                     el('mock-subtitle').style.color = txt;
                     el('mock-btn-primary').style.backgroundColor = acc; el('mock-btn-primary').style.color = accTxt;
                     el('mock-btn-secondary').style.borderColor = txt + '40'; el('mock-btn-secondary').style.color = txt;
                     const s1 = c[2]?.hex || acc; const s2 = c[3]?.hex || bg; 
                     el('mock-shapes').innerHTML = `<svg viewBox="0 0 400 400" fill="none" style="transform: rotate(-15deg);"><circle cx="300" cy="100" r="80" fill="${s1}" fill-opacity="0.2" /><rect x="200" y="200" width="120" height="120" rx="20" fill="${s2}" fill-opacity="0.2" /></svg>`;
                     const glassStyle = `background: ${txt}08; backdrop-filter: blur(12px); border: 1px solid ${txt}10; color: ${txt};`;
-                    el('mock-card-1').setAttribute('style', glassStyle);
-                    el('mock-card-2').setAttribute('style', glassStyle);
-                    el('mock-card-3').style.background = `linear-gradient(135deg, ${c[2]?.hex}, ${c[3]?.hex})`;
-                    el('mock-card-3').style.color = App.utils.getTextColor(c[2]?.hex);
+                    el('mock-card-1').setAttribute('style', glassStyle); el('mock-card-2').setAttribute('style', glassStyle);
+                    el('mock-card-3').style.background = `linear-gradient(135deg, ${c[2]?.hex}, ${c[3]?.hex})`; el('mock-card-3').style.color = App.utils.getTextColor(c[2]?.hex);
                     el('mock-footer').style.color = txt;
                 },
                 renderTypography: () => {
@@ -927,23 +916,16 @@
                 initHarmonyDropdown: () => {
                     const dd = document.getElementById('harmony-items');
                     const opts = [
-                        {v:'random', t:'🎲 Random Shuffle', i:'완전 무작위 배색'},
-                        {v:'analogous', t:'🎨 Analogous', i:'유사색: 인접한 색상들의 조화'},
-                        {v:'monochromatic', t:'🌗 Monochromatic', i:'단색: 명도 차이를 이용한 톤온톤'},
-                        {v:'complementary', t:'☯️ Complementary', i:'보색: 서로 반대되는 강렬한 대비'},
+                        {v:'random', t:'🎲 Random Shuffle', i:'완전 무작위 배색'}, {v:'analogous', t:'🎨 Analogous', i:'유사색: 인접한 색상들의 조화'},
+                        {v:'monochromatic', t:'🌗 Monochromatic', i:'단색: 명도 차이를 이용한 톤온톤'}, {v:'complementary', t:'☯️ Complementary', i:'보색: 서로 반대되는 강렬한 대비'},
                         {v:'triadic', t:'🔺 Triadic', i:'삼각조화: 균형 잡힌 3색 배합'}
                     ];
-                    dd.innerHTML = opts.map(o => `
-                        <div onclick="App.logic.selectHarmony('${o.v}', '${o.t}')" 
-                             onmouseenter="App.ui.updateInfo('${o.i}')" 
-                             onmouseleave="App.ui.resetInfo()">
-                            ${o.t}
-                        </div>
-                    `).join('');
+                    dd.innerHTML = opts.map(o => `<div onclick="App.logic.selectHarmony('${o.v}', '${o.t}')" onmouseenter="App.ui.updateInfo('${o.i}')" onmouseleave="App.ui.resetInfo()">${o.t}</div>`).join('');
                 },
                 toggleDropdown: (e) => {
                     e.stopPropagation();
-                    document.getElementById('harmony-items').classList.toggle('select-hide');
+                    const el = document.getElementById('harmony-items');
+                    el.style.display = el.style.display === 'block' ? 'none' : 'block';
                     document.querySelector('.select-selected i').classList.toggle('select-arrow-active');
                 },
                 renderHistory: () => {
@@ -1041,24 +1023,41 @@
                 showModal: (html) => {
                     const container = document.getElementById('modal-container'); container.innerHTML = html; container.classList.remove('hidden'); requestAnimationFrame(() => container.classList.remove('opacity-0'));
                 },
-                showShortcuts: () => {
+                showHelp: () => {
                     const content = `
-                        <div class="bg-white dark:bg-dark-surface rounded-2xl shadow-2xl w-full max-w-sm p-6 transform scale-100 transition-transform">
-                            <h3 class="font-bold text-lg mb-4 dark:text-white flex items-center gap-2"><i data-lucide="keyboard" class="w-5 h-5"></i> Shortcuts</h3>
-                            <div class="space-y-3 text-sm text-gray-600 dark:text-gray-300">
-                                <div class="flex justify-between"><span>Generate</span> <span class="font-mono bg-gray-100 dark:bg-dark-bg px-2 py-0.5 rounded">Space</span></div>
-                                <div class="flex justify-between"><span>Smart Shuffle</span> <span class="font-mono bg-gray-100 dark:bg-dark-bg px-2 py-0.5 rounded">Shift + Click</span></div>
-                                <div class="flex justify-between"><span>Undo</span> <span class="font-mono bg-gray-100 dark:bg-dark-bg px-2 py-0.5 rounded">Ctrl + Z</span></div>
-                                <div class="flex justify-between"><span>Redo</span> <span class="font-mono bg-gray-100 dark:bg-dark-bg px-2 py-0.5 rounded">Ctrl + Y</span></div>
-                                <div class="flex justify-between"><span>Lock 1-5</span> <span class="font-mono bg-gray-100 dark:bg-dark-bg px-2 py-0.5 rounded">1 ... 5</span></div>
-                                <div class="flex justify-between"><span>Toggle Sidebar</span> <span class="font-mono bg-gray-100 dark:bg-dark-bg px-2 py-0.5 rounded">Menu Btn</span></div>
+                        <div class="bg-white dark:bg-dark-surface rounded-2xl shadow-2xl w-full max-w-md p-6 transform scale-100 transition-transform overflow-hidden">
+                            <div class="flex border-b border-gray-100 dark:border-dark-border">
+                                <button class="flex-1 py-3 text-sm font-bold border-b-2 border-black dark:border-white" onclick="App.ui.switchHelpTab('shortcuts', this)">Shortcuts</button>
+                                <button class="flex-1 py-3 text-sm font-bold border-b-2 border-transparent text-gray-400" onclick="App.ui.switchHelpTab('features', this)">Features</button>
+                                <button class="flex-1 py-3 text-sm font-bold border-b-2 border-transparent text-gray-400" onclick="App.ui.switchHelpTab('tips', this)">Tips</button>
                             </div>
-                            <div class="mt-6 flex justify-end">
-                                <button onclick="App.ui.closeModal()" class="px-4 py-2 text-sm font-bold bg-black dark:bg-white text-white dark:text-black rounded-lg">Got it</button>
+                            <div class="p-6 h-64 overflow-y-auto" id="help-content">
+                                <div class="space-y-3 text-sm text-gray-600 dark:text-gray-300">
+                                    <div class="flex justify-between"><span>Generate</span> <span class="font-mono bg-gray-100 dark:bg-dark-bg px-2 py-0.5 rounded">Space</span></div>
+                                    <div class="flex justify-between"><span>Smart Shuffle</span> <span class="font-mono bg-gray-100 dark:bg-dark-bg px-2 py-0.5 rounded">Shift + Click</span></div>
+                                    <div class="flex justify-between"><span>Undo</span> <span class="font-mono bg-gray-100 dark:bg-dark-bg px-2 py-0.5 rounded">Ctrl + Z</span></div>
+                                    <div class="flex justify-between"><span>Redo</span> <span class="font-mono bg-gray-100 dark:bg-dark-bg px-2 py-0.5 rounded">Ctrl + Y</span></div>
+                                    <div class="flex justify-between"><span>Lock 1-5</span> <span class="font-mono bg-gray-100 dark:bg-dark-bg px-2 py-0.5 rounded">1 ... 5</span></div>
+                                </div>
+                            </div>
+                            <div class="p-4 border-t border-gray-100 dark:border-dark-border flex justify-end">
+                                <button onclick="App.ui.closeModal()" class="px-4 py-2 text-sm font-bold bg-black dark:bg-white text-white dark:text-black rounded-lg">Close</button>
                             </div>
                         </div>
                     `;
                     App.ui.showModal(content);
+                },
+                switchHelpTab: (tab, btn) => {
+                    btn.parentElement.querySelectorAll('button').forEach(b => { b.className = 'flex-1 py-3 text-sm font-bold border-b-2 border-transparent text-gray-400'; });
+                    btn.className = 'flex-1 py-3 text-sm font-bold border-b-2 border-black dark:border-white text-black dark:text-white';
+                    const content = document.getElementById('help-content');
+                    if(tab === 'shortcuts') {
+                        content.innerHTML = `<div class="space-y-3 text-sm text-gray-600 dark:text-gray-300"><div class="flex justify-between"><span>Generate</span> <span class="font-mono bg-gray-100 dark:bg-dark-bg px-2 py-0.5 rounded">Space</span></div><div class="flex justify-between"><span>Smart Shuffle</span> <span class="font-mono bg-gray-100 dark:bg-dark-bg px-2 py-0.5 rounded">Shift + Click</span></div><div class="flex justify-between"><span>Undo</span> <span class="font-mono bg-gray-100 dark:bg-dark-bg px-2 py-0.5 rounded">Ctrl + Z</span></div><div class="flex justify-between"><span>Redo</span> <span class="font-mono bg-gray-100 dark:bg-dark-bg px-2 py-0.5 rounded">Ctrl + Y</span></div><div class="flex justify-between"><span>Lock 1-5</span> <span class="font-mono bg-gray-100 dark:bg-dark-bg px-2 py-0.5 rounded">1 ... 5</span></div></div>`;
+                    } else if(tab === 'features') {
+                        content.innerHTML = `<div class="space-y-4 text-sm text-gray-600 dark:text-gray-300"><div><h4 class="font-bold text-black dark:text-white mb-1">🖼️ Image Match</h4><p>Paste any image (Ctrl+V) or upload to extract its palette.</p></div><div><h4 class="font-bold text-black dark:text-white mb-1">⚡ Smart Shuffle</h4><p>Hold Shift while generating to keep the current tone but change hue.</p></div><div><h4 class="font-bold text-black dark:text-white mb-1">🔄 Remix</h4><p>In Mockup/Typo view, click 'Remix' to shuffle color positions.</p></div><div><h4 class="font-bold text-black dark:text-white mb-1">💾 Library</h4><p>Save your favorite palettes to local storage to use later.</p></div></div>`;
+                    } else if(tab === 'tips') {
+                        content.innerHTML = `<div class="space-y-4 text-sm text-gray-600 dark:text-gray-300"><p>💡 <strong>60-30-10 Rule:</strong> Use 60% dominant color, 30% secondary, and 10% accent color for balance.</p><p>💡 <strong>Contrast:</strong> Check the WCAG badges between colors to ensure text readability.</p><p>💡 <strong>Monochromatic:</strong> Best for clean, professional corporate branding.</p></div>`;
+                    }
                 },
                 closeModal: () => {
                     const container = document.getElementById('modal-container'); container.classList.add('opacity-0'); setTimeout(() => container.classList.add('hidden'), 200);
@@ -1070,9 +1069,7 @@
                 updateSliderLabel: (val) => {
                     App.state.variability = parseInt(val); document.getElementById('variability-label').innerText = val < 20 ? 'Tight' : val > 70 ? 'Wide' : 'Medium';
                 },
-                toggleGrain: () => { // Deprecated but kept for compatibility logic removal
-                    // Grain removed
-                },
+                toggleGrain: () => {}, // removed
                 toggleDarkMode: () => {
                     App.state.darkMode = !App.state.darkMode; document.body.classList.toggle('dark'); localStorage.setItem('chromazen_dark', App.state.darkMode);
                 },
@@ -1094,21 +1091,14 @@
                     lucide.createIcons();
                     App.ui.showToast(App.state.soundEnabled ? 'Sound On' : 'Sound Off');
                 },
-                toggleColorBlindness: () => {
-                    const modes = ['normal', 'protanopia', 'deuteranopia', 'tritanopia', 'achromatopsia'];
-                    App.state.blindnessMode = (App.state.blindnessMode + 1) % modes.length;
-                    const mode = modes[App.state.blindnessMode];
-                    
+                toggleGrayscale: () => {
+                    App.state.grayscaleMode = !App.state.grayscaleMode;
                     const main = document.getElementById('app-main');
-                    main.classList.remove('filter-protanopia', 'filter-deuteranopia', 'filter-tritanopia', 'filter-achromatopsia');
-                    if(mode !== 'normal') main.classList.add(`filter-${mode}`);
-                    
-                    const indicator = document.getElementById('blindness-indicator');
-                    if(mode !== 'normal') indicator.classList.remove('hidden');
-                    else indicator.classList.add('hidden');
-                    
-                    const labels = ['Normal View', 'Protanopia (Red-Blind)', 'Deuteranopia (Green-Blind)', 'Tritanopia (Blue-Blind)', 'Achromatopsia (Monochrome)'];
-                    App.ui.showToast(`Simulating: ${labels[App.state.blindnessMode]}`);
+                    if (App.state.grayscaleMode) main.classList.add('grayscale'); else main.classList.remove('grayscale');
+                    const btn = document.getElementById('btn-grayscale');
+                    btn.innerHTML = App.state.grayscaleMode ? '<i data-lucide="eye-off" class="w-5 h-5 text-blue-500"></i>' : '<i data-lucide="eye" class="w-5 h-5"></i>';
+                    lucide.createIcons();
+                    App.ui.showToast(App.state.grayscaleMode ? 'Grayscale On' : 'Grayscale Off');
                 },
             },
             exports: {
