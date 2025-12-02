@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ChromaZen - Inspiration Color Tool v3.2.2</title>
+    <title>ChromaZen - Inspiration Color Tool v3.2.3</title>
     
     <!-- Dependencies -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -148,11 +148,11 @@
             <button onclick="App.ui.toggleSidebar()" class="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-dark-bg text-gray-500 transition-colors" title="Toggle Sidebar (Zen Mode)">
                 <i data-lucide="menu" class="w-5 h-5"></i>
             </button>
-            <div class="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity" onclick="window.location.reload()" title="Reload App">
+            <div class="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity" onclick="window.location.href='https://veryjune.github.io/widget/ColorPaletteGen.html'" title="ChromaZen">
                 <div class="w-8 h-8 rounded-lg bg-gradient-to-tr from-indigo-500 to-purple-500 flex items-center justify-center text-white shadow-md">
                     <i data-lucide="palette" class="w-4 h-4"></i>
                 </div>
-                <h1 class="text-lg font-bold tracking-tight text-gray-900 dark:text-white leading-none hidden md:block">ChromaZen <span class="text-[10px] font-medium text-gray-400 dark:text-gray-500 ml-1">v3.2.2</span></h1>
+                <h1 class="text-lg font-bold tracking-tight text-gray-900 dark:text-white leading-none hidden md:block">ChromaZen <span class="text-[10px] font-medium text-gray-400 dark:text-gray-500 ml-1">v3.2.3</span></h1>
             </div>
         </div>
         
@@ -779,7 +779,6 @@
                 }
             },
             ui: {
-                // ADDED: Missing addToHistory method causing the TypeError
                 addToHistory: () => {
                     if (!App.state.colors || App.state.colors.length === 0) return;
                     // Guard against null colors
