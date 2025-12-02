@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ChromaZen - Pro Color Tool v2.2</title>
+    <title>ChromaZen - Inspiration Color Tool v3.2.2</title>
     
     <!-- Dependencies -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -27,6 +27,14 @@
                     },
                     animation: {
                         'pop': 'pop 0.3s ease-in-out',
+                        'fade-in': 'fadeIn 0.5s ease-out',
+                        'pulse-fast': 'pulse 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                    },
+                    keyframes: {
+                        fadeIn: {
+                            '0%': { opacity: '0', transform: 'translateY(10px)' },
+                            '100%': { opacity: '1', transform: 'translateY(0)' },
+                        }
                     }
                 }
             }
@@ -37,6 +45,7 @@
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
         @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&display=swap');
         @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Abril+Fatface&display=swap');
         
         body {
             font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
@@ -89,7 +98,7 @@
         }
         .btn-pop { animation: pop 0.3s ease-in-out; }
         
-        /* Sidebar Transition - Fixed for Fullscreen Toggle */
+        /* Sidebar Transition */
         aside { 
             transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1), padding 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease; 
             will-change: width, padding;
@@ -126,6 +135,9 @@
         .dark .select-items div:hover { background-color: #333; }
         .select-hide { display: none; }
         .select-arrow-active { transform: rotate(180deg); }
+
+        /* Typography Styles */
+        .font-abril { font-family: 'Abril Fatface', cursive; }
     </style>
 </head>
 <body class="h-screen w-full flex flex-col overflow-hidden select-none transition-colors duration-300">
@@ -140,7 +152,7 @@
                 <div class="w-8 h-8 rounded-lg bg-gradient-to-tr from-indigo-500 to-purple-500 flex items-center justify-center text-white shadow-md">
                     <i data-lucide="palette" class="w-4 h-4"></i>
                 </div>
-                <h1 class="text-lg font-bold tracking-tight text-gray-900 dark:text-white leading-none hidden md:block">ChromaZen <span class="text-[10px] font-medium text-gray-400 dark:text-gray-500 ml-1">v2.2</span></h1>
+                <h1 class="text-lg font-bold tracking-tight text-gray-900 dark:text-white leading-none hidden md:block">ChromaZen <span class="text-[10px] font-medium text-gray-400 dark:text-gray-500 ml-1">v3.2.2</span></h1>
             </div>
         </div>
         
@@ -264,7 +276,7 @@
                 </div>
                 
                 <div id="sidebar-presets" class="flex-1 overflow-y-auto scrollbar-thin">
-                    <div class="grid grid-cols-2 gap-2" id="presets-grid"></div>
+                    <div class="space-y-4" id="presets-grid"></div>
                 </div>
                 <div id="sidebar-library" class="flex-1 overflow-y-auto scrollbar-thin hidden">
                     <div id="library-container" class="space-y-2"></div>
@@ -302,56 +314,33 @@
 
             <!-- Sticky Remix Header for Mockup -->
             <div id="view-mockup-content" class="hidden w-full h-full relative">
-                <div class="sticky top-0 z-30 w-full flex justify-end p-4 pointer-events-none">
+                <div class="sticky top-0 z-30 w-full flex justify-between items-center p-4 pointer-events-none">
+                    <!-- Scene Selector -->
+                    <div class="pointer-events-auto bg-white dark:bg-dark-surface p-1 rounded-lg border border-gray-200 dark:border-dark-border shadow-sm flex gap-1">
+                        <button onclick="App.ui.setMockupScene('landing')" class="mockup-scene-btn px-3 py-1.5 text-xs font-bold rounded-md bg-black text-white dark:bg-white dark:text-black">Landing</button>
+                        <button onclick="App.ui.setMockupScene('app')" class="mockup-scene-btn px-3 py-1.5 text-xs font-bold rounded-md hover:bg-gray-100 dark:hover:bg-dark-bg text-gray-500">App</button>
+                        <button onclick="App.ui.setMockupScene('dashboard')" class="mockup-scene-btn px-3 py-1.5 text-xs font-bold rounded-md hover:bg-gray-100 dark:hover:bg-dark-bg text-gray-500">Dash</button>
+                        <button onclick="App.ui.setMockupScene('art')" class="mockup-scene-btn px-3 py-1.5 text-xs font-bold rounded-md hover:bg-gray-100 dark:hover:bg-dark-bg text-gray-500">Art</button>
+                    </div>
+
                     <button id="btn-remix-mockup" onclick="App.logic.remix()" class="pointer-events-auto px-5 py-2.5 rounded-full shadow-lg font-bold flex items-center gap-2 transition-all hover:scale-105 active:scale-95 border-2 bg-white/80 backdrop-blur-sm dark:bg-black/80">
                         <i data-lucide="refresh-cw" class="w-4 h-4"></i> Remix Colors
                     </button>
                 </div>
                 
-                <div class="max-w-6xl mx-auto space-y-6 pb-20 px-4 md:px-10 -mt-16 pt-20"> 
-                    <div class="grid grid-cols-1 md:grid-cols-12 gap-6 min-h-[800px] rounded-3xl overflow-hidden shadow-2xl transition-colors" id="mock-container">
-                        <!-- Hero -->
-                        <div class="md:col-span-12 p-12 md:p-16 flex flex-col md:flex-row items-center justify-between relative overflow-hidden transition-colors" id="mock-hero">
-                            <div class="relative z-10 max-w-lg space-y-6">
-                                <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-widest backdrop-blur-sm bg-white/20" id="mock-badge">New Arrival</div>
-                                <h1 class="text-6xl md:text-8xl font-black tracking-tighter leading-[0.9]" id="mock-title">MAKE<br>WAVES.</h1>
-                                <p class="text-lg opacity-80 max-w-sm font-medium" id="mock-subtitle">Experience the next generation of creative tools.</p>
-                                <div class="flex gap-4 pt-4">
-                                    <button class="px-8 py-4 rounded-full font-bold shadow-lg hover:scale-105 transition-transform" id="mock-btn-primary">Get Started</button>
-                                    <button class="px-8 py-4 rounded-full font-bold border-2 hover:bg-white/10 transition-colors" id="mock-btn-secondary">Learn More</button>
-                                </div>
-                            </div>
-                            <div class="absolute right-0 top-0 w-full h-full md:w-1/2 opacity-30 pointer-events-none" id="mock-shapes"></div>
-                        </div>
-                        <!-- Cards with more padding -->
-                        <div class="md:col-span-4 p-10 rounded-3xl flex flex-col justify-between transition-colors" id="mock-card-1">
-                            <div class="w-12 h-12 rounded-full flex items-center justify-center bg-black/10 mb-6"><i data-lucide="zap" class="w-6 h-6"></i></div>
-                            <div><h3 class="text-2xl font-bold mb-2">Fast</h3><p class="opacity-70 text-sm">Lightning quick color generation.</p></div>
-                        </div>
-                        <div class="md:col-span-4 p-10 rounded-3xl flex flex-col justify-between transition-colors border-2 border-dashed" id="mock-card-2">
-                            <div class="w-full h-24 flex items-end gap-2 mb-6 opacity-50">
-                                <div class="w-1/4 h-1/2 bg-current rounded-t-lg"></div><div class="w-1/4 h-3/4 bg-current rounded-t-lg"></div><div class="w-1/4 h-full bg-current rounded-t-lg"></div><div class="w-1/4 h-2/3 bg-current rounded-t-lg"></div>
-                            </div>
-                            <div><h3 class="text-2xl font-bold mb-2">Analytics</h3><p class="opacity-70 text-sm">Data driven decisions.</p></div>
-                        </div>
-                        <div class="md:col-span-4 p-10 rounded-3xl flex flex-col justify-center items-center text-center transition-colors relative overflow-hidden" id="mock-card-3">
-                            <div class="absolute inset-0 opacity-20 bg-gradient-to-tr from-transparent to-black"></div><h3 class="text-3xl font-black relative z-10">PRO<br>MODE</h3>
-                        </div>
-                        <!-- Footer -->
-                        <div class="md:col-span-12 p-10 flex justify-between items-center transition-colors" id="mock-footer">
-                            <span class="font-bold text-xl tracking-tight">Brand.</span><div class="flex gap-6 text-sm font-medium opacity-60"><span>Privacy</span><span>Terms</span><span>Contact</span></div>
-                        </div>
-                    </div>
+                <div class="max-w-6xl mx-auto space-y-6 pb-20 px-4 md:px-10 -mt-16 pt-20 animate-fade-in" id="mockup-inject-area">
+                    <!-- Content injected via JS -->
                 </div>
             </div>
 
             <!-- Sticky Remix Header for Typography -->
             <div id="view-typography-content" class="hidden w-full h-full relative">
                 <div class="sticky top-0 z-30 w-full flex justify-between p-4 pointer-events-none items-center">
-                    <div class="pointer-events-auto bg-white dark:bg-dark-surface p-1 rounded-lg border border-gray-200 dark:border-dark-border shadow-sm flex">
-                        <button onclick="App.ui.setFont('sans')" class="px-3 py-1.5 text-xs font-bold rounded-md hover:bg-gray-100 dark:hover:bg-dark-bg font-sans" id="font-sans">Sans</button>
-                        <button onclick="App.ui.setFont('serif')" class="px-3 py-1.5 text-xs font-bold rounded-md hover:bg-gray-100 dark:hover:bg-dark-bg font-serif" id="font-serif">Serif</button>
-                        <button onclick="App.ui.setFont('mono')" class="px-3 py-1.5 text-xs font-bold rounded-md hover:bg-gray-100 dark:hover:bg-dark-bg font-mono" id="font-mono">Mono</button>
+                    <div class="pointer-events-auto bg-white dark:bg-dark-surface p-1 rounded-lg border border-gray-200 dark:border-dark-border shadow-sm flex gap-1">
+                        <button onclick="App.ui.setTypoStyle('modern')" class="typo-style-btn px-3 py-1.5 text-xs font-bold rounded-md bg-black text-white dark:bg-white dark:text-black">Modern</button>
+                        <button onclick="App.ui.setTypoStyle('editorial')" class="typo-style-btn px-3 py-1.5 text-xs font-bold rounded-md hover:bg-gray-100 dark:hover:bg-dark-bg text-gray-500">Editorial</button>
+                        <button onclick="App.ui.setTypoStyle('sns')" class="typo-style-btn px-3 py-1.5 text-xs font-bold rounded-md hover:bg-gray-100 dark:hover:bg-dark-bg text-gray-500">SNS</button>
+                        <button onclick="App.ui.setTypoStyle('poster')" class="typo-style-btn px-3 py-1.5 text-xs font-bold rounded-md hover:bg-gray-100 dark:hover:bg-dark-bg text-gray-500">Poster</button>
                     </div>
                     
                     <button id="btn-remix-typo" onclick="App.logic.remix()" class="pointer-events-auto px-5 py-2.5 rounded-full shadow-lg font-bold flex items-center gap-2 transition-all hover:scale-105 active:scale-95 border-2 bg-white/80 backdrop-blur-sm dark:bg-black/80">
@@ -359,8 +348,8 @@
                     </button>
                 </div>
 
-                <div class="max-w-5xl mx-auto space-y-6 pb-20 px-4 md:px-10 -mt-16 pt-20">
-                    <div id="typo-inject-area"></div>
+                <div class="max-w-5xl mx-auto space-y-6 pb-20 px-4 md:px-10 -mt-16 pt-20 animate-fade-in">
+                    <div id="typo-inject-area" class="min-h-[800px] transition-colors duration-500"></div>
                 </div>
             </div>
         </div>
@@ -403,26 +392,29 @@
             {r:127,g:255,b:212,n:"Aquamarine"},{r:240,g:255,b:255,n:"Azure"},{r:245,g:255,b:250,n:"Mint Cream"},{r:255,g:255,b:255,n:"White"}
         ];
 
-        // Magic Numbers Refactored
         const CONFIG = {
             SPREAD_MULTIPLIER: 0.6,
             BASE_OFFSET: 10,
-            MONO_L_STEP: 12, // Monochromatic lightness step
-            MONO_S_STEP: 5,  // Monochromatic saturation step
-            MONO_L_LIMIT_LOW: 5,
-            MONO_L_LIMIT_HIGH: 95,
-            COMPLEMENTARY_HUE_SHIFT: 180,
-            TRIADIC_HUE_SHIFT: 120,
-            RANDOM_NOISE: 20
+            MONO_L_STEP: 12, MONO_S_STEP: 5, MONO_L_LIMIT_LOW: 5, MONO_L_LIMIT_HIGH: 95,
+            COMPLEMENTARY_HUE_SHIFT: 180, TRIADIC_HUE_SHIFT: 120, RANDOM_NOISE: 20
+        };
+
+        const PRESET_CATEGORIES = {
+            'Social Vibes': ['warm', 'neon', 'vivid', 'minimal'],
+            'Business': ['corporate', 'dark', 'grayscale', 'tech'],
+            'Marketing': ['luxury', 'retro', 'pastel', 'coffee'],
+            'Art & Nature': ['nature', 'cyberpunk', 'wedding', 'forest', 'sunset'],
+            'Seasonal': ['spring', 'summer', 'autumn', 'winter'],
+            'Kids & Pop': ['kids', 'pop', 'candy']
         };
 
         const App = {
             state: {
                 mode: 3, colors: [], locked: [false,false,false,false,false], variability: 30, preset: 'none', harmony: 'random',
-                history: [], library: JSON.parse(localStorage.getItem('chromazen_library') || '[]'),
+                history: [], library: [],
                 undoStack: [], redoStack: [], viewMode: 'palette', grain: false, darkMode: false, editingIndex: -1,
-                colorOffset: 0, typoFont: 'sans', sidebarOpen: true, activeTab: 'presets', soundEnabled: false,
-                gradientAngle: 90, grayscaleMode: false, helpLang: 'ko', lastHelpTab: 'shortcuts'
+                colorOffset: 0, mockupScene: 'landing', typoStyle: 'modern', sidebarOpen: true, activeTab: 'presets', soundEnabled: false,
+                gradientAngle: 90, grayscaleMode: false, helpLang: 'ko', lastHelpTab: 'tips', openHelpSection: null
             },
             utils: {
                 hslToHex: (h, s, l) => {
@@ -495,7 +487,6 @@
                 updateHash: () => {
                     if(App.state.colors.length === 0) return;
                     const hash = App.state.colors.map(c => c.hex.replace('#', '')).join('-');
-                    // Update URL without reloading or creating history spam (optional: use pushState for history support)
                     window.history.replaceState(null, null, '#' + hash);
                 },
                 parseUrl: () => {
@@ -511,7 +502,35 @@
                 }
             },
             logic: {
+                getInfoText: (key) => {
+                    const map = {
+                        'vivid': '높은 채도의 에너지 넘치는 색상', 'pastel': '부드럽고 차분한 파스텔 톤', 'dark': '세련되고 무게감 있는 어두운 테마',
+                        'warm': '따뜻한 빨강, 주황, 노랑 계열', 'nature': '자연에서 영감을 받은 흙과 숲의 색', 'neon': '사이버펑크/나이트라이프 네온 스타일',
+                        'retro': '빛바랜 빈티지 감성', 'corporate': '신뢰감을 주는 블루/그레이 톤', 'luxury': '골드, 블랙, 깊이 있는 고급스러움',
+                        'wedding': '로맨틱한 화이트와 우아한 톤', 'grayscale': '무채색/와이어프레임 스타일', 'cyberpunk': '고대비 네온 다크 모드',
+                        'spread': '색상 간의 거리를 조절합니다', 'harmony': '색채 조화 규칙 선택', 'imagematch': '이미지 붙여넣기(Ctrl+V)로 색상 추출',
+                        'random': '완전 무작위 배색', 'analogous': '인접한 색상들의 조화 (유사색)', 'monochromatic': '한 가지 색상의 명도 변화 (단색)',
+                        'complementary': '강렬한 대비를 이루는 보색', 'triadic': '균형 잡힌 3색 조화',
+                        'minimal': '최소한의 색상으로 깔끔한 느낌', 'summer': '여름의 청량함과 밝은 에너지', 'forest': '깊은 숲속의 차분함', 'sunset': '해질녘의 따뜻하고 낭만적인 무드',
+                        'tech': '미래지향적인 차가운 테크 감성', 'berry': '달콤하고 상큼한 베리 톤', 'coffee': '따뜻하고 부드러운 브라운 톤',
+                        'spring': '봄의 화사함과 생명력', 'autumn': '가을의 깊고 풍부한 색감', 'winter': '겨울의 차갑고 깨끗한 느낌',
+                        'kids': '아이들을 위한 밝고 명랑한 색상', 'pop': '톡톡 튀는 팝아트 스타일', 'candy': '달콤한 사탕 같은 파스텔 톤'
+                    };
+                    return map[key] || '컨트롤이나 프리셋 위에 마우스를 올려보세요.';
+                },
                 init: () => {
+                    try {
+                        const lib = localStorage.getItem('chromazen_library');
+                        if(lib) App.state.library = JSON.parse(lib);
+                        
+                        const hist = localStorage.getItem('chromazen_history');
+                        if(hist) App.state.history = JSON.parse(hist);
+                    } catch(e) { 
+                        console.error('Storage load error', e); 
+                        App.state.library = [];
+                        App.state.history = [];
+                    }
+
                     if (localStorage.getItem('chromazen_dark') === 'true' || (!('chromazen_dark' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
                         App.state.darkMode = true; document.body.classList.add('dark');
                     }
@@ -523,7 +542,7 @@
                         if(e.key === ' ' || e.code === 'Space') { e.preventDefault(); App.logic.generate(true, e); }
                         if((e.ctrlKey||e.metaKey) && e.key === 'z') App.logic.undo();
                         if((e.ctrlKey||e.metaKey) && e.key === 'y') App.logic.redo();
-                        if(e.key === '?') App.ui.showShortcuts();
+                        if(e.key === '?') App.ui.showHelp();
                         if(['1','2','3','4','5'].includes(e.key)) App.logic.toggleLock(parseInt(e.key)-1);
                     };
                     window.onclick = (e) => {
@@ -579,9 +598,7 @@
 
                     for(let i=0; i<App.state.mode; i++) {
                         if(App.state.locked[i] && newColors[i]) continue;
-                        
                         let h, s, l;
-                        
                         if (isSmart && newColors[i]) {
                             h = Math.floor(Math.random() * 360); s = newColors[i].s; l = newColors[i].l;
                         } else {
@@ -591,7 +608,6 @@
                             } else {
                                 let b = newColors[0];
                                 h = b.h; s = b.s; l = b.l;
-                                
                                 if (rule === 'analogous') h += spread * i;
                                 else if (rule === 'monochromatic') {
                                     let lStep = (90 - b.l) / (App.state.mode); 
@@ -602,7 +618,6 @@
                                 else if (rule === 'complementary') h += CONFIG.COMPLEMENTARY_HUE_SHIFT + ((Math.random()-0.5)*spread);
                                 else if (rule === 'triadic') h += CONFIG.TRIADIC_HUE_SHIFT * i + ((Math.random()-0.5)*spread/2);
                                 else { h += (spread + CONFIG.BASE_OFFSET) * i; let rc = App.logic.getRandomColor(); s = rc.s; l = rc.l; }
-                                
                                 if(rule !== 'random') {
                                     const p = App.logic.getPresetConstraints();
                                     if (rule === 'monochromatic') {
@@ -649,21 +664,15 @@
                         retro: { sMin: 30, sMax: 60, lMin: 50, lMax: 80, hRange: [20, 50] }, corporate: { sMin: 10, sMax: 40, lMin: 20, lMax: 50, hRange: [200, 240] },
                         luxury: { sMin: 20, sMax: 60, lMin: 10, lMax: 40, hRange: [30, 60] }, wedding: { sMin: 10, sMax: 40, lMin: 40, lMax: 98 }, 
                         grayscale: { sMin: 0, sMax: 0, lMin: 10, lMax: 90 }, cyberpunk: { sMin: 80, sMax: 100, lMin: 40, lMax: 70 },
+                        minimal: { sMin: 0, sMax: 20, lMin: 80, lMax: 98 }, summer: { sMin: 60, sMax: 90, lMin: 50, lMax: 80, hRange: [0, 60] },
+                        forest: { sMin: 30, sMax: 70, lMin: 20, lMax: 50, hRange: [80, 160] }, sunset: { sMin: 50, sMax: 90, lMin: 40, lMax: 70, hRange: [260, 360] },
+                        tech: { sMin: 50, sMax: 90, lMin: 40, lMax: 80, hRange: [180, 240] }, berry: { sMin: 40, sMax: 80, lMin: 30, lMax: 60, hRange: [280, 340] },
+                        coffee: { sMin: 20, sMax: 50, lMin: 20, lMax: 60, hRange: [20, 40] }, spring: { sMin: 40, sMax: 70, lMin: 70, lMax: 90, hRange: [60, 150] },
+                        autumn: { sMin: 50, sMax: 90, lMin: 30, lMax: 60, hRange: [0, 60] }, winter: { sMin: 10, sMax: 40, lMin: 80, lMax: 95, hRange: [180, 240] },
+                        kids: { sMin: 80, sMax: 100, lMin: 50, lMax: 70 }, pop: { sMin: 70, sMax: 100, lMin: 50, lMax: 60 }, candy: { sMin: 50, sMax: 80, lMin: 70, lMax: 90 },
                         none: { sMin: 20, sMax: 95, lMin: 10, lMax: 90 }
                     };
                     return sets[App.state.preset] || sets.none;
-                },
-                getInfoText: (key) => {
-                    const map = {
-                        'vivid': '높은 채도의 에너지 넘치는 색상', 'pastel': '부드럽고 차분한 파스텔 톤', 'dark': '세련되고 무게감 있는 어두운 테마',
-                        'warm': '따뜻한 빨강, 주황, 노랑 계열', 'nature': '자연에서 영감을 받은 흙과 숲의 색', 'neon': '사이버펑크/나이트라이프 네온 스타일',
-                        'retro': '빛바랜 빈티지 감성', 'corporate': '신뢰감을 주는 블루/그레이 톤', 'luxury': '골드, 블랙, 깊이 있는 고급스러움',
-                        'wedding': '로맨틱한 화이트와 우아한 톤', 'grayscale': '무채색/와이어프레임 스타일', 'cyberpunk': '고대비 네온 다크 모드',
-                        'spread': '색상 간의 거리를 조절합니다', 'harmony': '색채 조화 규칙 선택', 'imagematch': '이미지 붙여넣기(Ctrl+V)로 색상 추출',
-                        'random': '완전 무작위 배색', 'analogous': '인접한 색상들의 조화 (유사색)', 'monochromatic': '한 가지 색상의 명도 변화 (단색)',
-                        'complementary': '강렬한 대비를 이루는 보색', 'triadic': '균형 잡힌 3색 조화'
-                    };
-                    return map[key] || '컨트롤이나 프리셋 위에 마우스를 올려보세요.';
                 },
                 toggleLock: (idx) => { if(idx >= App.state.mode) return; App.state.locked[idx] = !App.state.locked[idx]; App.ui.render(); },
                 saveState: () => {
@@ -738,8 +747,10 @@
                     reader.readAsDataURL(file);
                 },
                 clearHistory: () => { 
-                    if(App.state.activeTab === 'history') { App.state.history = []; App.ui.renderHistory(); } 
-                    else { App.state.history = []; App.ui.showToast("히스토리가 삭제되었습니다."); }
+                    App.state.history = [];
+                    localStorage.removeItem('chromazen_history');
+                    if(App.state.activeTab === 'history') { App.ui.renderHistory(); } 
+                    else { App.ui.showToast("히스토리가 삭제되었습니다."); }
                 },
                 handleDragStart: (e, idx) => {
                     e.dataTransfer.setData('text/plain', idx);
@@ -768,6 +779,34 @@
                 }
             },
             ui: {
+                // ADDED: Missing addToHistory method causing the TypeError
+                addToHistory: () => {
+                    if (!App.state.colors || App.state.colors.length === 0) return;
+                    // Guard against null colors
+                    const validColors = App.state.colors.filter(c => c && c.hex);
+                    if (validColors.length !== App.state.colors.length) return;
+
+                    const snap = validColors.map(c => c.hex);
+                    App.state.history.unshift(snap);
+                    if(App.state.history.length > 20) App.state.history.pop();
+                    
+                    // Save history to localStorage
+                    localStorage.setItem('chromazen_history', JSON.stringify(App.state.history));
+
+                    if(App.state.activeTab === 'history') App.ui.renderHistory();
+                },
+                // ADDED: Missing renderHistory method
+                renderHistory: () => {
+                    const container = document.getElementById('history-container'); container.innerHTML = '';
+                    if(App.state.history.length === 0) { container.innerHTML = '<p class="text-xs text-gray-400 col-span-4 text-center mt-4">히스토리가 비어있습니다.</p>'; return; }
+                    App.state.history.forEach(palette => {
+                        const div = document.createElement('div');
+                        div.className = 'w-full aspect-square rounded-lg overflow-hidden cursor-pointer hover:ring-2 ring-indigo-500 transition-all flex flex-col border dark:border-gray-700';
+                        div.onclick = () => { App.logic.saveState(); App.state.colors = palette.map(hex => App.utils.hexToHsl(hex)); App.logic.setMode(palette.length, false); };
+                        palette.forEach(hex => { const d = document.createElement('div'); d.style.backgroundColor = hex; d.className = 'flex-1 w-full'; div.appendChild(d); });
+                        container.appendChild(div);
+                    });
+                },
                 setViewMode: (mode) => {
                     App.state.viewMode = mode;
                     document.querySelectorAll('.view-btn').forEach(b => {
@@ -780,6 +819,8 @@
                         const el = document.getElementById(`view-${v}-content`);
                         if(v === mode) el.classList.remove('hidden'); else el.classList.add('hidden');
                     });
+                    if(mode === 'mockup') App.ui.setMockupScene(App.state.mockupScene);
+                    if(mode === 'typography') App.ui.setTypoStyle(App.state.typoStyle);
                     App.ui.render();
                 },
                 toggleSidebar: () => {
@@ -793,7 +834,7 @@
                     btn.innerHTML = App.state.soundEnabled 
                         ? '<i data-lucide="volume-2" class="w-5 h-5"></i>' 
                         : '<i data-lucide="volume-x" class="w-5 h-5"></i>';
-                    lucide.createIcons();
+                    if(window.lucide) lucide.createIcons();
                     App.ui.showToast(App.state.soundEnabled ? '사운드 켜짐' : '사운드 꺼짐');
                 },
                 toggleGrayscale: () => {
@@ -802,7 +843,7 @@
                     if (App.state.grayscaleMode) main.classList.add('grayscale'); else main.classList.remove('grayscale');
                     const btn = document.getElementById('btn-grayscale');
                     btn.innerHTML = App.state.grayscaleMode ? '<i data-lucide="eye-off" class="w-5 h-5 text-blue-500"></i>' : '<i data-lucide="eye" class="w-5 h-5"></i>';
-                    lucide.createIcons();
+                    if(window.lucide) lucide.createIcons();
                     App.ui.showToast(App.state.grayscaleMode ? '흑백 모드 켜짐' : '흑백 모드 꺼짐');
                 },
                 render: () => {
@@ -812,8 +853,8 @@
                     if(mode === 'mockup') App.ui.renderMockup();
                     if(mode === 'typography') App.ui.renderTypography();
                     App.ui.updateRemixButtons();
-                    lucide.createIcons();
-                    App.utils.updateHash(); // URL 업데이트
+                    if(window.lucide) lucide.createIcons();
+                    App.utils.updateHash();
                 },
                 updateRemixButtons: () => {
                     const c = App.state.colors; if(!c.length) return;
@@ -825,6 +866,7 @@
                 renderPalette: () => {
                     const container = document.getElementById('view-palette-content'); container.innerHTML = '';
                     App.state.colors.forEach((c, i) => {
+                        if (!c) return; // Guard against null colors
                         const txt = App.utils.getTextColor(c.hex); const isLocked = App.state.locked[i];
                         const name = App.utils.getColorName(c.hex);
                         const nextColor = App.state.colors[i+1];
@@ -837,7 +879,6 @@
                         div.ondragover = (e) => e.preventDefault();
                         div.ondrop = (e) => App.logic.handleDrop(e, i);
                         div.ondragend = (e) => e.target.classList.remove('panel-dragging');
-                        // Updated Quick Shade UI: Split Button Bar
                         div.innerHTML = `
                             <div class="absolute top-6 right-6"><button onclick="event.stopPropagation(); App.logic.toggleLock(${i})" class="p-2 rounded-full transition-all ${isLocked ? 'bg-black/20 text-white' : 'opacity-0 group-hover:opacity-100 hover:bg-black/10'}"><i data-lucide="${isLocked?'lock':'unlock'}" class="w-5 h-5"></i></button></div>
                             <h2 onclick="event.stopPropagation(); App.ui.openTuneModal(${i})" class="text-3xl font-black uppercase font-mono hover:opacity-70 transition-opacity" title="Edit">${c.hex}</h2>
@@ -855,33 +896,129 @@
                 },
                 renderGradient: () => {
                     const angle = App.state.gradientAngle || 90;
-                    const css = `linear-gradient(${angle}deg, ${App.state.colors.map(c=>c.hex).join(', ')})`;
+                    const css = `linear-gradient(${angle}deg, ${App.state.colors.filter(c=>c).map(c=>c.hex).join(', ')})`;
                     document.getElementById('gradient-box').style.background = css;
                     document.getElementById('gradient-css').innerText = css;
                 },
                 updateGradientAngle: (val) => {
                     App.state.gradientAngle = val; document.getElementById('grad-angle-val').innerText = val + '°'; App.ui.renderGradient();
                 },
+                setMockupScene: (scene) => {
+                    App.state.mockupScene = scene;
+                    document.querySelectorAll('.mockup-scene-btn').forEach(b => {
+                        b.className = 'mockup-scene-btn px-3 py-1.5 text-xs font-bold rounded-md hover:bg-gray-100 dark:hover:bg-dark-bg text-gray-500';
+                        if(b.innerText.toLowerCase().includes(scene) || (scene === 'app' && b.innerText === 'App') || (scene === 'dashboard' && b.innerText === 'Dash')) {
+                            b.className = 'mockup-scene-btn px-3 py-1.5 text-xs font-bold rounded-md bg-black text-white dark:bg-white dark:text-black';
+                        }
+                    });
+                    App.ui.renderMockup();
+                },
                 renderMockup: () => {
                     const rawColors = App.state.colors;
                     const offset = App.state.colorOffset;
                     const c = rawColors.map((_, i) => rawColors[(i + offset) % rawColors.length]);
+                    const container = document.getElementById('mockup-inject-area');
                     const bg = c[0].hex, txt = App.utils.getTextColor(bg), acc = c[1] ? c[1].hex : bg;
-                    const accTxt = App.utils.getTextColor(acc);
-                    const el = (id) => document.getElementById(id);
-                    el('mock-container').style.backgroundColor = bg; el('mock-hero').style.backgroundColor = bg; el('mock-hero').style.color = txt;
-                    el('mock-badge').style.backgroundColor = txt + '15'; el('mock-badge').style.color = txt;
-                    el('mock-title').style.background = `linear-gradient(to right, ${txt}, ${acc})`;
-                    el('mock-title').style.webkitBackgroundClip = 'text'; el('mock-title').style.webkitTextFillColor = 'transparent';
-                    el('mock-subtitle').style.color = txt;
-                    el('mock-btn-primary').style.backgroundColor = acc; el('mock-btn-primary').style.color = accTxt;
-                    el('mock-btn-secondary').style.borderColor = txt + '40'; el('mock-btn-secondary').style.color = txt;
-                    const s1 = c[2]?.hex || acc; const s2 = c[3]?.hex || bg; 
-                    el('mock-shapes').innerHTML = `<svg viewBox="0 0 400 400" fill="none" style="transform: rotate(-15deg);"><circle cx="300" cy="100" r="80" fill="${s1}" fill-opacity="0.2" /><rect x="200" y="200" width="120" height="120" rx="20" fill="${s2}" fill-opacity="0.2" /></svg>`;
-                    const glassStyle = `background: ${txt}08; backdrop-filter: blur(12px); border: 1px solid ${txt}10; color: ${txt};`;
-                    el('mock-card-1').setAttribute('style', glassStyle); el('mock-card-2').setAttribute('style', glassStyle);
-                    el('mock-card-3').style.background = `linear-gradient(135deg, ${c[2]?.hex}, ${c[3]?.hex})`; el('mock-card-3').style.color = App.utils.getTextColor(c[2]?.hex);
-                    el('mock-footer').style.color = txt;
+                    const scene = App.state.mockupScene;
+
+                    let html = '';
+                    if (scene === 'landing') {
+                        html = `
+                        <div class="grid grid-cols-1 md:grid-cols-12 gap-6 min-h-[800px] rounded-3xl overflow-hidden shadow-2xl transition-colors" style="background:${bg}">
+                            <div class="md:col-span-12 p-12 md:p-16 flex flex-col md:flex-row items-center justify-between relative overflow-hidden" style="background:${bg}; color:${txt}">
+                                <div class="relative z-10 max-w-lg space-y-6">
+                                    <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-widest backdrop-blur-sm" style="background:${txt}15; color:${txt}">New Arrival</div>
+                                    <h1 class="text-6xl md:text-8xl font-black tracking-tighter leading-[0.9]" style="background:linear-gradient(to right, ${txt}, ${acc}); -webkit-background-clip:text; -webkit-text-fill-color:transparent;">MAKE<br>WAVES.</h1>
+                                    <p class="text-lg opacity-80 max-w-sm font-medium">Experience the next generation of creative tools.</p>
+                                    <div class="flex gap-4 pt-4">
+                                        <button class="px-8 py-4 rounded-full font-bold shadow-lg hover:scale-105 transition-transform" style="background:${acc}; color:${App.utils.getTextColor(acc)}">Get Started</button>
+                                        <button class="px-8 py-4 rounded-full font-bold border-2 transition-colors" style="border-color:${txt}40; color:${txt}">Learn More</button>
+                                    </div>
+                                </div>
+                                <div class="absolute right-0 top-0 w-full h-full md:w-1/2 opacity-30 pointer-events-none"><svg viewBox="0 0 400 400" fill="none" style="transform: rotate(-15deg);"><circle cx="300" cy="100" r="80" fill="${c[2]?.hex || acc}" fill-opacity="0.2" /><rect x="200" y="200" width="120" height="120" rx="20" fill="${c[3]?.hex || bg}" fill-opacity="0.2" /></svg></div>
+                            </div>
+                            <div class="md:col-span-4 p-10 rounded-3xl flex flex-col justify-between" style="background:${txt}08; backdrop-filter: blur(12px); border: 1px solid ${txt}10; color:${txt}">
+                                <div class="w-12 h-12 rounded-full flex items-center justify-center bg-black/10 mb-6"><i data-lucide="zap" class="w-6 h-6"></i></div>
+                                <div><h3 class="text-2xl font-bold mb-2">Fast</h3><p class="opacity-70 text-sm">Lightning quick color generation.</p></div>
+                            </div>
+                            <div class="md:col-span-4 p-10 rounded-3xl flex flex-col justify-between border-2 border-dashed" style="background:${txt}08; backdrop-filter: blur(12px); border-color:${txt}20; color:${txt}">
+                                <div class="w-full h-24 flex items-end gap-2 mb-6 opacity-50"><div class="w-1/4 h-1/2 bg-current rounded-t-lg"></div><div class="w-1/4 h-3/4 bg-current rounded-t-lg"></div><div class="w-1/4 h-full bg-current rounded-t-lg"></div><div class="w-1/4 h-2/3 bg-current rounded-t-lg"></div></div>
+                                <div><h3 class="text-2xl font-bold mb-2">Analytics</h3><p class="opacity-70 text-sm">Data driven decisions.</p></div>
+                            </div>
+                            <div class="md:col-span-4 p-10 rounded-3xl flex flex-col justify-center items-center text-center relative overflow-hidden" style="background:linear-gradient(135deg, ${c[2]?.hex}, ${c[3]?.hex}); color:${App.utils.getTextColor(c[2]?.hex)}">
+                                <div class="absolute inset-0 opacity-20 bg-gradient-to-tr from-transparent to-black"></div><h3 class="text-3xl font-black relative z-10">PRO<br>MODE</h3>
+                            </div>
+                        </div>`;
+                    } else if (scene === 'app') {
+                        const cardBg = App.utils.getContrast(bg, '#ffffff') > 1.2 ? '#ffffff' : '#000000';
+                        html = `
+                        <div class="flex justify-center items-center min-h-[700px]" style="background:${c[2]?.hex}20">
+                            <div class="w-[375px] h-[750px] rounded-[40px] shadow-2xl overflow-hidden relative flex flex-col border-8 border-gray-900" style="background:${bg}; color:${txt}">
+                                <div class="h-14 flex items-center justify-between px-6 shrink-0"><i data-lucide="menu" class="w-6 h-6"></i><span class="font-bold">App</span><div class="w-8 h-8 rounded-full bg-current opacity-20"></div></div>
+                                <div class="p-6 space-y-6 flex-1 overflow-y-auto scrollbar-thin">
+                                    <div class="p-6 rounded-2xl" style="background:${acc}; color:${App.utils.getTextColor(acc)}">
+                                        <p class="opacity-70 text-xs font-bold uppercase mb-1">Balance</p><h2 class="text-3xl font-bold">$12,450</h2>
+                                    </div>
+                                    <div class="grid grid-cols-2 gap-4">
+                                        <div class="aspect-square rounded-2xl flex flex-col justify-center items-center gap-2" style="background:${c[2]?.hex}; color:${App.utils.getTextColor(c[2]?.hex)}"><i data-lucide="send" class="w-6 h-6"></i><span class="text-sm font-bold">Send</span></div>
+                                        <div class="aspect-square rounded-2xl flex flex-col justify-center items-center gap-2" style="background:${c[3]?.hex}; color:${App.utils.getTextColor(c[3]?.hex)}"><i data-lucide="download" class="w-6 h-6"></i><span class="text-sm font-bold">Receive</span></div>
+                                    </div>
+                                    <div class="space-y-3">
+                                        <h3 class="font-bold text-sm opacity-50 uppercase">Recent</h3>
+                                        ${[1,2,3].map(i => `<div class="flex items-center gap-4 p-4 rounded-xl" style="background:${txt}08"><div class="w-10 h-10 rounded-full flex items-center justify-center font-bold" style="background:${c[i]?.hex || acc}; color:${App.utils.getTextColor(c[i]?.hex || acc)}">${i}</div><div class="flex-1"><div class="h-2 w-20 bg-current opacity-20 rounded mb-1"></div><div class="h-2 w-12 bg-current opacity-10 rounded"></div></div></div>`).join('')}
+                                    </div>
+                                </div>
+                                <div class="h-16 flex items-center justify-around px-2 border-t" style="border-color:${txt}10"><i data-lucide="home" class="w-6 h-6 opacity-100"></i><i data-lucide="search" class="w-6 h-6 opacity-40"></i><i data-lucide="heart" class="w-6 h-6 opacity-40"></i><i data-lucide="user" class="w-6 h-6 opacity-40"></i></div>
+                            </div>
+                        </div>`;
+                    } else if (scene === 'dashboard') {
+                        html = `
+                        <div class="w-full min-h-[700px] p-8 rounded-xl shadow-inner grid grid-cols-4 gap-6" style="background:${bg}; color:${txt}">
+                            <div class="col-span-1 p-6 rounded-xl flex flex-col gap-6" style="background:${txt}05">
+                                <div class="font-bold text-xl flex items-center gap-2"><div class="w-6 h-6 rounded bg-gradient-to-tr from-${acc} to-${c[2]?.hex}"></div> Dash.</div>
+                                <div class="space-y-2 text-sm font-medium opacity-70">
+                                    <div class="p-2 rounded bg-current text-[${bg}]">Overview</div><div class="p-2">Analytics</div><div class="p-2">Settings</div>
+                                </div>
+                            </div>
+                            <div class="col-span-3 grid grid-cols-3 gap-6">
+                                <div class="col-span-3 p-8 rounded-xl flex items-end justify-between" style="background:${txt}05; height: 300px">
+                                    ${[40, 70, 50, 90, 60, 80, 45, 75].map((h, i) => `<div class="w-full mx-2 rounded-t-lg transition-all hover:opacity-80" style="height:${h}%; background:${i%2===0 ? acc : c[2]?.hex || acc}"></div>`).join('')}
+                                </div>
+                                <div class="col-span-1 p-6 rounded-xl" style="background:${c[3]?.hex || acc}; color:${App.utils.getTextColor(c[3]?.hex || acc)}">
+                                    <h3 class="text-sm font-bold opacity-70 mb-2">Total Users</h3><p class="text-4xl font-bold">24k</p>
+                                </div>
+                                <div class="col-span-1 p-6 rounded-xl" style="background:${c[2]?.hex || acc}; color:${App.utils.getTextColor(c[2]?.hex || acc)}">
+                                    <h3 class="text-sm font-bold opacity-70 mb-2">Revenue</h3><p class="text-4xl font-bold">$1.2M</p>
+                                </div>
+                                <div class="col-span-1 p-6 rounded-xl border-2 border-dashed flex items-center justify-center opacity-50" style="border-color:${txt}40">
+                                    <span>Add Widget</span>
+                                </div>
+                            </div>
+                        </div>`;
+                    } else if (scene === 'art') {
+                        html = `
+                        <div class="w-full min-h-[700px] rounded-xl overflow-hidden relative flex items-center justify-center" style="background:${bg}">
+                            <div class="absolute inset-0 opacity-50 mix-blend-multiply" style="background: radial-gradient(circle at 20% 30%, ${c[1]?.hex}, transparent 50%), radial-gradient(circle at 80% 70%, ${c[2]?.hex}, transparent 50%);"></div>
+                            <div class="relative z-10 text-center mix-blend-difference" style="color:${c[4]?.hex || '#fff'}">
+                                <h1 class="text-9xl font-black tracking-tighter leading-none mb-4">ART<br>IS<br>CHAOS</h1>
+                                <p class="text-2xl font-serif italic tracking-widest">Find your color.</p>
+                            </div>
+                            <div class="absolute w-64 h-64 rounded-full blur-3xl top-1/4 left-1/4 animate-pulse" style="background:${acc}"></div>
+                            <div class="absolute w-96 h-96 rounded-full blur-3xl bottom-1/4 right-1/4 animate-pulse" style="background:${c[3]?.hex}" style="animation-delay:1s"></div>
+                        </div>`;
+                    }
+                    container.innerHTML = html;
+                    if(window.lucide) lucide.createIcons();
+                },
+                setTypoStyle: (style) => {
+                    App.state.typoStyle = style;
+                    document.querySelectorAll('.typo-style-btn').forEach(b => {
+                        b.className = 'typo-style-btn px-3 py-1.5 text-xs font-bold rounded-md hover:bg-gray-100 dark:hover:bg-dark-bg text-gray-500';
+                        if(b.innerText.toLowerCase() === style) {
+                            b.className = 'typo-style-btn px-3 py-1.5 text-xs font-bold rounded-md bg-black text-white dark:bg-white dark:text-black';
+                        }
+                    });
+                    App.ui.renderTypography();
                 },
                 renderTypography: () => {
                     const rawColors = App.state.colors;
@@ -889,38 +1026,63 @@
                     const c = rawColors.map((_, i) => rawColors[(i + offset) % rawColors.length]);
                     const container = document.getElementById('typo-inject-area');
                     const getColor = (i) => c[i % c.length].hex;
-                    const fontClass = App.state.typoFont === 'serif' ? 'serif-font' : App.state.typoFont === 'mono' ? 'mono-font' : 'font-sans';
-                    container.className = fontClass + " bg-white dark:bg-dark-surface p-16 rounded-xl shadow-sm min-h-[800px]";
-                    container.innerHTML = `
-                        <article class="max-w-3xl mx-auto">
+                    const style = App.state.typoStyle;
+
+                    let html = '';
+                    if (style === 'modern') {
+                        html = `
+                        <article class="max-w-3xl mx-auto bg-white dark:bg-dark-surface p-16 rounded-xl shadow-sm" style="font-family: 'Inter', sans-serif;">
                             <div class="flex items-center justify-between border-b-2 pb-8 mb-12" style="border-color:${getColor(0)}">
                                 <span class="text-sm font-bold tracking-[0.2em] uppercase" style="color:${getColor(2)}">Brand Guideline</span>
                                 <span class="text-sm font-mono opacity-60" style="color:${getColor(0)}">v1.0</span>
                             </div>
                             <h1 class="text-7xl font-black mb-8 leading-tight" style="color:${getColor(0)}">Visual<br>Harmony.</h1>
-                            <div class="grid md:grid-cols-12 gap-8 mb-16">
-                                <div class="md:col-span-8">
-                                    <p class="text-2xl font-medium leading-relaxed mb-6" style="color:${getColor(1)}">Color creates emotion. It is the silent ambassador of your brand.</p>
-                                    <p class="text-lg opacity-70 leading-relaxed" style="color:${getColor(0)}">A well-chosen palette not only looks good but also enhances usability and user experience.</p>
-                                </div>
-                                <div class="md:col-span-4 p-6 rounded-lg" style="background:${getColor(3)}15">
-                                    <span class="block text-xs font-bold uppercase mb-2 opacity-50" style="color:${getColor(0)}">Accent</span>
-                                    <div class="h-2 w-12 mb-4" style="background:${getColor(3)}"></div>
-                                    <p class="text-sm font-mono" style="color:${getColor(0)}">${getColor(3)}</p>
-                                </div>
-                            </div>
-                            <div class="grid grid-cols-2 md:grid-cols-5 gap-0 mb-16 rounded-xl overflow-hidden shadow-lg">
-                                ${c.map(col => `<div class="h-32 flex items-end p-4" style="background:${col.hex}"><span class="text-xs font-mono bg-white/20 px-2 py-1 rounded backdrop-blur-sm" style="color:${App.utils.getTextColor(col.hex)}">${col.hex}</span></div>`).join('')}
-                            </div>
+                            <p class="text-2xl font-medium leading-relaxed mb-6" style="color:${getColor(1)}">Color creates emotion. It is the silent ambassador of your brand.</p>
                             <div class="p-10 rounded-xl mb-12" style="background:${getColor(4)}; color:${App.utils.getTextColor(getColor(4))}">
                                 <h3 class="text-2xl font-bold mb-4">"Design is intelligence made visible."</h3>
-                                <div class="flex gap-4 mt-6">
-                                    <button class="px-6 py-3 rounded-lg font-bold bg-black/20 hover:bg-black/30 transition-colors">Primary Action</button>
-                                    <button class="px-6 py-3 rounded-lg font-bold border-2 border-current opacity-70 hover:opacity-100 transition-opacity">Secondary</button>
-                                </div>
                             </div>
-                        </article>
-                    `;
+                        </article>`;
+                    } else if (style === 'editorial') {
+                        html = `
+                        <article class="max-w-4xl mx-auto p-16 rounded-xl shadow-sm" style="background:${getColor(0)}; color:${App.utils.getTextColor(getColor(0))}; font-family: 'Playfair Display', serif;">
+                            <div class="text-center mb-16"><span class="italic text-lg border-b border-current pb-1">The Collection</span></div>
+                            <h1 class="text-8xl font-black mb-12 text-center leading-none tracking-tight font-abril" style="color:${getColor(2)}">ELEGANCE<br>& GRACE</h1>
+                            <div class="columns-2 gap-8 text-lg leading-loose opacity-80" style="column-rule: 1px solid ${getColor(2)}40">
+                                <p class="mb-4"><span class="text-4xl float-left mr-2 font-bold" style="color:${getColor(1)}">T</span>rue elegance is not about being noticed, it's about being remembered. In the world of design, typography and color serve as the primary vehicles of expression.</p>
+                                <p>By carefully selecting a palette that whispers rather than shouts, we create an atmosphere of timeless sophistication.</p>
+                            </div>
+                        </article>`;
+                    } else if (style === 'sns') {
+                        html = `
+                        <div class="max-w-4xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-8">
+                            <!-- Story Format -->
+                            <div class="aspect-[9/16] rounded-2xl relative p-8 flex flex-col justify-between" style="background:${getColor(0)}; color:${App.utils.getTextColor(getColor(0))}">
+                                <div class="flex gap-2 opacity-50"><div class="flex-1 h-1 bg-current rounded-full"></div><div class="flex-1 h-1 bg-current rounded-full opacity-50"></div></div>
+                                <div>
+                                    <h2 class="text-5xl font-black mb-4 leading-tight">NEW<br>DROP<br>TODAY</h2>
+                                    <p class="text-lg font-medium opacity-80">Check out our latest collection in store now.</p>
+                                </div>
+                                <button class="w-full py-4 rounded-full font-bold text-center" style="background:${getColor(2)}; color:${App.utils.getTextColor(getColor(2))}">Swipe Up</button>
+                            </div>
+                            <!-- Feed Post Format -->
+                            <div class="aspect-square rounded-2xl p-8 flex flex-col justify-center items-center text-center relative" style="background:${getColor(1)}; color:${App.utils.getTextColor(getColor(1))}">
+                                <div class="absolute inset-4 border-2 opacity-30" style="border-color:currentColor"></div>
+                                <span class="text-xs font-bold tracking-[0.3em] uppercase mb-4 opacity-70">Quote of the Day</span>
+                                <h3 class="text-3xl font-serif italic leading-relaxed">"Colors are the smiles of nature."</h3>
+                                <div class="mt-6 flex items-center gap-2 text-sm font-bold"><div class="w-6 h-6 rounded-full bg-current"></div> @chromazen</div>
+                            </div>
+                        </div>`;
+                    } else if (style === 'poster') {
+                        html = `
+                        <div class="max-w-3xl mx-auto p-12 rounded-none shadow-none flex flex-col justify-between min-h-[800px] border-8" style="background:${getColor(0)}; border-color:${getColor(1)}; color:${App.utils.getTextColor(getColor(0))}">
+                            <div class="flex justify-between font-bold text-xl uppercase tracking-widest border-b-4 pb-4" style="border-color:${getColor(1)}"><span>01</span><span>Manifesto</span></div>
+                            <h1 class="text-[120px] font-black leading-[0.8] my-auto break-all" style="color:${getColor(2)}; -webkit-text-stroke: 2px ${getColor(1)}">BOLD<br>MOVES<br>ONLY.</h1>
+                            <div class="bg-black text-white p-6 font-mono text-sm" style="background:${getColor(1)}; color:${App.utils.getTextColor(getColor(1))}">
+                                FIG. 1 — THE POWER OF COLOR.<br>EXPLORE UNCHARTED TERRITORIES OF CREATIVITY.
+                            </div>
+                        </div>`;
+                    }
+                    container.innerHTML = html;
                 },
                 initHarmonyDropdown: () => {
                     const dd = document.getElementById('harmony-items');
@@ -937,39 +1099,237 @@
                     el.style.display = el.style.display === 'block' ? 'none' : 'block';
                     document.querySelector('.select-selected i').classList.toggle('select-arrow-active');
                 },
-                renderHistory: () => {
-                    const container = document.getElementById('history-container'); container.innerHTML = '';
-                    if(App.state.history.length === 0) { container.innerHTML = '<p class="text-xs text-gray-400 col-span-4 text-center mt-4">히스토리가 비어있습니다.</p>'; return; }
-                    App.state.history.forEach(palette => {
-                        const div = document.createElement('div');
-                        div.className = 'w-full aspect-square rounded-lg overflow-hidden cursor-pointer hover:ring-2 ring-indigo-500 transition-all flex flex-col border dark:border-gray-700';
-                        div.onclick = () => { App.logic.saveState(); App.state.colors = palette.map(hex => App.utils.hexToHsl(hex)); App.logic.setMode(palette.length, false); };
-                        palette.forEach(hex => { const d = document.createElement('div'); d.style.backgroundColor = hex; d.className = 'flex-1 w-full'; div.appendChild(d); });
-                        container.appendChild(div);
-                    });
+                toggleHelpSection: (id) => {
+                    const el = document.getElementById(id);
+                    const isHidden = el.classList.contains('hidden');
+                    document.querySelectorAll('.help-section-content').forEach(d => d.classList.add('hidden'));
+                    document.querySelectorAll('.help-arrow').forEach(a => a.style.transform = 'rotate(0deg)');
+                    if(isHidden) {
+                        el.classList.remove('hidden');
+                        document.getElementById('arrow-'+id).style.transform = 'rotate(180deg)';
+                    }
                 },
-                addToHistory: () => {
-                    const snap = App.state.colors.map(c => c.hex); App.state.history.unshift(snap);
-                    if(App.state.history.length > 20) App.state.history.pop();
-                    if(App.state.activeTab === 'history') App.ui.renderHistory();
+                toggleHelpLang: () => {
+                    App.state.helpLang = App.state.helpLang === 'ko' ? 'en' : 'ko';
+                    App.ui.showHelp(App.state.lastHelpTab);
+                },
+                // New Function to refresh inspiration card only
+                updateInspirationCard: () => {
+                    const isKo = App.state.helpLang === 'ko';
+                    const dailyTips = isKo ? [
+                        "파란색은 식욕을 억제합니다. 식품 관련 브랜드라면 주의하세요!",
+                        "가장 안전한 텍스트 색상은 #000이 아니라 #333 입니다.",
+                        "자연의 색은 결코 충돌하지 않습니다. 숲과 바다 사진에서 영감을 얻으세요.",
+                        "CTA 버튼은 페이지에서 가장 튀는 '강조색'을 사용해야 클릭률이 높습니다.",
+                        "회색에 아주 약간의 파란색을 섞으면 훨씬 세련된 쿨 그레이가 됩니다.",
+                        "노란색은 검정 배경 위에서 가장 가독성이 높습니다.",
+                        "여백(White Space)은 디자인에서 가장 중요한 '색상'입니다."
+                    ] : [
+                        "Blue suppresses appetite. Be careful with food branding!",
+                        "The safest text color is not #000, but #333.",
+                        "Nature's colors never clash. Look at forests and oceans for inspiration.",
+                        "Use your 'Accent Color' for CTA buttons to maximize click-through rates.",
+                        "Adding a tiny bit of blue to grey makes it look more premium.",
+                        "Yellow offers the highest readability against a black background.",
+                        "White space is the most important 'color' in design."
+                    ];
+                    const randomTip = dailyTips[Math.floor(Math.random() * dailyTips.length)];
+                    const card = document.getElementById('daily-inspiration-card');
+                    const text = document.getElementById('daily-inspiration-text');
+                    
+                    // Simple animation reset
+                    card.classList.remove('animate-pulse-fast');
+                    void card.offsetWidth; // Trigger reflow
+                    card.classList.add('animate-pulse-fast');
+                    
+                    text.innerText = `"${randomTip}"`;
+                    setTimeout(() => card.classList.remove('animate-pulse-fast'), 500);
+                },
+                showHelp: (initialTab = 'tips') => {
+                    App.state.lastHelpTab = initialTab;
+                    const isKo = App.state.helpLang === 'ko';
+                    
+                    const content = `
+                        <div class="bg-white dark:bg-dark-surface rounded-2xl shadow-2xl w-full max-w-lg p-6 transform scale-100 transition-transform overflow-hidden relative flex flex-col max-h-[85vh]">
+                            <button onclick="App.ui.toggleHelpLang()" class="absolute top-6 right-6 z-10 text-[10px] font-bold border border-gray-200 dark:border-gray-600 rounded px-2 py-1 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors uppercase tracking-widest text-gray-500 dark:text-gray-400">
+                                ${isKo ? 'EN' : 'KR'}
+                            </button>
+                            
+                            <!-- Clickable Inspiration Card -->
+                            <div id="daily-inspiration-card" onclick="App.ui.updateInspirationCard()" class="mb-4 p-4 rounded-xl bg-gradient-to-r from-indigo-500 to-purple-600 text-white shadow-lg shrink-0 cursor-pointer hover:shadow-xl hover:scale-[1.02] transition-all active:scale-95 group">
+                                <div class="flex justify-between items-center mb-1">
+                                    <div class="text-[10px] uppercase font-bold tracking-widest opacity-70">✨ ${isKo?'Today\'s Inspiration':'Today\'s Inspiration'}</div>
+                                    <i data-lucide="refresh-cw" class="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity"></i>
+                                </div>
+                                <p id="daily-inspiration-text" class="text-sm font-medium leading-relaxed">"Click me for a new tip!"</p>
+                            </div>
+
+                            <div class="flex border-b border-gray-100 dark:border-dark-border pr-12 shrink-0">
+                                <button class="flex-1 py-3 text-sm font-bold border-b-2 ${initialTab==='tips'?'border-black dark:border-white text-black dark:text-white':'border-transparent text-gray-400'}" onclick="App.ui.showHelp('tips')">${isKo ? '팁 가이드' : 'Tips & Guide'}</button>
+                                <button class="flex-1 py-3 text-sm font-bold border-b-2 ${initialTab==='shortcuts'?'border-black dark:border-white text-black dark:text-white':'border-transparent text-gray-400'}" onclick="App.ui.showHelp('shortcuts')">${isKo ? '단축키' : 'Shortcuts'}</button>
+                            </div>
+                            
+                            <div class="p-1 overflow-y-auto scrollbar-thin flex-1 mt-4" id="help-content">
+                                ${App.ui.getHelpContent(initialTab, isKo)}
+                            </div>
+                            
+                            <div class="pt-4 border-t border-gray-100 dark:border-dark-border flex justify-end shrink-0">
+                                <button onclick="App.ui.closeModal()" class="px-4 py-2 text-sm font-bold bg-black dark:bg-white text-white dark:text-black rounded-lg hover:opacity-80 transition-opacity">${isKo ? '닫기' : 'Close'}</button>
+                            </div>
+                        </div>
+                    `;
+                    App.ui.showModal(content);
+                    // Initialize with a tip
+                    App.ui.updateInspirationCard();
+                    if(window.lucide) lucide.createIcons();
+                },
+                getHelpContent: (tab, isKo) => {
+                    if(tab === 'shortcuts') {
+                        return `
+                            <div class="space-y-3 text-sm text-gray-600 dark:text-gray-300 p-2">
+                                <div class="flex justify-between items-center py-2 border-b border-gray-50 dark:border-gray-800"><span>${isKo?'색상 생성':'Generate'}</span> <span class="font-mono bg-gray-100 dark:bg-dark-bg px-2 py-1 rounded text-xs">Space</span></div>
+                                <div class="flex justify-between items-center py-2 border-b border-gray-50 dark:border-gray-800"><span>${isKo?'스마트 셔플 (톤 유지)':'Smart Shuffle (Keep Tone)'}</span> <span class="font-mono bg-gray-100 dark:bg-dark-bg px-2 py-1 rounded text-xs">Shift + Click</span></div>
+                                <div class="flex justify-between items-center py-2 border-b border-gray-50 dark:border-gray-800"><span>${isKo?'실행 취소/다시 실행':'Undo / Redo'}</span> <span class="font-mono bg-gray-100 dark:bg-dark-bg px-2 py-1 rounded text-xs">Ctrl + Z / Y</span></div>
+                                <div class="flex justify-between items-center py-2 border-b border-gray-50 dark:border-gray-800"><span>${isKo?'색상 잠금':'Lock Color'}</span> <span class="font-mono bg-gray-100 dark:bg-dark-bg px-2 py-1 rounded text-xs">1 ... 5</span></div>
+                                <div class="flex justify-between items-center py-2"><span>${isKo?'단축키 도움말':'Help'}</span> <span class="font-mono bg-gray-100 dark:bg-dark-bg px-2 py-1 rounded text-xs">?</span></div>
+                            </div>`;
+                    } else {
+                        // Extended Tips Content (30+ Tips)
+                        const sections = isKo ? [
+                            {id:'basic', title:'📐 기본 법칙 (The Basics)', content:`
+                                <ul class="list-disc pl-4 space-y-2">
+                                    <li><strong>60-30-10 법칙:</strong> 60% 배경(주조색), 30% 콘텐츠(보조색), 10% 포인트(강조색) 비율이 가장 안정적입니다.</li>
+                                    <li><strong>단색(Monochromatic):</strong> 실패 확률 0%. 한 가지 색상(Hue)의 명도(Lightness)만 다르게 배색하면 깔끔하고 세련된 느낌을 줍니다.</li>
+                                    <li><strong>유사색(Analogous):</strong> 색상환에서 바로 옆에 있는 색들을 조합하세요. (예: 초록+연두) 자연스럽고 편안합니다.</li>
+                                    <li><strong>보색(Complementary):</strong> 색상환 반대편 색을 사용하세요. (예: 파랑+주황) 주목도가 높지만 텍스트에는 피하는 것이 좋습니다.</li>
+                                    <li><strong>3색 조화(Triadic):</strong> 색상환에서 정삼각형을 이루는 세 가지 색. 생동감 넘치지만 균형 잡기가 어렵습니다.</li>
+                                </ul>`},
+                            {id:'psy', title:'🧠 색채 심리학 (Psychology)', content:`
+                                <ul class="list-disc pl-4 space-y-2">
+                                    <li><strong>파랑(Blue):</strong> 신뢰, 안정, 전문성. 금융(비자, 삼성), 테크(인텔, 메타), 의료 분야 선호도 1위.</li>
+                                    <li><strong>빨강(Red):</strong> 에너지, 긴박함, 식욕 자극. '할인', '마감 임박', '에러', '유튜브/넷플릭스' 등 행동 유도에 최적.</li>
+                                    <li><strong>초록(Green):</strong> 성장, 건강, 돈, 안정. 눈이 가장 편안하며 '성공', '안전' 메시지에 적합합니다.</li>
+                                    <li><strong>노랑(Yellow):</strong> 행복, 경고, 주목. 검정 배경 위에서 가장 눈에 잘 띄는 색상입니다. (카카오)</li>
+                                    <li><strong>보라(Purple):</strong> 창의성, 신비로움, 고급스러움. 뷰티, 타로, 프리미엄 서비스에 어울립니다.</li>
+                                    <li><strong>주황(Orange):</strong> 친근함, 활력, 저렴함. 가성비 좋은 서비스나 커뮤니티에 적합합니다.</li>
+                                </ul>`},
+                            {id:'uiux', title:'💻 실전 UI/UX 팁', content:`
+                                <ul class="list-disc pl-4 space-y-2">
+                                    <li><strong>다크 모드 배경:</strong> #000000(완전 검정) 대신 #121212를 사용하세요. 눈의 피로를 줄이고 OLED 스미어링을 방지합니다.</li>
+                                    <li><strong>그림자 색상:</strong> 검정 투명도(rgba(0,0,0,0.2)) 대신, 브랜드 컬러의 아주 어두운 톤을 사용하면 훨씬 생동감 있습니다.</li>
+                                    <li><strong>텍스트 계층:</strong> 폰트 크기뿐 아니라 색상의 명도로도 위계를 나누세요. (예: 제목 #111, 본문 #444, 캡션 #888)</li>
+                                    <li><strong>순수 회색 피하기:</strong> 회색에도 아주 약간의 파랑이나 노랑 틴트를 섞으면 훨씬 자연스러워 보입니다.</li>
+                                    <li><strong>배경색:</strong> 완전한 흰색(#FFF)보다 아주 연한 웜그레이(#F9F9F9)가 눈부심이 적고 고급스럽습니다.</li>
+                                    <li><strong>오류 메시지:</strong> 빨강만 쓰지 말고 아이콘을 함께 사용하세요. 색맹 사용자는 빨강과 초록을 구별하기 어렵습니다.</li>
+                                </ul>`},
+                            {id:'marketing', title:'📣 마케팅 & 브랜딩', content:`
+                                <ul class="list-disc pl-4 space-y-2">
+                                    <li><strong>CTA 버튼:</strong> 페이지 내에서 유일하게 튀는 색(강조색)이어야 클릭률이 높습니다.</li>
+                                    <li><strong>브랜드 일관성:</strong> 로고 색상을 그대로 UI에 쓰기보다, 채도와 명도를 조절한 팔레트를 별도로 정의하세요.</li>
+                                    <li><strong>타겟 오디언스:</strong> 10-20대는 과감하고 채도 높은 색(네온, 비비드)을, 40-50대는 차분하고 깊은 색(네이비, 와인)을 선호합니다.</li>
+                                    <li><strong>계절감:</strong> 봄(파스텔), 여름(비비드/쿨), 가을(딥/웜), 겨울(고대비/쿨) 마케팅 시즌에 맞춰 톤을 조정하세요.</li>
+                                </ul>`},
+                            {id:'trend', title:'✨ 트렌드 & 테크닉', content:`
+                                <ul class="list-disc pl-4 space-y-2">
+                                    <li><strong>그라디언트:</strong> 두 색상의 차이가 크지 않은 '미묘한 그라디언트'가 트렌드입니다. </li>
+                                    <li><strong>글래스모피즘:</strong> 배경을 흐리게(Blur) 하고 반투명한 흰색을 올려 유리 질감을 만드세요.</li>
+                                    <li><strong>네오 브루탈리즘:</strong> 고채도 원색 + 굵은 검정 테두리 + 그림자 없음. 힙하고 젊은 느낌을 줍니다.</li>
+                                    <li><strong>메쉬 그라디언트:</strong> 3-4가지 색상을 불규칙하게 섞어 몽환적인 배경을 만드는 기법입니다.</li>
+                                </ul>`},
+                            {id:'a11y', title:'👓 접근성 (Accessibility)', content:`
+                                <ul class="list-disc pl-4 space-y-2">
+                                    <li><strong>명암비 4.5:1:</strong> 텍스트와 배경의 명암비 최소 기준(WCAG AA). ChromaZen의 배지를 확인하세요.</li>
+                                    <li><strong>큰 텍스트 3:1:</strong> 18pt 이상 굵은 텍스트는 3:1 명암비도 허용됩니다.</li>
+                                    <li><strong>색상 단독 사용 금지:</strong> 링크나 에러 표시에 색상만 쓰지 말고 밑줄이나 아이콘을 병행하세요.</li>
+                                    <li><strong>흑백 테스트:</strong> 'Grayscale' 모드에서도 정보의 위계와 구분이 명확한지 항상 확인하세요.</li>
+                                </ul>`}
+                        ] : [
+                            {id:'basic', title:'📐 The Basics (Rules)', content:`
+                                <ul class="list-disc pl-4 space-y-2">
+                                    <li><strong>60-30-10 Rule:</strong> 60% Background (Dominant), 30% Content (Secondary), 10% CTA (Accent).</li>
+                                    <li><strong>Monochromatic:</strong> Easiest way to look professional. Use variations in lightness of a single hue.</li>
+                                    <li><strong>Analogous:</strong> Colors next to each other on the wheel. Serene and comfortable designs.</li>
+                                    <li><strong>Complementary:</strong> Opposite colors. High contrast, great for popping elements but risky for text.</li>
+                                </ul>`},
+                            {id:'psy', title:'🧠 Color Psychology', content:`
+                                <ul class="list-disc pl-4 space-y-2">
+                                    <li><strong>Blue:</strong> Trust, Security. #1 choice for Finance and Tech.</li>
+                                    <li><strong>Red:</strong> Energy, Urgency. Raises heart rate. Use for Sales/Errors.</li>
+                                    <li><strong>Green:</strong> Growth, Health, Money. Easiest on the eyes.</li>
+                                    <li><strong>Yellow:</strong> Optimism, Warning. Most visible color against black.</li>
+                                    <li><strong>Purple:</strong> Creativity, Luxury, Mystery.</li>
+                                    <li><strong>Orange:</strong> Friendly, Affordable, Energetic.</li>
+                                </ul>`},
+                            {id:'uiux', title:'💻 UI/UX Pro Tips', content:`
+                                <ul class="list-disc pl-4 space-y-2">
+                                    <li><strong>Dark Mode:</strong> Avoid #000000. Use Dark Grey (#121212) to reduce eye strain and smearing.</li>
+                                    <li><strong>Colored Shadows:</strong> Use a very dark shade of your primary color for shadows instead of pure black.</li>
+                                    <li><strong>Text Hierarchy:</strong> Use shades of grey (#111, #444, #888) to denote importance, not just size.</li>
+                                    <li><strong>Avoid Pure Grey:</strong> Always add a tiny bit of blue or yellow tint to your greys for a richer look.</li>
+                                    <li><strong>Backgrounds:</strong> Off-white (#F9F9F9) often looks more premium than pure white (#FFF).</li>
+                                </ul>`},
+                            {id:'marketing', title:'📣 Marketing & Branding', content:`
+                                <ul class="list-disc pl-4 space-y-2">
+                                    <li><strong>CTA Buttons:</strong> Should be the most vibrant/distinct color on the page to maximize clicks.</li>
+                                    <li><strong>Audience:</strong> Gen Z prefers bold/neon colors; Older demographics prefer muted/deep tones.</li>
+                                    <li><strong>Consistency:</strong> Define a palette and stick to it. Repetition builds brand recognition.</li>
+                                </ul>`},
+                            {id:'trend', title:'✨ Trends & Techniques', content:`
+                                <ul class="list-disc pl-4 space-y-2">
+                                    <li><strong>Subtle Gradients:</strong> Use closely related colors for a modern, flat-plus look.</li>
+                                    <li><strong>Glassmorphism:</strong> Background blur + semi-transparent white overlays.</li>
+                                    <li><strong>Mesh Gradients:</strong> Blending multiple freeform color blobs for a dreamy background.</li>
+                                </ul>`},
+                            {id:'a11y', title:'👓 Accessibility', content:`
+                                <ul class="list-disc pl-4 space-y-2">
+                                    <li><strong>Contrast 4.5:1:</strong> The gold standard for text readability. Check the badges in this app.</li>
+                                    <li><strong>Don't rely on color alone:</strong> Use icons or underlines for errors/links, not just red/blue color.</li>
+                                    <li><strong>Grayscale Test:</strong> If it works in black & white, it works in color. Use the toggle to check.</li>
+                                </ul>`}
+                        ];
+
+                        return `<div class="space-y-2 pb-4">
+                            ${sections.map(s => `
+                                <div class="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
+                                    <button onclick="App.ui.toggleHelpSection('${s.id}')" class="w-full flex justify-between items-center p-3 text-left bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
+                                        <span class="font-bold text-sm text-gray-800 dark:text-gray-200">${s.title}</span>
+                                        <i data-lucide="chevron-down" id="arrow-${s.id}" class="help-arrow w-4 h-4 transition-transform text-gray-400"></i>
+                                    </button>
+                                    <div id="${s.id}" class="help-section-content hidden p-4 text-sm text-gray-600 dark:text-gray-300 bg-white dark:bg-dark-surface leading-relaxed">
+                                        ${s.content}
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>`;
+                    }
                 },
                 renderPresets: () => {
                     const grid = document.getElementById('presets-grid');
-                    const presets = ['vivid','pastel','dark','warm','nature','neon','retro','corporate','luxury','wedding', 'grayscale', 'cyberpunk'];
-                    grid.innerHTML = presets.map(p => {
-                        const isActive = App.state.preset === p;
-                        const activeClass = isActive 
-                            ? 'bg-gray-900 text-white dark:bg-gray-100 dark:text-black border-transparent shadow-md' 
-                            : 'bg-gray-50 dark:bg-dark-bg border-gray-100 dark:border-dark-border text-gray-600 dark:text-gray-300 hover:border-gray-300';
-                        return `
-                        <button 
-                            onmouseenter="App.ui.updateInfo(App.logic.getInfoText('${p}'))" 
-                            onmouseleave="App.ui.resetInfo()"
-                            onclick="App.logic.togglePreset('${p}')" 
-                            class="py-2 px-3 rounded-lg border transition-all text-left flex items-center gap-2 ${activeClass}">
-                            <span class="w-3 h-3 rounded-full bg-gradient-to-br from-gray-300 to-gray-500"></span><span class="text-xs font-medium capitalize">${p}</span>
-                        </button>`;
-                    }).join('');
+                    grid.innerHTML = '';
+                    
+                    Object.entries(PRESET_CATEGORIES).forEach(([cat, items]) => {
+                        const section = document.createElement('div');
+                        section.innerHTML = `<h4 class="text-[10px] font-bold text-gray-400 dark:text-dark-muted uppercase tracking-wider mb-2 mt-4 first:mt-0">${cat}</h4>`;
+                        const itemGrid = document.createElement('div');
+                        itemGrid.className = 'grid grid-cols-2 gap-2';
+                        
+                        items.forEach(p => {
+                            const isActive = App.state.preset === p;
+                            const activeClass = isActive 
+                                ? 'bg-gray-900 text-white dark:bg-gray-100 dark:text-black border-transparent shadow-md' 
+                                : 'bg-gray-50 dark:bg-dark-bg border-gray-100 dark:border-dark-border text-gray-600 dark:text-gray-300 hover:border-gray-300';
+                            
+                            const btn = document.createElement('button');
+                            btn.className = `py-2 px-3 rounded-lg border transition-all text-left flex items-center gap-2 ${activeClass}`;
+                            btn.onclick = () => App.logic.togglePreset(p);
+                            btn.onmouseenter = () => App.ui.updateInfo(App.logic.getInfoText(p));
+                            btn.onmouseleave = () => App.ui.resetInfo();
+                            btn.innerHTML = `<span class="w-3 h-3 rounded-full bg-gradient-to-br from-gray-300 to-gray-500"></span><span class="text-xs font-medium capitalize">${p}</span>`;
+                            itemGrid.appendChild(btn);
+                        });
+                        section.appendChild(itemGrid);
+                        grid.appendChild(section);
+                    });
                 },
                 renderLibrary: () => {
                     const container = document.getElementById('library-container');
@@ -1032,117 +1392,6 @@
                 showModal: (html) => {
                     const container = document.getElementById('modal-container'); container.innerHTML = html; container.classList.remove('hidden'); requestAnimationFrame(() => container.classList.remove('opacity-0'));
                 },
-                toggleHelpLang: () => {
-                    App.state.helpLang = App.state.helpLang === 'ko' ? 'en' : 'ko';
-                    App.ui.showHelp(App.state.lastHelpTab);
-                },
-                showHelp: (initialTab = 'shortcuts') => {
-                    App.state.lastHelpTab = initialTab;
-                    const isKo = App.state.helpLang === 'ko';
-                    
-                    const content = `
-                        <div class="bg-white dark:bg-dark-surface rounded-2xl shadow-2xl w-full max-w-md p-6 transform scale-100 transition-transform overflow-hidden relative">
-                            <button onclick="App.ui.toggleHelpLang()" class="absolute top-6 right-6 z-10 text-[10px] font-bold border border-gray-200 dark:border-gray-600 rounded px-2 py-1 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors uppercase tracking-widest text-gray-500 dark:text-gray-400">
-                                ${isKo ? 'EN' : 'KR'}
-                            </button>
-                            <div class="flex border-b border-gray-100 dark:border-dark-border pr-12">
-                                <button class="flex-1 py-3 text-sm font-bold border-b-2 ${initialTab==='shortcuts'?'border-black dark:border-white text-black dark:text-white':'border-transparent text-gray-400'}" onclick="App.ui.showHelp('shortcuts')">${isKo ? '단축키' : 'Shortcuts'}</button>
-                                <button class="flex-1 py-3 text-sm font-bold border-b-2 ${initialTab==='features'?'border-black dark:border-white text-black dark:text-white':'border-transparent text-gray-400'}" onclick="App.ui.showHelp('features')">${isKo ? '기능' : 'Features'}</button>
-                                <button class="flex-1 py-3 text-sm font-bold border-b-2 ${initialTab==='tips'?'border-black dark:border-white text-black dark:text-white':'border-transparent text-gray-400'}" onclick="App.ui.showHelp('tips')">${isKo ? '팁' : 'Tips'}</button>
-                            </div>
-                            <div class="p-6 h-80 overflow-y-auto scrollbar-thin" id="help-content">
-                                ${App.ui.getHelpContent(initialTab, isKo)}
-                            </div>
-                            <div class="p-4 border-t border-gray-100 dark:border-dark-border flex justify-end">
-                                <button onclick="App.ui.closeModal()" class="px-4 py-2 text-sm font-bold bg-black dark:bg-white text-white dark:text-black rounded-lg">${isKo ? '닫기' : 'Close'}</button>
-                            </div>
-                        </div>
-                    `;
-                    App.ui.showModal(content);
-                },
-                getHelpContent: (tab, isKo) => {
-                    if(tab === 'shortcuts') {
-                        return `
-                            <div class="space-y-3 text-sm text-gray-600 dark:text-gray-300">
-                                <div class="flex justify-between"><span>${isKo?'색상 생성':'Generate'}</span> <span class="font-mono bg-gray-100 dark:bg-dark-bg px-2 py-0.5 rounded">Space</span></div>
-                                <div class="flex justify-between"><span>${isKo?'스마트 셔플 (톤 유지)':'Smart Shuffle (Keep Tone)'}</span> <span class="font-mono bg-gray-100 dark:bg-dark-bg px-2 py-0.5 rounded">Shift + Click</span></div>
-                                <div class="flex justify-between"><span>${isKo?'실행 취소':'Undo'}</span> <span class="font-mono bg-gray-100 dark:bg-dark-bg px-2 py-0.5 rounded">Ctrl + Z</span></div>
-                                <div class="flex justify-between"><span>${isKo?'다시 실행':'Redo'}</span> <span class="font-mono bg-gray-100 dark:bg-dark-bg px-2 py-0.5 rounded">Ctrl + Y</span></div>
-                                <div class="flex justify-between"><span>${isKo?'색상 잠금':'Lock Color'}</span> <span class="font-mono bg-gray-100 dark:bg-dark-bg px-2 py-0.5 rounded">1 ... 5</span></div>
-                                <div class="flex justify-between"><span>${isKo?'단축키 도움말':'Help'}</span> <span class="font-mono bg-gray-100 dark:bg-dark-bg px-2 py-0.5 rounded">?</span></div>
-                            </div>`;
-                    } else if(tab === 'features') {
-                        return isKo ? `
-                            <div class="space-y-4 text-sm text-gray-600 dark:text-gray-300">
-                                <div><h4 class="font-bold text-black dark:text-white mb-1">🖼️ 이미지 매칭</h4><p>이미지를 붙여넣기(Ctrl+V)하거나 업로드하여 주요 색상을 자동으로 추출하세요.</p></div>
-                                <div><h4 class="font-bold text-black dark:text-white mb-1">⚡ 스마트 셔플</h4><p>Shift 키를 누른 채 Generate 버튼을 누르면, 현재 색상의 톤(명도/채도)은 유지한 채 색조만 변경합니다.</p></div>
-                                <div><h4 class="font-bold text-black dark:text-white mb-1">🔄 리믹스</h4><p>Mockup 또는 Typography 뷰에서 'Remix' 버튼을 눌러 현재 팔레트 내에서 색상 위치를 재배치해보세요.</p></div>
-                                <div><h4 class="font-bold text-black dark:text-white mb-1">💾 라이브러리</h4><p>마음에 드는 팔레트는 하트 아이콘을 눌러 로컬 저장소에 영구 보관할 수 있습니다.</p></div>
-                            </div>` : `
-                            <div class="space-y-4 text-sm text-gray-600 dark:text-gray-300">
-                                <div><h4 class="font-bold text-black dark:text-white mb-1">🖼️ Image Match</h4><p>Paste (Ctrl+V) or upload an image to extract its dominant colors automatically.</p></div>
-                                <div><h4 class="font-bold text-black dark:text-white mb-1">⚡ Smart Shuffle</h4><p>Hold Shift while clicking Generate to change hues while keeping the current tone (saturation/lightness).</p></div>
-                                <div><h4 class="font-bold text-black dark:text-white mb-1">🔄 Remix</h4><p>Click 'Remix' in Mockup or Typography view to shuffle color positions within your current palette.</p></div>
-                                <div><h4 class="font-bold text-black dark:text-white mb-1">💾 Library</h4><p>Save your favorite palettes to local storage by clicking the heart icon.</p></div>
-                            </div>`;
-                    } else if(tab === 'tips') {
-                        return isKo ? `
-                            <div class="space-y-5 text-sm text-gray-600 dark:text-gray-300">
-                                <div>
-                                    <h4 class="font-bold text-black dark:text-white mb-2 text-xs uppercase tracking-wider">기본 규칙 (Rules)</h4>
-                                    <p class="mb-1">💡 <strong>60-30-10 Rule:</strong> 주조색 60%(배경), 보조색 30%(콘텐츠), 강조색 10%(CTA 버튼)의 비율로 균형을 맞추세요.</p>
-                                    <p class="mb-1">💡 <strong>Monochromatic:</strong> 단색 배색은 실패 확률이 낮고, 깔끔하고 전문적인 느낌을 줍니다. 명도 차이만으로 계층을 만드세요.</p>
-                                </div>
-                                <hr class="border-gray-100 dark:border-dark-border">
-                                <div>
-                                    <h4 class="font-bold text-black dark:text-white mb-2 text-xs uppercase tracking-wider">접근성 (Accessibility)</h4>
-                                    <p class="mb-1">✨ <strong>Contrast:</strong> 텍스트 가독성을 위해 배경과 글자의 명암비(Contrast Ratio)가 최소 4.5:1 이상인지 확인하세요. (WCAG AA 기준)</p>
-                                    <p class="mb-1">✨ <strong>Color Blindness:</strong> 'Grayscale' 버튼을 눌러 색상을 뺐을 때도 정보가 명확히 구분되는지 테스트해보세요.</p>
-                                </div>
-                                <hr class="border-gray-100 dark:border-dark-border">
-                                <div>
-                                    <h4 class="font-bold text-black dark:text-white mb-2 text-xs uppercase tracking-wider">색채 심리 (Psychology)</h4>
-                                    <p class="mb-1">🎨 <strong>Warm vs Cool:</strong> 빨강/노랑(난색)은 에너지와 긴박함을, 파랑/초록(한색)은 신뢰와 차분함을 줍니다.</p>
-                                    <p class="mb-1">🎨 <strong>Blue:</strong> 전 세계적으로 가장 선호도가 높으며, 금융/기술 기업에서 신뢰의 상징으로 자주 쓰입니다.</p>
-                                    <p class="mb-1">🎨 <strong>Green:</strong> 성장, 건강, 금전을 상징하며 눈이 가장 편안한 색상입니다.</p>
-                                </div>
-                                <hr class="border-gray-100 dark:border-dark-border">
-                                <div>
-                                    <h4 class="font-bold text-black dark:text-white mb-2 text-xs uppercase tracking-wider">UI 디자인 팁</h4>
-                                    <p class="mb-1">🖌️ <strong>Dark Mode:</strong> 완전한 검정(#000000)보다는 짙은 회색(#121212)을 배경으로 사용해야 눈의 피로(Smearing 현상)를 줄일 수 있습니다.</p>
-                                    <p class="mb-1">🖌️ <strong>Saturation:</strong> 채도가 높은 색은 '행동 유도 버튼(CTA)'에만 제한적으로 사용하고, 넓은 면적에는 채도를 낮춘 색을 쓰세요.</p>
-                                    <p class="mb-1">🖌️ <strong>Nature's Palette:</strong> 자연 사진에서 색을 추출하면 인공적이지 않고 눈에 자연스러운 조화로운 배색을 얻을 수 있습니다.</p>
-                                </div>
-                            </div>` : `
-                            <div class="space-y-5 text-sm text-gray-600 dark:text-gray-300">
-                                <div>
-                                    <h4 class="font-bold text-black dark:text-white mb-2 text-xs uppercase tracking-wider">Core Rules</h4>
-                                    <p class="mb-1">💡 <strong>60-30-10 Rule:</strong> Use 60% dominant color (bg), 30% secondary (content), and 10% accent (buttons) for balance.</p>
-                                    <p class="mb-1">💡 <strong>Monochromatic:</strong> Safest bet for a clean look. Use variations in lightness of a single hue.</p>
-                                </div>
-                                <hr class="border-gray-100 dark:border-dark-border">
-                                <div>
-                                    <h4 class="font-bold text-black dark:text-white mb-2 text-xs uppercase tracking-wider">Accessibility</h4>
-                                    <p class="mb-1">✨ <strong>Contrast:</strong> Ensure a contrast ratio of at least 4.5:1 for text readability (WCAG AA standard).</p>
-                                    <p class="mb-1">✨ <strong>Testing:</strong> Use the 'Grayscale' toggle to check if your design works without color cues.</p>
-                                </div>
-                                <hr class="border-gray-100 dark:border-dark-border">
-                                <div>
-                                    <h4 class="font-bold text-black dark:text-white mb-2 text-xs uppercase tracking-wider">Psychology</h4>
-                                    <p class="mb-1">🎨 <strong>Warm vs Cool:</strong> Warm colors (red, yellow) excite; Cool colors (blue, green) calm.</p>
-                                    <p class="mb-1">🎨 <strong>Blue:</strong> Represents trust and stability, widely used in finance and tech.</p>
-                                    <p class="mb-1">🎨 <strong>Green:</strong> Symbolizes growth and health, and is the easiest color on the eyes.</p>
-                                </div>
-                                <hr class="border-gray-100 dark:border-dark-border">
-                                <div>
-                                    <h4 class="font-bold text-black dark:text-white mb-2 text-xs uppercase tracking-wider">UI Tips</h4>
-                                    <p class="mb-1">🖌️ <strong>Dark Mode:</strong> Use dark grey (#121212) instead of pure black (#000) to prevent OLED smearing and eye strain.</p>
-                                    <p class="mb-1">🖌️ <strong>Saturation:</strong> Reserve high saturation for CTAs. Use desaturated colors for backgrounds to reduce visual noise.</p>
-                                    <p class="mb-1">🖌️ <strong>Nature:</strong> Extract palettes from nature photos for naturally harmonious results.</p>
-                                </div>
-                            </div>`;
-                    }
-                },
                 closeModal: () => {
                     const container = document.getElementById('modal-container'); container.classList.add('opacity-0'); setTimeout(() => container.classList.add('hidden'), 200);
                 },
@@ -1161,10 +1410,7 @@
                 resetInfo: () => { document.getElementById('info-text').innerText = 'Hover over controls or presets for details.'; },
                 setFont: (font) => {
                     App.state.typoFont = font;
-                    document.getElementById('font-sans').className = `px-3 py-1.5 text-xs font-bold rounded-md hover:bg-gray-100 dark:hover:bg-dark-bg font-sans ${font === 'sans' ? 'bg-black text-white dark:bg-white dark:text-black' : ''}`;
-                    document.getElementById('font-serif').className = `px-3 py-1.5 text-xs font-bold rounded-md hover:bg-gray-100 dark:hover:bg-dark-bg font-serif ${font === 'serif' ? 'bg-black text-white dark:bg-white dark:text-black' : ''}`;
-                    document.getElementById('font-mono').className = `px-3 py-1.5 text-xs font-bold rounded-md hover:bg-gray-100 dark:hover:bg-dark-bg font-mono ${font === 'mono' ? 'bg-black text-white dark:bg-white dark:text-black' : ''}`;
-                    App.ui.renderTypography();
+                    // ... implementation moved to setTypoStyle
                 },
                 toggleSound: () => {
                     App.state.soundEnabled = !App.state.soundEnabled;
@@ -1172,7 +1418,7 @@
                     btn.innerHTML = App.state.soundEnabled 
                         ? '<i data-lucide="volume-2" class="w-5 h-5"></i>' 
                         : '<i data-lucide="volume-x" class="w-5 h-5"></i>';
-                    lucide.createIcons();
+                    if(window.lucide) lucide.createIcons();
                     App.ui.showToast(App.state.soundEnabled ? '사운드 켜짐' : '사운드 꺼짐');
                 },
                 toggleGrayscale: () => {
@@ -1181,7 +1427,7 @@
                     if (App.state.grayscaleMode) main.classList.add('grayscale'); else main.classList.remove('grayscale');
                     const btn = document.getElementById('btn-grayscale');
                     btn.innerHTML = App.state.grayscaleMode ? '<i data-lucide="eye-off" class="w-5 h-5 text-blue-500"></i>' : '<i data-lucide="eye" class="w-5 h-5"></i>';
-                    lucide.createIcons();
+                    if(window.lucide) lucide.createIcons();
                     App.ui.showToast(App.state.grayscaleMode ? '흑백 모드 켜짐' : '흑백 모드 꺼짐');
                 },
             },
@@ -1199,8 +1445,10 @@
                 }
             }
         };
-        App.logic.init();
-        App.ui.setFont('sans'); // Init font UI
+        // Fix: Ensure DOM is loaded before init to avoid null reference errors
+        window.addEventListener('DOMContentLoaded', () => {
+            App.logic.init();
+        });
     </script>
 </body>
 </html>
