@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>MinimalMind</title>
-    <!-- Fonts & Libraries -->
     <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.8/dist/web/static/pretendard.css" />
     <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
@@ -23,7 +22,6 @@
             --tooltip-bg: rgba(0,0,0,0.8);
             --tooltip-text: #fff;
             
-            /* Custom Colors */
             --c-red: #FF3B30; --c-orange: #FF9500; --c-yellow: #FFCC00;
             --c-green: #34C759; --c-teal: #30B0C7; --c-blue: #007AFF;
             --c-purple: #AF52DE; --c-pink: #FF2D55;
@@ -56,7 +54,7 @@
             transition: background-color 0.3s ease, color 0.3s ease;
         }
 
-        /* --- Toolbar --- */
+        /* Toolbar */
         .toolbar {
             position: fixed; top: 0; left: 0; right: 0; height: 56px;
             display: flex; justify-content: space-between; align-items: center;
@@ -78,7 +76,6 @@
         }
         .daily-tip.fade-out { opacity: 0; }
         .daily-tip:hover { background: var(--accent-color); color: #fff; }
-        .daily-tip::before { content: "💡 "; }
 
         .btn-group { display: flex; gap: 6px; align-items: center; height: 100%; flex-shrink: 0; }
         
@@ -119,14 +116,28 @@
         }
         .save-indicator.show { opacity: 1; transform: translateY(0); }
 
-        /* --- Canvas --- */
-        #viewport { width: 100%; height: 100%; cursor: grab; touch-action: none; }
+        .zoom-indicator {
+            position: fixed; bottom: 24px; left: 24px;
+            background: var(--toolbar-bg); backdrop-filter: blur(10px);
+            padding: 6px 12px; border-radius: 8px; font-size: 12px; font-weight: 600;
+            color: var(--text-sub); border: 1px solid var(--line-color);
+            cursor: pointer; z-index: 1000; transition: 0.2s;
+        }
+        .zoom-indicator:hover { color: var(--accent-color); border-color: var(--accent-color); }
+
+        /* Canvas */
+        #viewport { width: 100%; height: 100%; cursor: grab; touch-action: none; position: relative; }
         #viewport:active { cursor: grabbing; }
         #world { position: absolute; top: 0; left: 0; transform-origin: 0 0; will-change: transform; }
         svg { position: absolute; top: 0; left: 0; width: 1px; height: 1px; overflow: visible; pointer-events: none; z-index: 0; }
         path.link { fill: none; stroke: var(--line-color); stroke-width: 2px; stroke-linecap: round; transition: d 0.3s cubic-bezier(0.25, 1, 0.5, 1); }
 
-        /* --- Node Styles --- */
+        .selection-box {
+            position: absolute; border: 1px solid var(--accent-color);
+            background: rgba(0, 122, 255, 0.1); pointer-events: none; z-index: 2000; display: none;
+        }
+
+        /* Node Styles */
         .node {
             position: absolute;
             background: var(--node-bg);
@@ -154,7 +165,17 @@
         }
         .node:empty:before { content: "내용 입력"; color: var(--text-sub); }
 
-        /* Custom Colors */
+        .node-image {
+            max-width: 100%; border-radius: 8px; margin-bottom: 8px; display: block; pointer-events: none;
+        }
+        .node.drag-over { border-color: var(--accent-color); background: rgba(0, 122, 255, 0.1); }
+
+        .node-text a { color: var(--accent-color); text-decoration: underline; pointer-events: auto; }
+        .checkbox { display: inline-block; width: 14px; height: 14px; border: 2px solid var(--text-sub); border-radius: 3px; margin-right: 6px; vertical-align: middle; cursor: pointer; position: relative; }
+        .checkbox.checked { background: var(--accent-color); border-color: var(--accent-color); }
+        .checkbox.checked::after { content: "✓"; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: #fff; font-size: 10px; font-weight: bold; }
+        
+        /* Colors */
         .node.color-red { border-color: var(--c-red); background: #FFF5F5; color: var(--c-red); }
         .node.color-orange { border-color: var(--c-orange); background: #FFF8F0; color: var(--c-orange); }
         .node.color-green { border-color: var(--c-green); background: #F2FDF5; color: var(--c-green); }
@@ -198,60 +219,65 @@
         .sticker-item { font-size: 16px; line-height: 1; cursor: pointer; transition: transform 0.1s; }
         .sticker-item:hover { transform: scale(1.2); }
 
-        /* 1. Modal for Help */
+        /* Popups */
         .modal-overlay {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: rgba(0,0,0,0.4); backdrop-filter: blur(4px);
             z-index: 3000; display: none; align-items: center; justify-content: center;
-            animation: fadeIn 0.2s;
         }
         .modal-overlay.active { display: flex; }
         
         .help-modal {
-            background: var(--node-bg); width: 500px; max-height: 80vh;
-            border-radius: 24px; box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            background: var(--node-bg); width: 700px; max-height: 85vh;
+            border-radius: 20px; box-shadow: 0 10px 40px rgba(0,0,0,0.2);
             display: flex; flex-direction: column; overflow: hidden;
             border: 1px solid var(--line-color);
-            animation: slideUp 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
         }
-        @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
 
         .help-header { 
             padding: 20px 24px; border-bottom: 1px solid var(--line-color);
             display: flex; justify-content: space-between; align-items: center;
+            background: var(--bg-color);
         }
         .help-header h3 { margin: 0; font-size: 18px; font-weight: 800; color: var(--text-color); }
-        .close-help { cursor: pointer; font-size: 24px; color: var(--text-sub); transition: 0.2s; }
+        .close-help { cursor: pointer; font-size: 24px; color: var(--text-sub); padding: 4px; }
         .close-help:hover { color: var(--text-color); }
 
-        .help-tabs { display: flex; padding: 0 24px; border-bottom: 1px solid var(--line-color); background: var(--bg-color); }
-        .help-tab { 
-            padding: 12px 16px; cursor: pointer; font-size: 14px; font-weight: 600; color: var(--text-sub);
-            border-bottom: 2px solid transparent; transition: 0.2s;
-        }
-        .help-tab.active { color: var(--accent-color); border-bottom-color: var(--accent-color); background: var(--node-bg); }
-
         .help-body { padding: 24px; overflow-y: auto; flex: 1; }
+        
+        .help-tabs { display: flex; gap: 10px; margin-bottom: 20px; border-bottom: 1px solid var(--line-color); padding-bottom: 10px; }
+        .help-tab { cursor: pointer; font-weight: 700; color: var(--text-sub); padding: 6px 12px; font-size: 14px; border-radius: 8px; transition: 0.2s; }
+        .help-tab:hover { background: var(--btn-hover); }
+        .help-tab.active { color: var(--accent-color); background: rgba(0, 122, 255, 0.1); }
+
         .help-page { display: none; }
         .help-page.active { display: block; }
-
-        .help-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 24px; }
-        .shortcut-row { display: flex; justify-content: space-between; align-items: center; font-size: 13px; color: var(--text-color); padding-bottom: 8px; border-bottom: 1px dashed var(--line-color); }
-        .key { background: var(--btn-hover); padding: 4px 8px; border: 1px solid var(--line-color); border-radius: 6px; font-family: monospace; font-weight: bold; color: var(--accent-color); }
-
+        
+        .help-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+        .help-card { background: var(--bg-color); padding: 16px; border-radius: 12px; border: 1px solid var(--line-color); }
+        .help-card h4 { margin: 0 0 12px 0; font-size: 15px; color: var(--accent-color); font-weight: 800; }
+        
+        .shortcut-list { list-style: none; padding: 0; margin: 0; }
+        .shortcut-list li { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 13px; color: var(--text-color); align-items: center; }
+        .key-badge { background: var(--node-bg); padding: 2px 6px; border: 1px solid var(--line-color); border-radius: 4px; font-family: monospace; font-weight: bold; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
+        
         .tip-list { list-style: none; padding: 0; margin: 0; }
-        .tip-list li { margin-bottom: 12px; display: flex; align-items: flex-start; gap: 10px; font-size: 13px; color: var(--text-color); line-height: 1.6; }
+        .tip-list li { margin-bottom: 10px; display: flex; align-items: flex-start; gap: 10px; font-size: 13px; color: var(--text-color); line-height: 1.6; }
         .tip-cat { font-weight: 800; color: #fff; font-size: 10px; background: var(--accent-color); padding: 2px 6px; border-radius: 4px; white-space: nowrap; flex-shrink: 0; margin-top: 2px; }
 
-        .ghost-node {
-            position: fixed; pointer-events: none;
-            background: var(--node-bg); padding: 10px 16px;
-            border-radius: 10px; opacity: 0.8;
-            box-shadow: var(--shadow-hover);
-            z-index: 9999; border: 2px solid var(--accent-color);
-            font-size: 14px;
+        /* Save Modal */
+        .save-modal-body { padding: 30px; text-align: center; }
+        .save-input {
+            width: 100%; padding: 10px; margin: 20px 0; border: 1px solid var(--line-color);
+            border-radius: 8px; font-size: 16px; background: var(--bg-color); color: var(--text-color);
+            outline: none; text-align: center;
         }
-        .node.drop-target { background-color: rgba(0, 122, 255, 0.1); border-style: dashed; }
+        .save-actions { display: flex; justify-content: center; gap: 10px; }
+        .modal-btn { 
+            padding: 8px 20px; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; border: none;
+        }
+        .modal-btn.primary { background: var(--accent-color); color: #fff; }
+        .modal-btn.secondary { background: var(--bg-color); color: var(--text-color); border: 1px solid var(--line-color); }
 
         #context-menu, .popup-menu {
             position: fixed; display: none; z-index: 3000;
@@ -285,6 +311,16 @@
             border-radius: 12px; transition: 0.1s;
         }
         .picker-item:hover { background: var(--btn-hover); transform: scale(1.15); }
+
+        .ghost-node {
+            position: fixed; pointer-events: none;
+            background: var(--node-bg); padding: 10px 16px;
+            border-radius: 10px; opacity: 0.8;
+            box-shadow: var(--shadow-hover);
+            z-index: 9999; border: 2px solid var(--accent-color);
+            font-size: 14px;
+        }
+        .node.drop-target { background-color: rgba(0, 122, 255, 0.1); border-style: dashed; }
     </style>
 </head>
 <body>
@@ -332,7 +368,7 @@
                 <svg viewBox="0 0 24 24"><path d="M12 3c-4.97 0-9 4.03-9 9s4.03 9 9 9 9-4.03 9-9c0-.46-.04-.92-.1-1.36a5.389 5.389 0 0 1-4.4 2.26 5.403 5.403 0 0 1-3.14-9.8c-.44-.06-.9-.1-1.36-.1z"/></svg>
             </button>
             
-            <button onclick="app.saveFile()" class="icon-btn" data-tooltip="파일 저장">
+            <button onclick="app.openSaveModal()" class="icon-btn" data-tooltip="파일 저장">
                 <svg viewBox="0 0 24 24"><path d="M17 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V7l-4-4zm-5 16c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm3-10H5V5h10v4z"/></svg>
             </button>
             <button onclick="document.getElementById('fileInput').click()" class="icon-btn" data-tooltip="파일 열기">
@@ -346,6 +382,7 @@
     </header>
 
     <div id="save-indicator" class="save-indicator">저장됨 ✔</div>
+    <div id="zoom-indicator" class="zoom-indicator" onclick="app.resetZoom()">100%</div>
 
     <div id="context-menu">
         <div class="ctx-colors">
@@ -361,31 +398,58 @@
         <div class="ctx-item danger" onclick="app.deleteNodeFromContext()"><span>🗑️</span> 삭제</div>
     </div>
 
-    <!-- 1. Centered Help Modal -->
+    <!-- Save Modal -->
+    <div id="save-modal" class="modal-overlay" onclick="app.closeSaveModal()">
+        <div class="help-modal" style="width: 300px; height: auto;" onclick="event.stopPropagation()">
+            <div class="help-header">
+                <h3>파일 이름 저장</h3>
+                <span class="close-help" onclick="app.closeSaveModal()">✕</span>
+            </div>
+            <div class="save-modal-body">
+                <input type="text" id="save-filename" class="save-input" value="MinimalMind.json" onkeydown="if(event.key==='Enter') app.confirmSave()">
+                <div class="save-actions">
+                    <button class="modal-btn secondary" onclick="app.closeSaveModal()">취소</button>
+                    <button class="modal-btn primary" onclick="app.confirmSave()">저장</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Help Modal -->
     <div id="help-modal" class="modal-overlay" onclick="app.toggleHelp()">
         <div class="help-modal" onclick="event.stopPropagation()">
             <div class="help-header">
-                <h3>도움말</h3>
+                <h3>도움말 & 가이드</h3>
                 <span class="close-help" onclick="app.toggleHelp()">✕</span>
             </div>
             <div class="help-tabs">
                 <div class="help-tab active" onclick="app.switchHelpTab('shortcuts')">단축키</div>
-                <div class="help-tab" onclick="app.switchHelpTab('tips')">마인드맵 팁</div>
+                <div class="help-tab" onclick="app.switchHelpTab('tips')">50가지 팁</div>
             </div>
             
             <div class="help-body">
                 <div id="help-shortcuts" class="help-page active">
                     <div class="help-grid">
-                        <div class="shortcut-row"><span class="key">Tab</span> 하위 주제 추가</div>
-                        <div class="shortcut-row"><span class="key">Enter</span> 동위 주제 추가</div>
-                        <div class="shortcut-row"><span class="key">Space / F2</span> 내용 편집</div>
-                        <div class="shortcut-row"><span class="key">Shift+Enter</span> 줄바꿈 (편집 중)</div>
-                        <div class="shortcut-row"><span class="key">Drag</span> 주제 이동 (자식으로)</div>
-                        <div class="shortcut-row"><span class="key">Shift+Drag</span> 순서 변경</div>
-                        <div class="shortcut-row"><span class="key">Ctrl+Z</span> 실행 취소</div>
-                        <div class="shortcut-row"><span class="key">전체 보기 버튼</span> 전체 화면</div>
-                        <div class="shortcut-row"><span class="key">Home</span> 루트로 이동</div>
-                        <div class="shortcut-row"><span class="key">우클릭</span> 메뉴 (색상 등)</div>
+                        <div class="help-card">
+                            <h4>기본 조작</h4>
+                            <ul class="shortcut-list">
+                                <li><span>하위 주제 추가</span> <span class="key-badge">Tab</span></li>
+                                <li><span>동위 주제 추가</span> <span class="key-badge">Enter</span></li>
+                                <li><span>내용 편집</span> <span class="key-badge">Space / F2</span></li>
+                                <li><span>줄바꿈</span> <span class="key-badge">Shift+Enter</span></li>
+                                <li><span>삭제</span> <span class="key-badge">Del</span></li>
+                            </ul>
+                        </div>
+                        <div class="help-card">
+                            <h4>고급 기능</h4>
+                            <ul class="shortcut-list">
+                                <li><span>실행 취소</span> <span class="key-badge">Ctrl+Z</span></li>
+                                <li><span>다중 선택</span> <span class="key-badge">Shift+Drag</span></li>
+                                <li><span>이미지 붙여넣기</span> <span class="key-badge">Ctrl+V</span></li>
+                                <li><span>링크 열기</span> <span class="key-badge">Alt+Click</span></li>
+                                <li><span>루트로 이동</span> <span class="key-badge">Home</span></li>
+                            </ul>
+                        </div>
                     </div>
                 </div>
 
@@ -399,6 +463,8 @@
     <div id="sticker-picker" class="popup-menu">
         <!-- Emojis populated by JS -->
     </div>
+
+    <div id="selection-box" class="selection-box"></div>
 
     <div id="viewport">
         <div id="world">
@@ -417,9 +483,12 @@ class MinimalMind {
         
         this.view = { x: 0, y: 0, scale: 1 };
         this.isPanning = false;
+        this.isBoxSelecting = false;
         this.lastMouse = { x: 0, y: 0 };
+        this.boxStart = { x: 0, y: 0 };
         
         this.selectedId = null;
+        this.selectedIds = new Set();
         this.editingId = null;
         this.contextMenuId = null;
         
@@ -438,36 +507,64 @@ class MinimalMind {
         this.nodesLayer = document.getElementById('nodes-layer');
         this.contextMenu = document.getElementById('context-menu');
         this.helpModal = document.getElementById('help-modal');
+        this.saveModal = document.getElementById('save-modal');
         this.saveIndicator = document.getElementById('save-indicator');
+        this.zoomIndicator = document.getElementById('zoom-indicator');
         this.stickerPicker = document.getElementById('sticker-picker');
+        this.selectionBox = document.getElementById('selection-box');
 
+        // 1. Massive Tip List (50+)
         this.tips = [
             {cat: "발상", text: "비판 금지! 엉뚱한 생각도 일단 모두 적으세요."},
             {cat: "발상", text: "중심 단어 하나에서 꼬리에 꼬리를 무세요."},
             {cat: "발상", text: "양(Quantity)이 질(Quality)을 만듭니다. 많이 적으세요."},
             {cat: "발상", text: "SCAMPER: 대체, 결합, 응용, 변형, 용도변경, 제거, 재배열."},
             {cat: "발상", text: "만약에(What if)? 질문을 던져보세요."},
+            {cat: "발상", text: "반대로 생각해보세요. (Reverse Thinking)"},
+            {cat: "발상", text: "관점을 바꿔보세요. (고객, 경쟁사, 아이의 시선)"},
+            {cat: "발상", text: "제약 조건을 없애고 상상해보세요."},
+            {cat: "발상", text: "가장 최악의 시나리오를 상상해보세요."},
+            {cat: "발상", text: "단어를 이미지로 시각화해보세요."},
             {cat: "구조", text: "문장 대신 '핵심 키워드' 명사를 사용하세요."},
             {cat: "구조", text: "상위 가지는 굵은 개념, 하위는 세부 사항."},
             {cat: "구조", text: "가지를 7개 이하로 유지하면 한눈에 들어옵니다."},
             {cat: "구조", text: "MECE: 겹치지 않고 빠짐없이 분류하세요."},
             {cat: "구조", text: "논리적 흐름에 따라 노드 순서를 재배열하세요."},
+            {cat: "구조", text: "중복되는 내용은 연결선으로 관계를 표시하세요."},
+            {cat: "구조", text: "너무 깊은 단계(Depth)보다는 넓은 가지(Breadth)가 좋습니다."},
+            {cat: "구조", text: "핵심 주제는 항상 중앙에 크게 배치하세요."},
+            {cat: "구조", text: "그룹핑(Grouping)으로 정보를 덩어리 지으세요."},
+            {cat: "구조", text: "번호를 매겨 순서를 명확히 하세요."},
             {cat: "시각화", text: "같은 카테고리는 같은 색상으로 묶으세요."},
             {cat: "시각화", text: "중요한 노드는 빨간색이나 굵은 글씨로 강조하세요."},
             {cat: "시각화", text: "시계 방향(1시 방향부터)으로 가지를 읽으세요."},
             {cat: "시각화", text: "복잡한 맵은 하위 가지를 접어서(Fold) 보세요."},
-            {cat: "학습", text: "배운 내용을 마인드맵으로 정리하면 기억에 오래 남습니다."},
-            {cat: "학습", text: "백지에 중심 주제만 놓고 기억나는 것을 인출해보세요."},
-            {cat: "문제해결", text: "큰 문제를 작은 단위로 쪼개서(Decomposition) 보세요."},
-            {cat: "문제해결", text: "'왜(Why)?'를 5번 반복하며 근본 원인을 찾으세요."},
-            {cat: "기획", text: "육하원칙(5W1H)을 1차 가지로 잡고 시작해보세요."},
-            {cat: "협업", text: "다른 사람에게 설명하듯 소리 내어 맵을 읽어보세요."},
-            {cat: "습관", text: "단축키(Tab, Enter)를 익혀 생각의 속도를 맞추세요."},
-            {cat: "습관", text: "막힐 땐 잠시 산책을 하고 뇌를 쉬게 해주세요."},
-            {cat: "습관", text: "매일 아침 '오늘 할 일'을 맵으로 그려보세요."},
-            {cat: "팁", text: "Shift+휠 클릭으로 전체 지도를 한눈에 볼 수 있습니다."},
-            {cat: "팁", text: "드래그로 노드 위치를 자유롭게 바꿀 수 있습니다."},
-            {cat: "팁", text: "우클릭 메뉴로 노드 색상을 빠르게 변경하세요."}
+            {cat: "시각화", text: "이미지를 붙여넣어(Ctrl+V) 기억력을 높이세요."},
+            {cat: "시각화", text: "스티커를 활용해 상태(진행중, 완료)를 표시하세요."},
+            {cat: "시각화", text: "폰트 크기 변화로 위계를 표현하세요."},
+            {cat: "시각화", text: "여백을 충분히 주어 답답하지 않게 하세요."},
+            {cat: "시각화", text: "전체 보기를 통해 숲을 조망하세요."},
+            {cat: "시각화", text: "다크 모드를 활용해 눈의 피로를 줄이세요."},
+            {cat: "활용", text: "복잡한 문제는 잘게 쪼개서(Decomposition) 정복하세요."},
+            {cat: "활용", text: "'왜(Why)?'를 5번 반복하며 근본 원인을 찾으세요."},
+            {cat: "활용", text: "육하원칙(5W1H)을 1차 가지로 잡고 시작해보세요."},
+            {cat: "활용", text: "SWOT 분석: 강점, 약점, 기회, 위협을 가지로 만드세요."},
+            {cat: "활용", text: "할 일 목록(To-do)을 만들고 체크박스로 관리하세요."},
+            {cat: "활용", text: "회의록을 마인드맵으로 작성하면 구조 파악이 쉽습니다."},
+            {cat: "활용", text: "독서 후 핵심 내용을 마인드맵으로 요약해보세요."},
+            {cat: "활용", text: "여행 계획을 짤 때 동선과 준비물을 정리하세요."},
+            {cat: "활용", text: "프로젝트 일정을 단계별로 시각화하세요."},
+            {cat: "활용", text: "발표 자료의 목차를 잡을 때 유용합니다."},
+            {cat: "팁", text: "Shift+드래그로 여러 노드를 한 번에 선택하세요."},
+            {cat: "팁", text: "Alt+클릭으로 링크를 바로 여세요."},
+            {cat: "팁", text: "이미지를 드래그 앤 드롭하여 삽입하세요."},
+            {cat: "팁", text: "단축키(Tab, Enter)를 익히면 속도가 2배 빨라집니다."},
+            {cat: "팁", text: "자동 정리 버튼으로 흐트러진 맵을 정돈하세요."},
+            {cat: "팁", text: "저장은 습관입니다. Ctrl+S를 자주 누르세요."},
+            {cat: "팁", text: "배경을 더블 클릭하면 줌이 초기화됩니다."},
+            {cat: "팁", text: "노드 우클릭으로 스타일을 빠르게 초기화하세요."},
+            {cat: "팁", text: "Home 키를 눌러 언제든 중앙으로 돌아오세요."},
+            {cat: "팁", text: "생각이 막힐 땐 잠시 산책을 다녀오세요."}
         ];
 
         this.emojis = ['😍', '👍', '🔥', '💡', '✅', '❌', '⭐', '🚩', '❓', '📅', '🎉', '💻', '💰', '🚀', '❤️', '😱', '👀', '✨'];
@@ -509,9 +606,8 @@ class MinimalMind {
             const div = document.createElement('div');
             div.className = 'picker-item';
             div.innerText = emoji;
-            // 2. Sticker Deletion Logic Fix - toggle logic
             div.onmousedown = (e) => {
-                e.stopPropagation(); // prevent drag
+                e.stopPropagation(); 
                 this.toggleSticker(this.selectedId, emoji);
             };
             this.stickerPicker.appendChild(div);
@@ -531,20 +627,25 @@ class MinimalMind {
             el.classList.add('fade-out');
             setTimeout(() => {
                 const tip = this.tips[Math.floor(Math.random() * this.tips.length)];
-                el.innerText = `💡 ${tip.text}`;
+                el.innerText = tip.text;
                 el.classList.remove('fade-out');
             }, 300);
         } else {
             const tip = this.tips[Math.floor(Math.random() * this.tips.length)];
-            el.innerText = `💡 ${tip.text}`;
+            el.innerText = tip.text;
         }
     }
 
     toggleDarkMode() { document.body.classList.toggle('dark-mode'); }
 
-    // 1. Help Modal Logic
-    toggleHelp() {
-        this.helpModal.classList.toggle('active');
+    // Modal Logic
+    toggleHelp() { this.helpModal.classList.toggle('active'); }
+    openSaveModal() { this.saveModal.classList.add('active'); document.getElementById('save-filename').focus(); }
+    closeSaveModal() { this.saveModal.classList.remove('active'); }
+    confirmSave() {
+        const filename = document.getElementById('save-filename').value || 'MinimalMind.json';
+        this.saveFile(filename);
+        this.closeSaveModal();
     }
 
     switchHelpTab(tabName) {
@@ -614,6 +715,15 @@ class MinimalMind {
         this.saveState();
     }
 
+    toggleCheckbox(nodeId) {
+        const node = this.nodes[nodeId];
+        if (!node) return;
+        if (node.text.startsWith('[] ')) node.text = node.text.replace('[] ', '[x] ');
+        else if (node.text.startsWith('[x] ')) node.text = node.text.replace('[x] ', '[] ');
+        this.render();
+        this.saveState();
+    }
+
     saveState() {
         const state = JSON.stringify({ nodes: this.nodes, rootId: this.rootId });
         if (this.historyIdx >= 0 && this.history[this.historyIdx] === state) return;
@@ -647,6 +757,7 @@ class MinimalMind {
         this.nodes = state.nodes;
         this.rootId = state.rootId;
         this.selectedId = null;
+        this.selectedIds.clear();
         this.editingId = null;
         this.nodesLayer.innerHTML = ''; 
         this.render(); 
@@ -708,16 +819,25 @@ class MinimalMind {
     deleteNode(id) {
         if (id === this.rootId) return;
         this.stopEditing();
-        const parentId = this.nodes[id].parentId;
-        const parent = this.nodes[parentId];
-        parent.children = parent.children.filter(cid => cid !== id);
-        const deleteRecursive = (nid) => {
-            const n = this.nodes[nid];
-            if (n && n.children) n.children.forEach(deleteRecursive);
-            delete this.nodes[nid];
-        };
-        deleteRecursive(id);
-        this.selectNode(parentId);
+        
+        const idsToDelete = this.selectedIds.size > 0 ? Array.from(this.selectedIds) : [id];
+        
+        idsToDelete.forEach(targetId => {
+            if(targetId === this.rootId) return;
+            const parentId = this.nodes[targetId].parentId;
+            const parent = this.nodes[parentId];
+            if(parent) parent.children = parent.children.filter(cid => cid !== targetId);
+            
+            const deleteRecursive = (nid) => {
+                const n = this.nodes[nid];
+                if (n && n.children) n.children.forEach(deleteRecursive);
+                delete this.nodes[nid];
+            };
+            deleteRecursive(targetId);
+        });
+        
+        this.selectedIds.clear();
+        this.selectNode(null);
         this.updateLayout();
         this.saveState();
     }
@@ -733,10 +853,13 @@ class MinimalMind {
     }
 
     autoOrganize() {
-        if(!confirm("모든 레이아웃을 자동 정리하시겠습니까?")) return;
+        if(!confirm("모든 레이아웃을 자동 정리하시겠습니까? (좌우 위치는 유지됩니다)")) return;
         if (this.rootId && this.nodes[this.rootId]) {
             this.nodes[this.rootId].children.forEach(cid => {
-                this.nodes[cid].direction = 'right';
+                const child = this.nodes[cid];
+                const root = this.nodes[this.rootId];
+                if (child.x < root.x) child.direction = 'left';
+                else child.direction = 'right';
             });
         }
         this.updateLayout();
@@ -754,17 +877,11 @@ class MinimalMind {
         const root = this.nodes[this.rootId];
         const leftChildren = [];
         const rightChildren = [];
-        const AUTO_BALANCE_THRESHOLD = 10;
-        const shouldAutoBalance = root.children.length > AUTO_BALANCE_THRESHOLD;
 
         root.children.forEach((cid, index) => {
             const child = this.nodes[cid];
             if (child.direction === 'left') leftChildren.push(cid);
-            else if (child.direction === 'right') rightChildren.push(cid);
-            else {
-                if (shouldAutoBalance && index % 2 !== 0) leftChildren.push(cid);
-                else rightChildren.push(cid);
-            }
+            else rightChildren.push(cid);
         });
 
         const calcSize = (id) => {
@@ -834,6 +951,7 @@ class MinimalMind {
 
     render() {
         this.world.style.transform = `translate(${this.view.x}px, ${this.view.y}px) scale(${this.view.scale})`;
+        this.zoomIndicator.innerText = `${Math.round(this.view.scale * 100)}%`;
 
         const existingEls = {};
         Array.from(this.nodesLayer.children).forEach(el => existingEls[el.id] = el);
@@ -881,6 +999,7 @@ class MinimalMind {
                 el.onmousedown = (e) => this.handleNodeDown(e, id);
                 el.ondblclick = (e) => { e.stopPropagation(); this.startEditing(id); };
                 el.onkeydown = (e) => this.handleKey(e);
+                el.onclick = (e) => { if(e.altKey) this.handleLinkClick(e, node.text); };
                 
                 el.oncontextmenu = (e) => {
                     e.preventDefault();
@@ -888,6 +1007,11 @@ class MinimalMind {
                     this.selectNode(id);
                     this.showContextMenu(e.clientX, e.clientY, id);
                 };
+                
+                // 4. Image Drag & Paste Support
+                el.ondragover = (e) => { e.preventDefault(); el.classList.add('drag-over'); };
+                el.ondragleave = (e) => { e.preventDefault(); el.classList.remove('drag-over'); };
+                el.ondrop = (e) => this.handleImageDrop(e, id);
                 
                 const stickers = document.createElement('div'); stickers.className = 'stickers-container'; el.appendChild(stickers);
                 const text = document.createElement('div'); text.className = 'node-text'; el.appendChild(text);
@@ -922,8 +1046,14 @@ class MinimalMind {
             el.dataset.dir = node.direction;
             el.dataset.isRoot = (id === this.rootId);
             
-            const isSelected = this.selectedId === id;
+            const isSelected = this.selectedId === id || this.selectedIds.has(id);
             el.className = `node ${isSelected ? 'selected' : ''} ${node.styleClass || ''}`;
+            
+            if (node.text.startsWith('[x] ') || node.text.startsWith('[] ')) {
+                el.classList.toggle('checked', node.text.startsWith('[x] '));
+            } else {
+                el.classList.remove('checked');
+            }
             
             if (node.customWidth) el.style.width = node.customWidth + 'px'; else el.style.width = '';
 
@@ -931,7 +1061,6 @@ class MinimalMind {
             if (node.stickers && node.stickers.length > 0) {
                 stickersEl.innerHTML = node.stickers.map(s => `<span class="sticker-item">${s}</span>`).join('');
                 stickersEl.style.display = 'flex';
-                // 2. Sticker Delete Bind (mousedown to capture before drag)
                 Array.from(stickersEl.children).forEach(item => {
                     item.onmousedown = (e) => { 
                         e.stopPropagation(); 
@@ -943,7 +1072,24 @@ class MinimalMind {
             }
 
             const textEl = el.querySelector('.node-text');
-            textEl.innerText = node.text;
+            
+            let imgHTML = '';
+            if (node.image) {
+                imgHTML = `<img src="${node.image}" class="node-image" draggable="false">`;
+            }
+
+            let displayHTML = node.text;
+            if (displayHTML.startsWith('[] ')) {
+                displayHTML = `<span class="checkbox" onmousedown="event.stopPropagation(); app.toggleCheckbox('${id}')"></span>` + displayHTML.substring(3);
+            } else if (displayHTML.startsWith('[x] ')) {
+                displayHTML = `<span class="checkbox checked" onmousedown="event.stopPropagation(); app.toggleCheckbox('${id}')"></span>` + displayHTML.substring(4);
+            }
+            
+            // 3. Alt+Click Link Fix (regex refinement)
+            const urlRegex = /(https?:\/\/[^\s]+|www\.[^\s]+)/g;
+            displayHTML = displayHTML.replace(urlRegex, (url) => `<span class="link-text" style="color:var(--accent-color); text-decoration:underline;">${url}</span>`);
+            
+            textEl.innerHTML = imgHTML + displayHTML;
 
             el.style.left = `${node.x}px`;
             el.style.top = `${node.y}px`;
@@ -986,7 +1132,56 @@ class MinimalMind {
         this.svg.innerHTML = svgPath;
     }
 
+    handleImageDrop(e, id) {
+        e.preventDefault();
+        e.stopPropagation();
+        document.getElementById(id).classList.remove('drag-over');
+        
+        const file = e.dataTransfer.files[0];
+        if (file && file.type.startsWith('image/')) {
+            this.readAndAttachImage(file, id);
+        }
+    }
+
+    // 4. Paste Image Support
+    handlePaste(e) {
+        if (!this.selectedId) return; // Must have node selected
+        
+        // Check for files in clipboard
+        if (e.clipboardData && e.clipboardData.files.length > 0) {
+            const file = e.clipboardData.files[0];
+            if (file.type.startsWith('image/')) {
+                e.preventDefault();
+                this.readAndAttachImage(file, this.selectedId);
+            }
+        }
+    }
+
+    readAndAttachImage(file, nodeId) {
+        const reader = new FileReader();
+        reader.onload = (event) => {
+            this.nodes[nodeId].image = event.target.result;
+            this.updateLayout();
+            this.render();
+            this.saveState();
+        };
+        reader.readAsDataURL(file);
+    }
+
+    handleLinkClick(e, text) {
+        const urlRegex = /(https?:\/\/[^\s]+|www\.[^\s]+)/g;
+        const match = text.match(urlRegex);
+        if (match) {
+            let url = match[0];
+            if (url.startsWith('www.')) url = 'https://' + url;
+            window.open(url, '_blank');
+        }
+    }
+
     setupEvents() {
+        // 4. Global Paste Listener
+        window.addEventListener('paste', (e) => this.handlePaste(e));
+
         this.viewport.onmousedown = (e) => {
             if (e.button === 1) { e.preventDefault(); this.resetZoom(); return; }
             this.hideContextMenu();
@@ -998,11 +1193,22 @@ class MinimalMind {
             }
 
             if (e.target === this.viewport || e.target === this.world) {
-                // 3. Zoom to Fit via button only now
-                
+                if (e.shiftKey) {
+                    // 2. Multi-select Box Init
+                    this.isBoxSelecting = true;
+                    this.boxStart = { x: e.clientX, y: e.clientY };
+                    this.selectionBox.style.display = 'block';
+                    this.selectionBox.style.left = e.clientX + 'px';
+                    this.selectionBox.style.top = e.clientY + 'px';
+                    this.selectionBox.style.width = '0';
+                    this.selectionBox.style.height = '0';
+                    return;
+                }
+
                 this.isPanning = true;
                 this.lastMouse = { x: e.clientX, y: e.clientY };
                 this.selectNode(null);
+                this.selectedIds.clear();
                 this.stopEditing();
             }
         };
@@ -1015,17 +1221,36 @@ class MinimalMind {
                 this.view.x += dx; this.view.y += dy;
                 this.lastMouse = { x: e.clientX, y: e.clientY };
                 requestAnimationFrame(() => this.render());
+            } else if (this.isBoxSelecting) {
+                const currentX = e.clientX;
+                const currentY = e.clientY;
+                const width = Math.abs(currentX - this.boxStart.x);
+                const height = Math.abs(currentY - this.boxStart.y);
+                const left = Math.min(currentX, this.boxStart.x);
+                const top = Math.min(currentY, this.boxStart.y);
+                
+                this.selectionBox.style.width = width + 'px';
+                this.selectionBox.style.height = height + 'px';
+                this.selectionBox.style.left = left + 'px';
+                this.selectionBox.style.top = top + 'px';
             } else if (this.dragNodeId) { this.updateDragGhost(e); }
         };
 
         window.onmouseup = (e) => {
-            this.isPanning = false; this.isResizing = false;
+            this.isPanning = false; 
+            this.isResizing = false;
+            
+            if (this.isBoxSelecting) {
+                this.isBoxSelecting = false;
+                this.selectionBox.style.display = 'none';
+                this.checkSelectionBox(e);
+            }
+
             if (this.dragNodeId) this.endDrag(e);
         };
 
         this.viewport.onwheel = (e) => {
             if (e.ctrlKey) return; 
-            // 3. Shift key prevents zoom to avoid conflict
             if (e.shiftKey) return; 
             
             e.preventDefault();
@@ -1054,9 +1279,11 @@ class MinimalMind {
                 }
                 if (e.key === 'Escape') {
                     this.selectNode(null);
+                    this.selectedIds.clear();
                     this.hideContextMenu();
                     this.helpModal.classList.remove('active');
                     this.stickerPicker.classList.remove('active');
+                    this.closeSaveModal();
                 }
                 if (e.key === 'Home') {
                     this.resetZoom();
@@ -1069,9 +1296,45 @@ class MinimalMind {
                         e.preventDefault();
                         this.redo();
                     }
+                    // Paste is handled by 'paste' event, but 'v' key fallback just in case? No need.
                 }
             }
         });
+    }
+
+    // 2. Multi-select Fix (Accurate Hit Test)
+    checkSelectionBox(e) {
+        const rect = this.selectionBox.getBoundingClientRect();
+        
+        // Convert selection box to world coordinates
+        // boxWorldX = (boxScreenX - viewX) / scale
+        const startX = (rect.left - this.view.x) / this.view.scale;
+        const startY = (rect.top - this.view.y) / this.view.scale;
+        const endX = startX + (rect.width / this.view.scale);
+        const endY = startY + (rect.height / this.view.scale);
+
+        this.selectedIds.clear();
+        Object.values(this.nodes).forEach(node => {
+            // Node bbox in world coords
+            const nodeLeft = node.x;
+            const nodeTop = node.y;
+            const nodeRight = node.x + (node.width || 100);
+            const nodeBottom = node.y + (node.height || 40);
+            
+            // Box Intersection Logic
+            // If SelectionBox overlaps NodeBox
+            // Overlap condition: !(r2.left > r1.right || r2.right < r1.left || r2.top > r1.bottom || r2.bottom < r1.top)
+            if (startX < nodeRight && endX > nodeLeft && startY < nodeBottom && endY > nodeTop) {
+                this.selectedIds.add(node.id);
+            }
+        });
+        
+        if (this.selectedIds.size > 0) {
+            this.selectNode(this.selectedIds.values().next().value); 
+        } else {
+            this.selectNode(null);
+        }
+        this.render();
     }
 
     startResizing(e, id) {
@@ -1093,6 +1356,15 @@ class MinimalMind {
 
     handleNodeDown(e, id) {
         if(e.button !== 0) return;
+        
+        // 3. Alt Click Check (If not editing)
+        if (e.altKey) {
+            // Let click event handle it or handle here.
+            // Since drag starts here, better let drag logic fail or pass.
+            // If we want Alt+Click to JUST open link and not drag, we stop here.
+            return; 
+        }
+        
         e.stopPropagation();
         this.selectNode(id);
         this.hideContextMenu();
@@ -1433,9 +1705,17 @@ class MinimalMind {
         });
     }
 
+    saveFile(filename) {
+        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify({ nodes: this.nodes, rootId: this.rootId }));
+        const anchor = document.createElement('a');
+        anchor.href = dataStr;
+        anchor.download = filename;
+        anchor.click();
+    }
+
     saveToStorage() {
         const data = { nodes: this.nodes, rootId: this.rootId };
-        localStorage.setItem('minimalMind_final_v13', JSON.stringify(data));
+        localStorage.setItem('minimalMind_final_v17', JSON.stringify(data));
         this.showSaveIndicator();
     }
     
@@ -1448,7 +1728,7 @@ class MinimalMind {
     }
 
     loadFromStorage() {
-        const raw = localStorage.getItem('minimalMind_final_v13');
+        const raw = localStorage.getItem('minimalMind_final_v17');
         if (raw) {
             try {
                 const data = JSON.parse(raw);
@@ -1457,13 +1737,7 @@ class MinimalMind {
             } catch(e) {}
         }
     }
-    saveFile() {
-        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify({ nodes: this.nodes, rootId: this.rootId }));
-        const anchor = document.createElement('a');
-        anchor.href = dataStr;
-        anchor.download = "mindmap.json";
-        anchor.click();
-    }
+    
     loadFile(input) {
         const file = input.files[0];
         if(!file) return;
