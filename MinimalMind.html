@@ -4,9 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>MinimalMind</title>
+    <!-- Pretendard Font -->
     <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.8/dist/web/static/pretendard.css" />
-    <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <style>
         :root {
             --bg-color: #F5F5F7;
@@ -22,9 +21,11 @@
             --tooltip-bg: rgba(0,0,0,0.8);
             --tooltip-text: #fff;
             
-            --c-red: #FF3B30; --c-orange: #FF9500; --c-yellow: #FFCC00;
-            --c-green: #34C759; --c-teal: #30B0C7; --c-blue: #007AFF;
-            --c-purple: #AF52DE; --c-pink: #FF2D55;
+            /* Glassmorphism Variables */
+            --glass-bg: rgba(255, 255, 255, 0.75);
+            --card-glass-bg: rgba(255, 255, 255, 0.4); /* More transparent card background */
+            --glass-border: rgba(0, 0, 0, 0.08);
+            --blur-amt: 20px;
         }
 
         body.dark-mode {
@@ -39,6 +40,9 @@
             --btn-hover: rgba(255, 255, 255, 0.1);
             --tooltip-bg: rgba(255,255,255,0.9);
             --tooltip-text: #000;
+            --glass-bg: rgba(44, 44, 46, 0.75);
+            --card-glass-bg: rgba(60, 60, 62, 0.4);
+            --glass-border: rgba(255, 255, 255, 0.1);
         }
 
         * { box-sizing: border-box; outline: none; -webkit-tap-highlight-color: transparent; }
@@ -54,55 +58,81 @@
             transition: background-color 0.3s ease, color 0.3s ease;
         }
 
-        /* Toolbar */
+        /* Toolbar Layout */
         .toolbar {
             position: fixed; top: 0; left: 0; right: 0; height: 56px;
             display: flex; justify-content: space-between; align-items: center;
             padding: 0 24px;
             background: var(--toolbar-bg);
-            backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+            backdrop-filter: blur(var(--blur-amt)); -webkit-backdrop-filter: blur(var(--blur-amt));
             border-bottom: 1px solid var(--line-color);
             z-index: 1000;
         }
 
-        .logo-area { display: flex; align-items: center; gap: 12px; flex: 1; min-width: 0; }
+        .left-area { display: flex; align-items: center; gap: 16px; z-index: 2; flex: 1; }
         .logo { font-weight: 800; font-size: 18px; letter-spacing: -0.5px; color: var(--text-color); flex-shrink: 0; }
         
         .daily-tip {
             font-size: 13px; color: var(--text-sub); cursor: pointer;
             background: var(--btn-hover); padding: 6px 12px; border-radius: 20px;
-            transition: 0.3s; max-width: 500px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+            transition: 0.3s; max-width: 400px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
             opacity: 1;
         }
-        .daily-tip.fade-out { opacity: 0; }
         .daily-tip:hover { background: var(--accent-color); color: #fff; }
+        .daily-tip.fade-out { opacity: 0; }
 
-        .btn-group { display: flex; gap: 6px; align-items: center; height: 100%; flex-shrink: 0; }
-        
+        /* 3. Title Input Styling - Editable Look */
+        .center-area {
+            position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+            z-index: 5; /* Increased z-index to ensure clickability */
+            display: flex; justify-content: center;
+        }
+        .title-input {
+            background: transparent; border: 1px solid transparent;
+            color: var(--text-color); font-size: 16px; font-weight: 700;
+            padding: 6px 12px; border-radius: 8px; width: 280px;
+            text-align: center; transition: 0.2s; cursor: text;
+            text-overflow: ellipsis; white-space: nowrap; overflow: hidden;
+            user-select: text; -webkit-user-select: text; /* Allow text selection */
+        }
+        .title-input:hover {
+            background: var(--btn-hover);
+            border-color: var(--line-color);
+        }
+        .title-input:focus {
+            background: var(--node-bg);
+            border-color: var(--accent-color);
+            outline: none;
+        }
+
+        .right-area { 
+            display: flex; gap: 6px; align-items: center; height: 100%; 
+            z-index: 2; flex: 1; justify-content: flex-end;
+        }
+
         .icon-btn {
             background: transparent; border: none;
-            width: 40px; height: 40px;
-            padding: 0; margin: 0; border-radius: 10px;
+            width: 36px; height: 36px;
+            padding: 0; margin: 0; border-radius: 8px;
             display: flex !important; justify-content: center !important; align-items: center !important;
             color: var(--text-color); cursor: pointer; position: relative; transition: all 0.2s;
         }
         .icon-btn:hover { background: var(--btn-hover); color: var(--accent-color); transform: translateY(-1px); }
-        .icon-btn svg { width: 22px; height: 22px; fill: currentColor; display: block; }
+        .icon-btn svg { width: 20px; height: 20px; fill: currentColor; display: block; }
         .icon-btn.active { background: var(--accent-color); color: #fff; }
         .icon-btn.danger:hover { color: #FF3B30; background: rgba(255, 59, 48, 0.1); }
         
         .icon-btn[data-tooltip]:hover::after {
             content: attr(data-tooltip);
-            position: absolute; top: 120%; left: 50%; transform: translateX(-50%);
+            position: absolute; top: 115%; left: 50%; transform: translateX(-50%);
             background: var(--tooltip-bg); color: var(--tooltip-text);
-            padding: 6px 10px; font-size: 12px; border-radius: 6px;
+            padding: 5px 10px; font-size: 11px; border-radius: 6px;
             white-space: nowrap; pointer-events: none; opacity: 1;
             box-shadow: 0 4px 12px rgba(0,0,0,0.2);
-            z-index: 2000; animation: fadeIn 0.2s;
+            z-index: 2000;
         }
-        @keyframes fadeIn { from { opacity: 0; transform: translate(-50%, -5px); } to { opacity: 1; transform: translate(-50%, 0); } }
 
-        .divider { width: 1px; height: 20px; background: var(--line-color); margin: 0 8px; opacity: 0.5; }
+        .divider { width: 1px; height: 16px; background: var(--line-color); margin: 0 4px; opacity: 0.5; }
 
         .save-indicator {
             position: fixed; top: 70px; right: 24px;
@@ -130,12 +160,7 @@
         #viewport:active { cursor: grabbing; }
         #world { position: absolute; top: 0; left: 0; transform-origin: 0 0; will-change: transform; }
         svg { position: absolute; top: 0; left: 0; width: 1px; height: 1px; overflow: visible; pointer-events: none; z-index: 0; }
-        path.link { fill: none; stroke: var(--line-color); stroke-width: 2px; stroke-linecap: round; transition: d 0.3s cubic-bezier(0.25, 1, 0.5, 1); }
-
-        .selection-box {
-            position: absolute; border: 1px solid var(--accent-color);
-            background: rgba(0, 122, 255, 0.1); pointer-events: none; z-index: 2000; display: none;
-        }
+        path.link { fill: none; stroke: var(--line-color); stroke-width: 2px; stroke-linecap: round; transition: d 0.3s cubic-bezier(0.25, 1, 0.5, 1), stroke 0.3s; }
 
         /* Node Styles */
         .node {
@@ -148,48 +173,33 @@
             font-size: 15px; line-height: 1.5; color: var(--text-color);
             transform: translate(0, -50%); cursor: pointer;
             border: 2px solid transparent;
-            transition: box-shadow 0.2s, border-color 0.2s, background-color 0.2s, opacity 0.3s;
+            transition: box-shadow 0.2s, border-color 0.2s, background-color 0.3s, color 0.3s, transform 0.2s;
             z-index: 1;
             white-space: pre-wrap; word-break: break-word; text-align: center;
         }
         
+        .node.colored-mode { border-width: 1px; }
         .node[data-is-root="true"] { font-weight: 800; font-size: 20px; padding: 20px 32px; border: 3px solid var(--line-color); }
-        .node:hover { box-shadow: var(--shadow-hover); }
+        .node:hover { box-shadow: var(--shadow-hover); transform: translate(0, -50%) scale(1.02); }
         .node.selected { border-color: var(--accent-color); z-index: 10; }
         .node.dragging { opacity: 0.5; pointer-events: none; }
+        
         .node.editing {
             cursor: text; user-select: text; -webkit-user-select: text;
-            border-color: var(--accent-color); background: var(--node-bg);
+            border-color: var(--accent-color); background: var(--node-bg) !important;
             z-index: 100; box-shadow: 0 0 0 4px rgba(0, 122, 255, 0.2);
-            min-width: 100px; color: var(--text-color);
+            min-width: 100px; color: var(--text-color) !important;
         }
         .node:empty:before { content: "내용 입력"; color: var(--text-sub); }
 
-        .node-image {
-            max-width: 100%; border-radius: 8px; margin-bottom: 8px; display: block; pointer-events: none;
-        }
+        .node-image { max-width: 100%; border-radius: 8px; margin-bottom: 8px; display: block; pointer-events: none; }
         .node.drag-over { border-color: var(--accent-color); background: rgba(0, 122, 255, 0.1); }
-
         .node-text a { color: var(--accent-color); text-decoration: underline; pointer-events: auto; }
+        
         .checkbox { display: inline-block; width: 14px; height: 14px; border: 2px solid var(--text-sub); border-radius: 3px; margin-right: 6px; vertical-align: middle; cursor: pointer; position: relative; }
         .checkbox.checked { background: var(--accent-color); border-color: var(--accent-color); }
         .checkbox.checked::after { content: "✓"; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: #fff; font-size: 10px; font-weight: bold; }
         
-        /* Colors */
-        .node.color-red { border-color: var(--c-red); background: #FFF5F5; color: var(--c-red); }
-        .node.color-orange { border-color: var(--c-orange); background: #FFF8F0; color: var(--c-orange); }
-        .node.color-green { border-color: var(--c-green); background: #F2FDF5; color: var(--c-green); }
-        .node.color-blue { border-color: var(--c-blue); background: #F0F8FF; color: var(--c-blue); }
-        .node.color-purple { border-color: var(--c-purple); background: #F8F0FF; color: var(--c-purple); }
-        .node.color-gray { border-color: #8E8E93; background: #F2F2F7; color: #8E8E93; }
-        
-        body.dark-mode .node.color-red { background: #3a0d0d; }
-        body.dark-mode .node.color-orange { background: #3a2200; }
-        body.dark-mode .node.color-green { background: #0a2912; }
-        body.dark-mode .node.color-blue { background: #001a3a; }
-        body.dark-mode .node.color-purple { background: #2a0d3a; }
-        body.dark-mode .node.color-gray { background: #2c2c2e; }
-
         .fold-btn {
             position: absolute; top: 50%; transform: translateY(-50%);
             width: 22px; height: 22px; background: var(--node-bg);
@@ -213,104 +223,125 @@
             width: 4px; height: 16px; background: var(--line-color); border-radius: 2px;
         }
 
-        .stickers-container {
-            display: flex; gap: 4px; margin-bottom: 6px; flex-wrap: wrap; justify-content: center;
-        }
-        .sticker-item { font-size: 16px; line-height: 1; cursor: pointer; transition: transform 0.1s; }
-        .sticker-item:hover { transform: scale(1.2); }
-
-        /* Popups */
+        /* Modal Styles */
         .modal-overlay {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.4); backdrop-filter: blur(4px);
+            background: rgba(0,0,0,0.2); backdrop-filter: blur(4px);
             z-index: 3000; display: none; align-items: center; justify-content: center;
         }
         .modal-overlay.active { display: flex; }
         
         .help-modal {
-            background: var(--node-bg); width: 700px; max-height: 85vh;
-            border-radius: 20px; box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            background: var(--glass-bg);
+            width: 720px; max-height: 85vh;
+            border-radius: 24px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.15);
             display: flex; flex-direction: column; overflow: hidden;
-            border: 1px solid var(--line-color);
+            border: 1px solid var(--glass-border);
+            backdrop-filter: blur(40px); -webkit-backdrop-filter: blur(40px);
         }
 
         .help-header { 
-            padding: 20px 24px; border-bottom: 1px solid var(--line-color);
+            padding: 20px 24px; border-bottom: 1px solid var(--glass-border);
             display: flex; justify-content: space-between; align-items: center;
-            background: var(--bg-color);
+            flex-shrink: 0; background: rgba(255,255,255,0.2);
         }
-        .help-header h3 { margin: 0; font-size: 18px; font-weight: 800; color: var(--text-color); }
-        .close-help { cursor: pointer; font-size: 24px; color: var(--text-sub); padding: 4px; }
-        .close-help:hover { color: var(--text-color); }
+        .help-header h3 { margin: 0; font-size: 20px; font-weight: 800; color: var(--text-color); }
+        .close-help { cursor: pointer; font-size: 24px; color: var(--text-sub); padding: 4px; transition: 0.2s; }
+        .close-help:hover { color: var(--text-color); transform: rotate(90deg); }
 
-        .help-body { padding: 24px; overflow-y: auto; flex: 1; }
-        
-        .help-tabs { display: flex; gap: 10px; margin-bottom: 20px; border-bottom: 1px solid var(--line-color); padding-bottom: 10px; }
-        .help-tab { cursor: pointer; font-weight: 700; color: var(--text-sub); padding: 6px 12px; font-size: 14px; border-radius: 8px; transition: 0.2s; }
-        .help-tab:hover { background: var(--btn-hover); }
-        .help-tab.active { color: var(--accent-color); background: rgba(0, 122, 255, 0.1); }
+        .help-tabs { 
+            display: flex; padding: 0 24px; border-bottom: 1px solid var(--glass-border); 
+            background: rgba(0,0,0,0.02); gap: 8px; flex-shrink: 0;
+            padding-top: 10px;
+        }
+        .help-tab { 
+            padding: 10px 16px; cursor: pointer; font-size: 14px; font-weight: 600; color: var(--text-sub);
+            border-bottom: 3px solid transparent; transition: 0.1s;
+            border-radius: 8px 8px 0 0;
+        }
+        .help-tab:hover { color: var(--text-color); background: rgba(0,0,0,0.03); }
+        .help-tab.active { color: var(--accent-color); border-bottom-color: var(--accent-color); background: rgba(255,255,255,0.4); }
 
+        .help-body { padding: 0; overflow-y: auto; flex: 1; scroll-behavior: smooth; }
+        .help-content-area { padding: 24px; }
         .help-page { display: none; }
         .help-page.active { display: block; }
         
-        .help-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-        .help-card { background: var(--bg-color); padding: 16px; border-radius: 12px; border: 1px solid var(--line-color); }
-        .help-card h4 { margin: 0 0 12px 0; font-size: 15px; color: var(--accent-color); font-weight: 800; }
+        /* 3. Improved Inspiration Tabs Alignment */
+        .insp-category-tabs {
+            display: flex; gap: 8px; margin-bottom: 20px; flex-wrap: wrap;
+            position: sticky; top: -1px; background: var(--glass-bg);
+            padding: 10px 0; z-index: 10; backdrop-filter: blur(10px);
+            border-bottom: 1px solid var(--glass-border);
+            justify-content: center; /* Centered */
+        }
+        .insp-cat-btn {
+            padding: 8px 16px; border-radius: 20px; border: 1px solid var(--line-color);
+            background: var(--card-glass-bg); color: var(--text-color); font-size: 13px; cursor: pointer;
+            transition: 0.2s; font-weight: 600;
+        }
+        .insp-cat-btn.active { background: var(--accent-color); color: #fff; border-color: var(--accent-color); }
+        .insp-cat-btn:hover:not(.active) { background: var(--btn-hover); transform: translateY(-1px); }
+
+        .help-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        
+        /* 3. More Transparent Card Background */
+        .help-card { 
+            background: var(--card-glass-bg); 
+            padding: 24px; border-radius: 16px; 
+            border: 1px solid var(--glass-border); 
+            box-shadow: 0 4px 12px rgba(0,0,0,0.03);
+        }
+        
+        .help-card h4 { margin: 0 0 20px 0; font-size: 16px; color: var(--accent-color); font-weight: 800; display: flex; align-items: center; gap: 8px; }
         
         .shortcut-list { list-style: none; padding: 0; margin: 0; }
-        .shortcut-list li { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 13px; color: var(--text-color); align-items: center; }
-        .key-badge { background: var(--node-bg); padding: 2px 6px; border: 1px solid var(--line-color); border-radius: 4px; font-family: monospace; font-weight: bold; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
+        .shortcut-list li { display: flex; justify-content: space-between; margin-bottom: 12px; font-size: 14px; color: var(--text-color); align-items: center; }
+        .key-badge { 
+            background: var(--bg-color); padding: 4px 10px; border: 1px solid var(--line-color); 
+            border-radius: 6px; font-family: monospace; font-weight: bold; font-size: 12px;
+            color: var(--text-color); min-width: 24px; text-align: center;
+        }
         
-        .tip-list { list-style: none; padding: 0; margin: 0; }
-        .tip-list li { margin-bottom: 10px; display: flex; align-items: flex-start; gap: 10px; font-size: 13px; color: var(--text-color); line-height: 1.6; }
-        .tip-cat { font-weight: 800; color: #fff; font-size: 10px; background: var(--accent-color); padding: 2px 6px; border-radius: 4px; white-space: nowrap; flex-shrink: 0; margin-top: 2px; }
+        .tip-list { list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: 1fr; gap: 12px; }
+        .tip-list li { 
+            display: flex; align-items: flex-start; gap: 14px; font-size: 15px; color: var(--text-color); line-height: 1.5; 
+            padding: 16px; background: var(--card-glass-bg); border-radius: 12px;
+            border: 1px solid var(--glass-border); box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+        }
+        .tip-icon { font-size: 18px; line-height: 1.4; flex-shrink: 0; }
 
         /* Save Modal */
         .save-modal-body { padding: 30px; text-align: center; }
         .save-input {
-            width: 100%; padding: 10px; margin: 20px 0; border: 1px solid var(--line-color);
-            border-radius: 8px; font-size: 16px; background: var(--bg-color); color: var(--text-color);
+            width: 100%; padding: 12px; margin: 20px 0; border: 1px solid var(--line-color);
+            border-radius: 12px; font-size: 16px; background: var(--bg-color); color: var(--text-color);
             outline: none; text-align: center;
         }
         .save-actions { display: flex; justify-content: center; gap: 10px; }
         .modal-btn { 
-            padding: 8px 20px; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; border: none;
+            padding: 10px 24px; border-radius: 12px; font-size: 14px; font-weight: 600; cursor: pointer; border: none;
+            transition: 0.2s;
         }
+        .modal-btn:active { transform: scale(0.96); }
         .modal-btn.primary { background: var(--accent-color); color: #fff; }
         .modal-btn.secondary { background: var(--bg-color); color: var(--text-color); border: 1px solid var(--line-color); }
 
-        #context-menu, .popup-menu {
+        #context-menu {
             position: fixed; display: none; z-index: 3000;
             background: var(--toolbar-bg); backdrop-filter: blur(20px);
             border: 1px solid var(--line-color); border-radius: 12px;
-            box-shadow: var(--shadow-hover); padding: 8px; min-width: 160px;
-            flex-direction: column; gap: 4px;
+            box-shadow: var(--shadow-hover); padding: 6px; min-width: 160px;
+            flex-direction: column; gap: 2px;
         }
         .ctx-item {
-            padding: 8px 12px; border-radius: 6px; cursor: pointer; font-size: 13px; color: var(--text-color);
+            padding: 8px 12px; border-radius: 8px; cursor: pointer; font-size: 13px; color: var(--text-color);
             display: flex; align-items: center; gap: 8px; transition: 0.1s;
         }
         .ctx-item:hover { background: var(--accent-color); color: #fff; }
         .ctx-item.danger { color: #FF3B30; }
         .ctx-item.danger:hover { background: #FF3B30; color: #fff; }
-        .ctx-divider { height: 1px; background: var(--line-color); margin: 4px 0; opacity: 0.5; }
-        .ctx-colors { display: flex; gap: 6px; padding: 4px 8px; justify-content: space-between; }
-        .color-dot { width: 18px; height: 18px; border-radius: 50%; cursor: pointer; border: 1px solid rgba(0,0,0,0.1); transition: transform 0.1s; }
-        .color-dot:hover { transform: scale(1.2); }
-
-        .popup-menu {
-            top: 60px; left: 50%; transform: translateX(-50%);
-            animation: popIn 0.2s cubic-bezier(0.25, 0.8, 0.25, 1);
-        }
-        @keyframes popIn { from { opacity: 0; transform: translate(-50%, -10px); } to { opacity: 1; transform: translate(-50%, 0); } }
-        .popup-menu.active { display: grid; }
-        #sticker-picker { grid-template-columns: repeat(6, 1fr); gap: 10px; }
-        .picker-item { 
-            cursor: pointer; font-size: 28px; width: 44px; height: 44px;
-            display: flex; align-items: center; justify-content: center;
-            border-radius: 12px; transition: 0.1s;
-        }
-        .picker-item:hover { background: var(--btn-hover); transform: scale(1.15); }
 
         .ghost-node {
             position: fixed; pointer-events: none;
@@ -326,11 +357,16 @@
 <body>
 
     <header class="toolbar">
-        <div class="logo-area">
+        <div class="left-area">
             <div class="logo">MinimalMind</div>
             <div class="daily-tip" id="daily-tip" onclick="app.refreshTip(true)" title="클릭해서 새로운 팁 보기"></div>
         </div>
-        <div class="btn-group">
+        
+        <div class="center-area">
+            <input type="text" id="doc-title" class="title-input" value="Untitled Project" onchange="app.updateTitle(this.value)">
+        </div>
+
+        <div class="right-area">
             <button onclick="app.undo()" class="icon-btn" data-tooltip="취소 (Ctrl+Z)" id="btn-undo">
                 <svg viewBox="0 0 24 24"><path d="M12.5 8c-2.65 0-5.05.99-6.9 2.6L2 7v9h9l-3.62-3.62c1.39-1.16 3.16-1.88 5.12-1.88 3.54 0 6.55 2.31 7.6 5.5l2.37-.78C21.08 11.03 17.15 8 12.5 8z"/></svg>
             </button>
@@ -340,38 +376,31 @@
             
             <div class="divider"></div>
 
-            <button onclick="app.toggleStickerPicker()" class="icon-btn" id="btn-sticker" data-tooltip="스티커">
-                <svg viewBox="0 0 24 24"><path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm3.5-9c.83 0 1.5-.67 1.5-1.5S16.33 8 15.5 8 14 8.67 14 9.5s.67 1.5 1.5 1.5zm-7 0c.83 0 1.5-.67 1.5-1.5S9.33 8 8.5 8 7 8.67 7 9.5 7.67 11 8.5 11zm3.5 6.5c2.33 0 4.31-1.46 5.11-3.5H6.89c.8 2.04 2.78 3.5 5.11 3.5z"/></svg>
-            </button>
-            <button onclick="app.autoOrganize()" class="icon-btn" data-tooltip="자동 정리">
-                <svg viewBox="0 0 24 24"><path d="M4 14h4v-4H4v4zm0 5h16v-2H4v2zM4 9h4V5H4v4zm5 5h12v-4H9v4zm0-9v4h12V5H9z"/></svg>
-            </button>
+            <!-- 1. Auto Organize Button Removed -->
             
+            <button onclick="app.toggleColorMode()" class="icon-btn" id="btn-color" data-tooltip="컬러 모드">
+                <svg viewBox="0 0 24 24"><path d="M12 3a9 9 0 0 0 0 18c.83 0 1.5-.67 1.5-1.5 0-.39-.15-.74-.39-1.01-.23-.26-.38-.61-.38-.99 0-.83.67-1.5 1.5-1.5H16c2.76 0 5-2.24 5-5 0-4.42-4.03-8-9-8zm-5.5 9c-.83 0-1.5-.67-1.5-1.5S5.67 9 6.5 9 8 9.67 8 10.5 7.33 12 6.5 12zm3-4C8.67 8 8 7.33 8 6.5S8.67 5 9.5 5s1.5.67 1.5 1.5S10.33 8 9.5 8zm5 0c-.83 0-1.5-.67-1.5-1.5S13.67 5 14.5 5s1.5.67 1.5 1.5S15.33 8 14.5 8zm3 4c-.83 0-1.5-.67-1.5-1.5S16.67 9 17.5 9s1.5.67 1.5 1.5-.67 1.5-1.5 1.5z"/></svg>
+            </button>
+
             <div class="divider"></div>
 
             <button onclick="app.zoomToFit()" class="icon-btn" data-tooltip="전체 보기">
                 <svg viewBox="0 0 24 24"><path d="M15 3l2.3 2.3-2.89 2.87 1.42 1.42L18.7 6.7 21 9V3zM3 9l2.3-2.3 2.87 2.89 1.42-1.42L6.7 5.3 9 3H3zm6 12l-2.3-2.3 2.89-2.87-1.42-1.42L5.3 17.3 3 15v6zm12-6l-2.3 2.3-2.87-2.89-1.42 1.42 2.89 2.87L15 21h6z"/></svg>
             </button>
-            <button onclick="app.exportImage()" class="icon-btn" data-tooltip="이미지 저장">
-                <svg viewBox="0 0 24 24"><path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/></svg>
-            </button>
-            <button onclick="app.exportPDF()" class="icon-btn" data-tooltip="PDF 저장">
-                <svg viewBox="0 0 24 24"><path d="M20 2H8c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-8.5 7.5c0 .83-.67 1.5-1.5 1.5H9v2H7.5V7H10c.83 0 1.5.67 1.5 1.5v1zm5 2c0 .83-.67 1.5-1.5 1.5h-2.5V7H15c.83 0 1.5.67 1.5 1.5v3zm4-3H19v1h1.5V11H19v2h-1.5V7h3v1.5zM9 9.5h1v-1H9v1zM4 6H2v14c0 1.1.9 2 2 2h14v-2H4V6zm10 5.5h1v-3h-1v3z"/></svg>
-            </button>
 
-            <div class="divider"></div>
-            
-            <button onclick="app.toggleHelp()" class="icon-btn" data-tooltip="도움말">
+            <button onclick="app.toggleHelp()" class="icon-btn" data-tooltip="가이드 & 키">
                 <svg viewBox="0 0 24 24"><path d="M11 18h2v-2h-2v2zm1-16C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm0-14c-2.21 0-4 1.79-4 4h2c0-1.1.9-2 2-2s2 .9 2 2c0 2-3 1.75-3 5h2c0-2.25 3-2.5 3-5 0-2.21-1.79-4-4-4z"/></svg>
             </button>
-            <button onclick="app.toggleDarkMode()" class="icon-btn" data-tooltip="다크모드 토글">
+            <button onclick="app.toggleDarkMode()" class="icon-btn" data-tooltip="다크모드">
                 <svg viewBox="0 0 24 24"><path d="M12 3c-4.97 0-9 4.03-9 9s4.03 9 9 9 9-4.03 9-9c0-.46-.04-.92-.1-1.36a5.389 5.389 0 0 1-4.4 2.26 5.403 5.403 0 0 1-3.14-9.8c-.44-.06-.9-.1-1.36-.1z"/></svg>
             </button>
+            
+            <div class="divider"></div>
             
             <button onclick="app.openSaveModal()" class="icon-btn" data-tooltip="파일 저장">
                 <svg viewBox="0 0 24 24"><path d="M17 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V7l-4-4zm-5 16c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm3-10H5V5h10v4z"/></svg>
             </button>
-            <button onclick="document.getElementById('fileInput').click()" class="icon-btn" data-tooltip="파일 열기">
+            <button onclick="document.getElementById('fileInput').click()" class="icon-btn" data-tooltip="열기">
                 <svg viewBox="0 0 24 24"><path d="M20 6h-8l-2-2H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm0 12H4V8h16v10z"/></svg>
             </button>
             <button onclick="app.reset()" class="icon-btn danger" data-tooltip="초기화">
@@ -385,28 +414,20 @@
     <div id="zoom-indicator" class="zoom-indicator" onclick="app.resetZoom()">100%</div>
 
     <div id="context-menu">
-        <div class="ctx-colors">
-            <div class="color-dot" style="background:#FF3B30" onclick="app.setNodeColor('color-red')"></div>
-            <div class="color-dot" style="background:#FF9500" onclick="app.setNodeColor('color-orange')"></div>
-            <div class="color-dot" style="background:#34C759" onclick="app.setNodeColor('color-green')"></div>
-            <div class="color-dot" style="background:#007AFF" onclick="app.setNodeColor('color-blue')"></div>
-            <div class="color-dot" style="background:#AF52DE" onclick="app.setNodeColor('color-purple')"></div>
-            <div class="color-dot" style="background:#8E8E93" onclick="app.setNodeColor('color-gray')"></div>
-        </div>
-        <div class="ctx-divider"></div>
-        <div class="ctx-item" onclick="app.setNodeColor(null)"><span>🔄</span> 스타일 초기화</div>
+        <div class="ctx-item" onclick="app.toggleCheckbox(app.contextMenuId)"><span>☑️</span> 체크박스 토글</div>
         <div class="ctx-item danger" onclick="app.deleteNodeFromContext()"><span>🗑️</span> 삭제</div>
     </div>
 
     <!-- Save Modal -->
     <div id="save-modal" class="modal-overlay" onclick="app.closeSaveModal()">
-        <div class="help-modal" style="width: 300px; height: auto;" onclick="event.stopPropagation()">
+        <div class="help-modal" style="width: 340px; height: auto;" onclick="event.stopPropagation()">
             <div class="help-header">
-                <h3>파일 이름 저장</h3>
+                <h3>파일 저장</h3>
                 <span class="close-help" onclick="app.closeSaveModal()">✕</span>
             </div>
             <div class="save-modal-body">
-                <input type="text" id="save-filename" class="save-input" value="MinimalMind.json" onkeydown="if(event.key==='Enter') app.confirmSave()">
+                <p style="color:var(--text-sub); font-size:14px; margin:0;">현재 프로젝트 이름을 파일명으로 사용합니다.</p>
+                <input type="text" id="save-filename" class="save-input" onkeydown="if(event.key==='Enter') app.confirmSave()">
                 <div class="save-actions">
                     <button class="modal-btn secondary" onclick="app.closeSaveModal()">취소</button>
                     <button class="modal-btn primary" onclick="app.confirmSave()">저장</button>
@@ -419,52 +440,57 @@
     <div id="help-modal" class="modal-overlay" onclick="app.toggleHelp()">
         <div class="help-modal" onclick="event.stopPropagation()">
             <div class="help-header">
-                <h3>도움말 & 가이드</h3>
+                <h3>Inspiration & Keys</h3>
                 <span class="close-help" onclick="app.toggleHelp()">✕</span>
             </div>
             <div class="help-tabs">
-                <div class="help-tab active" onclick="app.switchHelpTab('shortcuts')">단축키</div>
-                <div class="help-tab" onclick="app.switchHelpTab('tips')">50가지 팁</div>
+                <div class="help-tab active" onclick="app.switchHelpTab('shortcuts')">단축키 & 조작</div>
+                <div class="help-tab" onclick="app.switchHelpTab('inspiration')">영감 얻기</div>
             </div>
             
             <div class="help-body">
-                <div id="help-shortcuts" class="help-page active">
-                    <div class="help-grid">
-                        <div class="help-card">
-                            <h4>기본 조작</h4>
-                            <ul class="shortcut-list">
-                                <li><span>하위 주제 추가</span> <span class="key-badge">Tab</span></li>
-                                <li><span>동위 주제 추가</span> <span class="key-badge">Enter</span></li>
-                                <li><span>내용 편집</span> <span class="key-badge">Space / F2</span></li>
-                                <li><span>줄바꿈</span> <span class="key-badge">Shift+Enter</span></li>
-                                <li><span>삭제</span> <span class="key-badge">Del</span></li>
-                            </ul>
-                        </div>
-                        <div class="help-card">
-                            <h4>고급 기능</h4>
-                            <ul class="shortcut-list">
-                                <li><span>실행 취소</span> <span class="key-badge">Ctrl+Z</span></li>
-                                <li><span>다중 선택</span> <span class="key-badge">Shift+Drag</span></li>
-                                <li><span>이미지 붙여넣기</span> <span class="key-badge">Ctrl+V</span></li>
-                                <li><span>링크 열기</span> <span class="key-badge">Alt+Click</span></li>
-                                <li><span>루트로 이동</span> <span class="key-badge">Home</span></li>
-                            </ul>
+                <div class="help-content-area">
+                    <div id="help-shortcuts" class="help-page active">
+                        <div class="help-grid">
+                            <div class="help-card">
+                                <h4>⌨️ 노드 편집</h4>
+                                <ul class="shortcut-list">
+                                    <li><span>하위 주제 추가</span> <span class="key-badge">Tab</span></li>
+                                    <li><span>같은 레벨 추가</span> <span class="key-badge">Enter</span></li>
+                                    <li><span>내용 수정</span> <span class="key-badge">Space</span></li>
+                                    <li><span>줄바꿈</span> <span class="key-badge">Shift+Enter</span></li>
+                                    <li><span>삭제</span> <span class="key-badge">Del</span></li>
+                                </ul>
+                            </div>
+                            <div class="help-card">
+                                <h4>🚀 네비게이션</h4>
+                                <ul class="shortcut-list">
+                                    <li><span>이동</span> <span class="key-badge">방향키</span></li>
+                                    <li><span>화면 이동</span> <span class="key-badge">바탕 드래그</span></li>
+                                    <li><span>줌 인/아웃</span> <span class="key-badge">휠</span></li>
+                                    <li><span>루트로 이동</span> <span class="key-badge">Home</span></li>
+                                </ul>
+                            </div>
+                            <div class="help-card">
+                                <h4>✨ 기타 기능</h4>
+                                <ul class="shortcut-list">
+                                    <li><span>실행 취소</span> <span class="key-badge">Ctrl+Z</span></li>
+                                    <li><span>이미지 넣기</span> <span class="key-badge">Ctrl+V</span></li>
+                                    <li><span>링크 열기</span> <span class="key-badge">Alt+Click</span></li>
+                                    <li><span>위치 재정렬</span> <span class="key-badge">Drag</span></li>
+                                </ul>
+                            </div>
                         </div>
                     </div>
-                </div>
 
-                <div id="help-tips" class="help-page">
-                    <ul class="tip-list" id="tip-list"></ul>
+                    <div id="help-inspiration" class="help-page">
+                        <div class="insp-category-tabs" id="insp-tabs"></div>
+                        <ul class="tip-list" id="tip-list"></ul>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
-
-    <div id="sticker-picker" class="popup-menu">
-        <!-- Emojis populated by JS -->
-    </div>
-
-    <div id="selection-box" class="selection-box"></div>
 
     <div id="viewport">
         <div id="world">
@@ -483,12 +509,9 @@ class MinimalMind {
         
         this.view = { x: 0, y: 0, scale: 1 };
         this.isPanning = false;
-        this.isBoxSelecting = false;
         this.lastMouse = { x: 0, y: 0 };
-        this.boxStart = { x: 0, y: 0 };
         
         this.selectedId = null;
-        this.selectedIds = new Set();
         this.editingId = null;
         this.contextMenuId = null;
         
@@ -498,8 +521,12 @@ class MinimalMind {
         this.resizeStartX = 0;
         this.resizeStartWidth = 0;
 
-        this.GAP_X = 100;
-        this.GAP_Y = 20;
+        this.GAP_X = 120;
+        this.GAP_Y = 30;
+
+        this.docTitle = "Untitled Project";
+        this.isColorMode = false;
+        this.randomTitles = ["빛나는 아이디어", "생각의 지도", "프로젝트 기획", "오늘의 브레인스토밍", "무한한 확장", "핵심 정리", "새로운 발견"];
 
         this.viewport = document.getElementById('viewport');
         this.world = document.getElementById('world');
@@ -510,75 +537,87 @@ class MinimalMind {
         this.saveModal = document.getElementById('save-modal');
         this.saveIndicator = document.getElementById('save-indicator');
         this.zoomIndicator = document.getElementById('zoom-indicator');
-        this.stickerPicker = document.getElementById('sticker-picker');
-        this.selectionBox = document.getElementById('selection-box');
+        this.titleInput = document.getElementById('doc-title');
+        this.colorBtn = document.getElementById('btn-color');
 
-        // 1. Massive Tip List (50+)
-        this.tips = [
-            {cat: "발상", text: "비판 금지! 엉뚱한 생각도 일단 모두 적으세요."},
-            {cat: "발상", text: "중심 단어 하나에서 꼬리에 꼬리를 무세요."},
-            {cat: "발상", text: "양(Quantity)이 질(Quality)을 만듭니다. 많이 적으세요."},
-            {cat: "발상", text: "SCAMPER: 대체, 결합, 응용, 변형, 용도변경, 제거, 재배열."},
-            {cat: "발상", text: "만약에(What if)? 질문을 던져보세요."},
-            {cat: "발상", text: "반대로 생각해보세요. (Reverse Thinking)"},
-            {cat: "발상", text: "관점을 바꿔보세요. (고객, 경쟁사, 아이의 시선)"},
-            {cat: "발상", text: "제약 조건을 없애고 상상해보세요."},
-            {cat: "발상", text: "가장 최악의 시나리오를 상상해보세요."},
-            {cat: "발상", text: "단어를 이미지로 시각화해보세요."},
-            {cat: "구조", text: "문장 대신 '핵심 키워드' 명사를 사용하세요."},
-            {cat: "구조", text: "상위 가지는 굵은 개념, 하위는 세부 사항."},
-            {cat: "구조", text: "가지를 7개 이하로 유지하면 한눈에 들어옵니다."},
-            {cat: "구조", text: "MECE: 겹치지 않고 빠짐없이 분류하세요."},
-            {cat: "구조", text: "논리적 흐름에 따라 노드 순서를 재배열하세요."},
-            {cat: "구조", text: "중복되는 내용은 연결선으로 관계를 표시하세요."},
-            {cat: "구조", text: "너무 깊은 단계(Depth)보다는 넓은 가지(Breadth)가 좋습니다."},
-            {cat: "구조", text: "핵심 주제는 항상 중앙에 크게 배치하세요."},
-            {cat: "구조", text: "그룹핑(Grouping)으로 정보를 덩어리 지으세요."},
-            {cat: "구조", text: "번호를 매겨 순서를 명확히 하세요."},
-            {cat: "시각화", text: "같은 카테고리는 같은 색상으로 묶으세요."},
-            {cat: "시각화", text: "중요한 노드는 빨간색이나 굵은 글씨로 강조하세요."},
-            {cat: "시각화", text: "시계 방향(1시 방향부터)으로 가지를 읽으세요."},
-            {cat: "시각화", text: "복잡한 맵은 하위 가지를 접어서(Fold) 보세요."},
-            {cat: "시각화", text: "이미지를 붙여넣어(Ctrl+V) 기억력을 높이세요."},
-            {cat: "시각화", text: "스티커를 활용해 상태(진행중, 완료)를 표시하세요."},
-            {cat: "시각화", text: "폰트 크기 변화로 위계를 표현하세요."},
-            {cat: "시각화", text: "여백을 충분히 주어 답답하지 않게 하세요."},
-            {cat: "시각화", text: "전체 보기를 통해 숲을 조망하세요."},
-            {cat: "시각화", text: "다크 모드를 활용해 눈의 피로를 줄이세요."},
-            {cat: "활용", text: "복잡한 문제는 잘게 쪼개서(Decomposition) 정복하세요."},
-            {cat: "활용", text: "'왜(Why)?'를 5번 반복하며 근본 원인을 찾으세요."},
-            {cat: "활용", text: "육하원칙(5W1H)을 1차 가지로 잡고 시작해보세요."},
-            {cat: "활용", text: "SWOT 분석: 강점, 약점, 기회, 위협을 가지로 만드세요."},
-            {cat: "활용", text: "할 일 목록(To-do)을 만들고 체크박스로 관리하세요."},
-            {cat: "활용", text: "회의록을 마인드맵으로 작성하면 구조 파악이 쉽습니다."},
-            {cat: "활용", text: "독서 후 핵심 내용을 마인드맵으로 요약해보세요."},
-            {cat: "활용", text: "여행 계획을 짤 때 동선과 준비물을 정리하세요."},
-            {cat: "활용", text: "프로젝트 일정을 단계별로 시각화하세요."},
-            {cat: "활용", text: "발표 자료의 목차를 잡을 때 유용합니다."},
-            {cat: "팁", text: "Shift+드래그로 여러 노드를 한 번에 선택하세요."},
-            {cat: "팁", text: "Alt+클릭으로 링크를 바로 여세요."},
-            {cat: "팁", text: "이미지를 드래그 앤 드롭하여 삽입하세요."},
-            {cat: "팁", text: "단축키(Tab, Enter)를 익히면 속도가 2배 빨라집니다."},
-            {cat: "팁", text: "자동 정리 버튼으로 흐트러진 맵을 정돈하세요."},
-            {cat: "팁", text: "저장은 습관입니다. Ctrl+S를 자주 누르세요."},
-            {cat: "팁", text: "배경을 더블 클릭하면 줌이 초기화됩니다."},
-            {cat: "팁", text: "노드 우클릭으로 스타일을 빠르게 초기화하세요."},
-            {cat: "팁", text: "Home 키를 눌러 언제든 중앙으로 돌아오세요."},
-            {cat: "팁", text: "생각이 막힐 땐 잠시 산책을 다녀오세요."}
-        ];
-
-        this.emojis = ['😍', '👍', '🔥', '💡', '✅', '❌', '⭐', '🚩', '❓', '📅', '🎉', '💻', '💰', '🚀', '❤️', '😱', '👀', '✨'];
+        this.inspirationData = {
+            "발상(Idea)": [
+                "비판 금지! 엉뚱한 생각도 일단 모두 적으세요.",
+                "중심 단어 하나에서 꼬리에 꼬리를 무세요.",
+                "양(Quantity)이 질(Quality)을 만듭니다. 많이 적으세요.",
+                "SCAMPER: 대체, 결합, 응용, 변형, 용도변경, 제거, 재배열.",
+                "만약에(What if)? 질문을 던져보세요.",
+                "반대로 생각해보세요. (Reverse Thinking)",
+                "관점을 바꿔보세요. (고객, 경쟁사, 아이의 시선)",
+                "제약 조건을 없애고 상상해보세요.",
+                "가장 최악의 시나리오를 상상해보세요.",
+                "단어를 이미지로 시각화해보세요.",
+                "랜덤 단어 3개를 뽑아 강제로 연결해보세요.",
+                "아이와 대화한다고 생각하고 쉽게 풀어보세요."
+            ],
+            "기획(Plan)": [
+                "5W1H (누가, 언제, 어디서, 무엇을, 어떻게, 왜)를 작성하세요.",
+                "MECE: 겹치지 않고 빠짐없이 분류하세요.",
+                "핵심 목표(Goal)를 최상단에 배치하세요.",
+                "타임라인 순서대로 노드를 배치해보세요.",
+                "예상되는 리스크와 대응 방안을 가지치기 하세요.",
+                "필요한 자원(인력, 예산, 시간)을 나열하세요.",
+                "이해관계자(Stakeholders)를 맵핑하세요.",
+                "프로젝트의 마일스톤을 굵은 가지로 만드세요.",
+                "우선순위(P1, P2, P3)를 태그로 표시하세요.",
+                "경쟁사 분석(SWOT)을 가지별로 진행하세요."
+            ],
+            "학습(Study)": [
+                "목차를 먼저 대주제로 잡고 시작하세요.",
+                "핵심 키워드 위주로 명사형으로 요약하세요.",
+                "모르는 단어는 빨간색으로 표시해두세요.",
+                "관련된 개념끼리 선으로 연결하세요.",
+                "자신만의 언어로 다시 풀어서 적으세요.",
+                "복습할 때는 하위 노드를 접어두고 기억해내세요.",
+                "파인만 기법: 설명하듯이 내용을 작성하세요.",
+                "출처나 페이지 번호를 함께 적으세요.",
+                "비슷한 개념과 차이점을 대조해보세요.",
+                "전체적인 흐름(Flow)을 파악하며 배치하세요."
+            ],
+            "목표(Goal)": [
+                "SMART: 구체적, 측정가능, 달성가능, 현실적, 기한있게.",
+                "큰 목표를 작은 단위(Micro Goal)로 쪼개세요.",
+                "목표 달성 시 얻게 될 보상을 적어보세요.",
+                "방해 요소가 무엇일지 미리 적어보세요.",
+                "매일 해야 할 루틴(Habit)을 하위 가지로 만드세요.",
+                "장기(1년) -> 중기(분기) -> 단기(월) 순으로 내리세요.",
+                "멘토나 롤모델의 조언을 적어보세요.",
+                "현재 상태와 목표 상태의 갭(Gap)을 분석하세요.",
+                "실패했을 때의 대안(Plan B)을 마련하세요.",
+                "시각적인 비전 보드를 만든다고 생각하세요."
+            ],
+            "문제해결(Solve)": [
+                "'왜(Why)?'를 5번 반복하며 근본 원인을 찾으세요.",
+                "문제의 현상과 원인을 분리해서 적으세요.",
+                "해결 가능한 것과 불가능한 것을 구분하세요.",
+                "브레인라이팅: 침묵 속에 글로 해결책을 쓰세요.",
+                "장점과 단점(Pros & Cons)을 대립시켜보세요.",
+                "이상적인 결과(Best Case)를 상상해보세요.",
+                "전문가라면 어떻게 했을지 상상해보세요.",
+                "문제의 구성 요소를 최대한 잘게 분해하세요.",
+                "비슷한 사례나 과거의 경험을 떠올려보세요.",
+                "지금 당장 시도할 수 있는 작은 액션을 적으세요."
+            ]
+        };
+        this.currentInspCategory = "발상(Idea)";
+        this.tips = [].concat(...Object.values(this.inspirationData));
 
         this.init();
     }
 
     init() {
-        if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
-            document.body.classList.add('dark-mode');
-        }
-
-        this.initStickerPicker();
         this.loadFromStorage();
+        
+        if(!this.docTitle || this.docTitle === "Untitled Project") {
+             this.docTitle = this.randomTitles[Math.floor(Math.random() * this.randomTitles.length)];
+        }
+        this.titleInput.value = this.docTitle;
+
         if (!this.rootId) this.reset();
         else {
             this.history = [];
@@ -586,12 +625,11 @@ class MinimalMind {
             this.saveState();
         }
         
-        this.populateTips();
-        this.refreshTip();
-        
-        setInterval(() => this.refreshTip(), 60000);
-
+        this.renderInspirationTabs();
+        this.renderInspirationList();
+        this.refreshTip(true); 
         this.setupEvents();
+        this.updateColorModeUI();
         
         requestAnimationFrame(() => {
             this.render(); 
@@ -600,50 +638,76 @@ class MinimalMind {
         });
     }
 
-    initStickerPicker() {
-        this.stickerPicker.innerHTML = '';
-        this.emojis.forEach(emoji => {
-            const div = document.createElement('div');
-            div.className = 'picker-item';
-            div.innerText = emoji;
-            div.onmousedown = (e) => {
-                e.stopPropagation(); 
-                this.toggleSticker(this.selectedId, emoji);
-            };
-            this.stickerPicker.appendChild(div);
-        });
-    }
-
-    populateTips() {
-        const list = document.getElementById('tip-list');
-        list.innerHTML = this.tips.map(t => 
-            `<li><span class="tip-cat" style="background:var(--accent-color)">${t.cat}</span>${t.text}</li>`
-        ).join('');
-    }
-
     refreshTip(manual = false) {
         const el = document.getElementById('daily-tip');
+        if(!el) return;
         if(!manual) {
             el.classList.add('fade-out');
             setTimeout(() => {
                 const tip = this.tips[Math.floor(Math.random() * this.tips.length)];
-                el.innerText = tip.text;
+                el.innerText = tip;
                 el.classList.remove('fade-out');
             }, 300);
         } else {
             const tip = this.tips[Math.floor(Math.random() * this.tips.length)];
-            el.innerText = tip.text;
+            el.innerText = tip;
         }
+    }
+
+    renderInspirationTabs() {
+        const container = document.getElementById('insp-tabs');
+        container.innerHTML = Object.keys(this.inspirationData).map(cat => 
+            `<button class="insp-cat-btn ${cat === this.currentInspCategory ? 'active' : ''}" 
+                onclick="app.setInspCategory('${cat}')">${cat}</button>`
+        ).join('');
+    }
+
+    setInspCategory(cat) {
+        this.currentInspCategory = cat;
+        this.renderInspirationTabs();
+        this.renderInspirationList();
+    }
+
+    renderInspirationList() {
+        const list = document.getElementById('tip-list');
+        const items = this.inspirationData[this.currentInspCategory] || [];
+        list.innerHTML = items.map(t => 
+            `<li><span class="tip-icon">💡</span> ${t}</li>`
+        ).join('');
+    }
+
+    updateTitle(newTitle) {
+        this.docTitle = newTitle || "Untitled Project";
+        this.saveToStorage();
+    }
+
+    toggleColorMode() {
+        this.isColorMode = !this.isColorMode;
+        this.updateColorModeUI();
+        this.render();
+        this.saveState();
+    }
+
+    updateColorModeUI() {
+        if(this.isColorMode) this.colorBtn.classList.add('active');
+        else this.colorBtn.classList.remove('active');
     }
 
     toggleDarkMode() { document.body.classList.toggle('dark-mode'); }
 
-    // Modal Logic
     toggleHelp() { this.helpModal.classList.toggle('active'); }
-    openSaveModal() { this.saveModal.classList.add('active'); document.getElementById('save-filename').focus(); }
+    
+    openSaveModal() { 
+        this.saveModal.classList.add('active'); 
+        document.getElementById('save-filename').value = this.docTitle + ".json";
+        document.getElementById('save-filename').focus(); 
+    }
+    
     closeSaveModal() { this.saveModal.classList.remove('active'); }
+    
     confirmSave() {
-        const filename = document.getElementById('save-filename').value || 'MinimalMind.json';
+        const inputName = document.getElementById('save-filename').value;
+        const filename = (inputName && inputName.trim() !== "") ? inputName : 'MinimalMind.json';
         this.saveFile(filename);
         this.closeSaveModal();
     }
@@ -657,15 +721,15 @@ class MinimalMind {
             document.getElementById('help-shortcuts').classList.add('active');
         } else {
             document.querySelector('.help-tab:nth-child(2)').classList.add('active');
-            document.getElementById('help-tips').classList.add('active');
+            document.getElementById('help-inspiration').classList.add('active');
         }
     }
 
     showContextMenu(x, y, nodeId) {
         this.contextMenuId = nodeId;
         this.contextMenu.style.display = 'flex';
-        const menuWidth = 180;
-        const menuHeight = 120;
+        const menuWidth = 160;
+        const menuHeight = 80;
         let finalX = x;
         let finalY = y;
         if (x + menuWidth > window.innerWidth) finalX = x - menuWidth;
@@ -679,15 +743,6 @@ class MinimalMind {
         this.contextMenuId = null;
     }
 
-    setNodeColor(colorClass) {
-        if (!this.contextMenuId) return;
-        const node = this.nodes[this.contextMenuId];
-        node.styleClass = colorClass;
-        this.hideContextMenu();
-        this.render();
-        this.saveState();
-    }
-
     deleteNodeFromContext() {
         if (this.contextMenuId) {
             this.deleteNode(this.contextMenuId);
@@ -695,37 +750,20 @@ class MinimalMind {
         }
     }
 
-    toggleStickerPicker() {
-        this.stickerPicker.classList.toggle('active');
-        document.getElementById('btn-sticker').classList.toggle('active', this.stickerPicker.classList.contains('active'));
-    }
-
-    toggleSticker(nodeId, emoji) {
-        if (!nodeId) return;
-        const node = this.nodes[nodeId];
-        if (!node.stickers) node.stickers = [];
-        const idx = node.stickers.indexOf(emoji);
-        if (idx !== -1) {
-            node.stickers.splice(idx, 1);
-        } else {
-            node.stickers.push(emoji);
-        }
-        this.updateLayout(); 
-        this.render();
-        this.saveState();
-    }
-
     toggleCheckbox(nodeId) {
         const node = this.nodes[nodeId];
         if (!node) return;
         if (node.text.startsWith('[] ')) node.text = node.text.replace('[] ', '[x] ');
         else if (node.text.startsWith('[x] ')) node.text = node.text.replace('[x] ', '[] ');
+        else node.text = '[] ' + node.text;
+        
+        this.hideContextMenu();
         this.render();
         this.saveState();
     }
 
     saveState() {
-        const state = JSON.stringify({ nodes: this.nodes, rootId: this.rootId });
+        const state = JSON.stringify({ nodes: this.nodes, rootId: this.rootId, docTitle: this.docTitle, isColorMode: this.isColorMode });
         if (this.historyIdx >= 0 && this.history[this.historyIdx] === state) return;
         if (this.historyIdx < this.history.length - 1) {
             this.history = this.history.slice(0, this.historyIdx + 1);
@@ -756,8 +794,13 @@ class MinimalMind {
         const state = JSON.parse(this.history[this.historyIdx]);
         this.nodes = state.nodes;
         this.rootId = state.rootId;
+        this.docTitle = state.docTitle || "Untitled Project";
+        this.isColorMode = state.isColorMode || false;
+        
+        this.titleInput.value = this.docTitle;
+        this.updateColorModeUI();
+        
         this.selectedId = null;
-        this.selectedIds.clear();
         this.editingId = null;
         this.nodesLayer.innerHTML = ''; 
         this.render(); 
@@ -777,21 +820,19 @@ class MinimalMind {
             id, text, parentId, children: [],
             x: 0, y: 0, width: 0, height: 0, 
             customWidth: null, folded: false, colorIdx: 0,
-            direction: 'right', stickers: []
+            direction: 'right'
         };
 
         if (parentId) {
             const parent = this.nodes[parentId];
+            
+            // Inherit direction if sibling exists
             if (this.selectedId && this.nodes[this.selectedId].parentId === parentId) {
                 const sibling = this.nodes[this.selectedId];
                 this.nodes[id].direction = sibling.direction; 
-                
                 const siblingIdx = parent.children.indexOf(this.selectedId);
-                if (siblingIdx !== -1) {
-                    parent.children.splice(siblingIdx + 1, 0, id);
-                } else {
-                    parent.children.push(id);
-                }
+                if (siblingIdx !== -1) parent.children.splice(siblingIdx + 1, 0, id);
+                else parent.children.push(id);
             } else {
                 if (parent.direction) this.nodes[id].direction = parent.direction;
                 if (parentId === this.rootId) this.nodes[id].direction = 'right'; 
@@ -805,14 +846,12 @@ class MinimalMind {
             }
         } else {
             this.rootId = id;
-            this.nodes[id].text = "Minimal Mind"; 
+            this.nodes[id].text = this.docTitle; 
             this.nodes[id].direction = 'root';
         }
 
         this.render(); 
         this.updateLayout();
-        this.refreshTip();
-        
         return id;
     }
 
@@ -820,23 +859,19 @@ class MinimalMind {
         if (id === this.rootId) return;
         this.stopEditing();
         
-        const idsToDelete = this.selectedIds.size > 0 ? Array.from(this.selectedIds) : [id];
-        
-        idsToDelete.forEach(targetId => {
-            if(targetId === this.rootId) return;
-            const parentId = this.nodes[targetId].parentId;
+        if (id) {
+            const parentId = this.nodes[id].parentId;
             const parent = this.nodes[parentId];
-            if(parent) parent.children = parent.children.filter(cid => cid !== targetId);
+            if(parent) parent.children = parent.children.filter(cid => cid !== id);
             
             const deleteRecursive = (nid) => {
                 const n = this.nodes[nid];
                 if (n && n.children) n.children.forEach(deleteRecursive);
                 delete this.nodes[nid];
             };
-            deleteRecursive(targetId);
-        });
+            deleteRecursive(id);
+        }
         
-        this.selectedIds.clear();
         this.selectNode(null);
         this.updateLayout();
         this.saveState();
@@ -852,21 +887,6 @@ class MinimalMind {
         }
     }
 
-    autoOrganize() {
-        if(!confirm("모든 레이아웃을 자동 정리하시겠습니까? (좌우 위치는 유지됩니다)")) return;
-        if (this.rootId && this.nodes[this.rootId]) {
-            this.nodes[this.rootId].children.forEach(cid => {
-                const child = this.nodes[cid];
-                const root = this.nodes[this.rootId];
-                if (child.x < root.x) child.direction = 'left';
-                else child.direction = 'right';
-            });
-        }
-        this.updateLayout();
-        this.centerView();
-        this.saveState();
-    }
-
     updateLayout() {
         if (!this.rootId) return;
         Object.values(this.nodes).forEach(node => {
@@ -878,7 +898,7 @@ class MinimalMind {
         const leftChildren = [];
         const rightChildren = [];
 
-        root.children.forEach((cid, index) => {
+        root.children.forEach((cid) => {
             const child = this.nodes[cid];
             if (child.direction === 'left') leftChildren.push(cid);
             else rightChildren.push(cid);
@@ -903,13 +923,15 @@ class MinimalMind {
         rightChildren.forEach(calcSize);
         root.subtreeHeight = root.height;
 
-        const setPos = (id, x, y, dir) => {
+        const setPos = (id, x, y, dir, depth) => {
             const node = this.nodes[id];
-            node.x = x; node.y = y; node.direction = dir;
+            node.x = x; node.y = y; node.direction = dir; node.depth = depth;
             if (node.folded || node.children.length === 0) return;
+            
             let totalChildH = 0;
             node.children.forEach(cid => totalChildH += this.nodes[cid].subtreeHeight);
             totalChildH += (node.children.length - 1) * this.GAP_Y;
+            
             let currentY = y - totalChildH / 2;
             node.children.forEach(cid => {
                 const child = this.nodes[cid];
@@ -917,12 +939,12 @@ class MinimalMind {
                 let childX;
                 if (dir === 'right') childX = x + node.width + 40 + (this.GAP_X - 40);
                 else childX = x - (this.GAP_X - 40) - child.width - 40;
-                setPos(cid, childX, childY, dir);
+                setPos(cid, childX, childY, dir, depth + 1);
                 currentY += child.subtreeHeight + this.GAP_Y;
             });
         };
 
-        root.x = 0; root.y = 0; root.direction = 'root';
+        root.x = 0; root.y = 0; root.direction = 'root'; root.depth = 0;
 
         let totalRH = 0;
         rightChildren.forEach(cid => totalRH += this.nodes[cid].subtreeHeight);
@@ -931,7 +953,7 @@ class MinimalMind {
         rightChildren.forEach(cid => {
             const child = this.nodes[cid];
             const cy = curRightY + child.subtreeHeight/2;
-            setPos(cid, root.width + this.GAP_X, cy, 'right');
+            setPos(cid, root.width + this.GAP_X, cy, 'right', 1);
             curRightY += child.subtreeHeight + this.GAP_Y;
         });
 
@@ -942,7 +964,7 @@ class MinimalMind {
         leftChildren.forEach(cid => {
             const child = this.nodes[cid];
             const cy = curLeftY + child.subtreeHeight/2;
-            setPos(cid, -(this.GAP_X + child.width), cy, 'left');
+            setPos(cid, -(this.GAP_X + child.width), cy, 'left', 1);
             curLeftY += child.subtreeHeight + this.GAP_Y;
         });
 
@@ -962,39 +984,43 @@ class MinimalMind {
             if (!node) return; 
             let el = existingEls[id];
 
+            let nodeBg = 'var(--node-bg)';
+            let nodeBorder = 'transparent';
+            let strokeColor = 'var(--line-color)'; 
+            let textColor = 'var(--text-color)';
+            
+            if(this.isColorMode) {
+                if(id === this.rootId) {
+                    nodeBg = 'var(--node-bg)';
+                    strokeColor = 'var(--line-color)';
+                } else {
+                    const hue = node.colorIdx * 50;
+                    const saturation = 80;
+                    let lightness = Math.max(30, 98 - (node.depth * 8)); 
+                    
+                    nodeBg = `hsl(${hue}, ${saturation}%, ${lightness}%)`;
+                    nodeBorder = `hsl(${hue}, ${saturation}%, ${Math.max(20, lightness - 20)}%)`;
+                    strokeColor = `hsl(${hue}, 70%, 50%)`;
+
+                    if(lightness < 60) textColor = '#fff';
+                    else textColor = 'var(--text-color)';
+                }
+            } else {
+                strokeColor = 'var(--line-color)';
+            }
+
             if (this.editingId === id && el) {
                 el.style.left = `${node.x}px`;
                 el.style.top = `${node.y}px`;
                 delete existingEls[id]; 
                 if (!node.folded) node.children.forEach(drawRecursive);
-                if (node.parentId) {
-                   const p = this.nodes[node.parentId];
-                   if(p) {
-                       let startX, startY, endX, endY, cp1x, cp2x;
-                       startY = p.y; endY = node.y;
-                       const isVisuallyLeft = node.x < p.x;
-                       if (isVisuallyLeft) {
-                           startX = p.x; endX = node.x + node.width;
-                           const dist = Math.abs(endX - startX);
-                           cp1x = startX - dist * 0.4; cp2x = endX + dist * 0.4;
-                       } else {
-                           startX = p.x + p.width; endX = node.x;
-                           const dist = Math.abs(endX - startX);
-                           cp1x = startX + dist * 0.4; cp2x = endX - dist * 0.4;
-                       }
-                       let colorIdx = node.colorIdx;
-                       const color = (this.nodes[this.rootId].children.includes(node.id) || this.nodes[this.rootId].children.includes(p.id)) 
-                                   ? `hsl(${colorIdx * 50}, 70%, 50%)` : 'var(--line-color)';
-                       svgPath += `<path d="M ${startX} ${startY} C ${cp1x} ${startY}, ${cp2x} ${endY}, ${endX} ${endY}" class="link" style="stroke:${color};"></path>`;
-                   }
-                }
+                if (node.parentId) this.drawLink(node, svgPath, strokeColor);
                 return; 
             }
             
             if (!el) {
                 el = document.createElement('div');
                 el.id = id;
-                el.className = 'node';
                 el.tabIndex = 0;
                 el.onmousedown = (e) => this.handleNodeDown(e, id);
                 el.ondblclick = (e) => { e.stopPropagation(); this.startEditing(id); };
@@ -1002,18 +1028,15 @@ class MinimalMind {
                 el.onclick = (e) => { if(e.altKey) this.handleLinkClick(e, node.text); };
                 
                 el.oncontextmenu = (e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
+                    e.preventDefault(); e.stopPropagation();
                     this.selectNode(id);
                     this.showContextMenu(e.clientX, e.clientY, id);
                 };
                 
-                // 4. Image Drag & Paste Support
                 el.ondragover = (e) => { e.preventDefault(); el.classList.add('drag-over'); };
                 el.ondragleave = (e) => { e.preventDefault(); el.classList.remove('drag-over'); };
                 el.ondrop = (e) => this.handleImageDrop(e, id);
                 
-                const stickers = document.createElement('div'); stickers.className = 'stickers-container'; el.appendChild(stickers);
                 const text = document.createElement('div'); text.className = 'node-text'; el.appendChild(text);
                 const btn = document.createElement('div'); btn.className = 'fold-btn';
                 btn.onclick = (e) => { e.stopPropagation(); this.toggleFold(id); }; el.appendChild(btn);
@@ -1026,57 +1049,25 @@ class MinimalMind {
                 delete existingEls[id];
             }
 
-            if (!el.querySelector('.fold-btn')) {
-                const btn = document.createElement('div'); btn.className = 'fold-btn';
-                btn.onclick = (e) => { e.stopPropagation(); this.toggleFold(id); }; el.appendChild(btn);
-            }
-            if (!el.querySelector('.resize-handle')) {
-                const h = document.createElement('div'); h.className = 'resize-handle';
-                h.onmousedown = (e) => this.startResizing(e, id); el.appendChild(h);
-            }
-            if (!el.querySelector('.stickers-container')) {
-                 const s = document.createElement('div'); s.className = 'stickers-container'; el.prepend(s);
-            }
-            if (!el.querySelector('.node-text')) {
-                 const t = document.createElement('div'); t.className = 'node-text'; 
-                 while(el.firstChild && el.firstChild.nodeType === 3) t.appendChild(el.firstChild);
-                 el.insertBefore(t, el.querySelector('.fold-btn'));
-            }
-
+            el.className = `node ${this.isColorMode ? 'colored-mode' : ''} ${this.selectedId === id ? 'selected' : ''}`;
+            el.style.backgroundColor = nodeBg;
+            el.style.color = textColor;
+            
+            if(this.isColorMode && id !== this.rootId) el.style.borderColor = nodeBorder;
+            else el.style.borderColor = (this.selectedId === id) ? 'var(--accent-color)' : ((id === this.rootId) ? 'var(--line-color)' : 'transparent');
+            
             el.dataset.dir = node.direction;
             el.dataset.isRoot = (id === this.rootId);
-            
-            const isSelected = this.selectedId === id || this.selectedIds.has(id);
-            el.className = `node ${isSelected ? 'selected' : ''} ${node.styleClass || ''}`;
-            
-            if (node.text.startsWith('[x] ') || node.text.startsWith('[] ')) {
-                el.classList.toggle('checked', node.text.startsWith('[x] '));
-            } else {
-                el.classList.remove('checked');
-            }
+
+            if (node.text.startsWith('[x] ')) el.classList.add('checked');
+            else el.classList.remove('checked');
             
             if (node.customWidth) el.style.width = node.customWidth + 'px'; else el.style.width = '';
-
-            const stickersEl = el.querySelector('.stickers-container');
-            if (node.stickers && node.stickers.length > 0) {
-                stickersEl.innerHTML = node.stickers.map(s => `<span class="sticker-item">${s}</span>`).join('');
-                stickersEl.style.display = 'flex';
-                Array.from(stickersEl.children).forEach(item => {
-                    item.onmousedown = (e) => { 
-                        e.stopPropagation(); 
-                        this.toggleSticker(id, item.innerText); 
-                    }
-                });
-            } else {
-                stickersEl.style.display = 'none';
-            }
 
             const textEl = el.querySelector('.node-text');
             
             let imgHTML = '';
-            if (node.image) {
-                imgHTML = `<img src="${node.image}" class="node-image" draggable="false">`;
-            }
+            if (node.image) imgHTML = `<img src="${node.image}" class="node-image" draggable="false">`;
 
             let displayHTML = node.text;
             if (displayHTML.startsWith('[] ')) {
@@ -1085,9 +1076,8 @@ class MinimalMind {
                 displayHTML = `<span class="checkbox checked" onmousedown="event.stopPropagation(); app.toggleCheckbox('${id}')"></span>` + displayHTML.substring(4);
             }
             
-            // 3. Alt+Click Link Fix (regex refinement)
             const urlRegex = /(https?:\/\/[^\s]+|www\.[^\s]+)/g;
-            displayHTML = displayHTML.replace(urlRegex, (url) => `<span class="link-text" style="color:var(--accent-color); text-decoration:underline;">${url}</span>`);
+            displayHTML = displayHTML.replace(urlRegex, (url) => `<span class="link-text" style="color:${this.isColorMode && lightness < 60 ? '#8ecfff' : 'var(--accent-color)'}; text-decoration:underline;">${url}</span>`);
             
             textEl.innerHTML = imgHTML + displayHTML;
 
@@ -1103,51 +1093,44 @@ class MinimalMind {
                 btn.style.display = 'none';
             }
 
-            if (node.parentId) {
-                const p = this.nodes[node.parentId];
-                if (p) {
-                    let startX, startY, endX, endY, cp1x, cp2x;
-                    startY = p.y; endY = node.y;
-                    const isVisuallyLeft = node.x < p.x;
-                    if (isVisuallyLeft) {
-                        startX = p.x; endX = node.x + node.width;
-                        const dist = Math.abs(endX - startX);
-                        cp1x = startX - dist * 0.4; cp2x = endX + dist * 0.4;
-                    } else {
-                        startX = p.x + p.width; endX = node.x;
-                        const dist = Math.abs(endX - startX);
-                        cp1x = startX + dist * 0.4; cp2x = endX - dist * 0.4;
-                    }
-                    let colorIdx = node.colorIdx;
-                    const color = (this.nodes[this.rootId].children.includes(node.id) || this.nodes[this.rootId].children.includes(p.id)) 
-                                ? `hsl(${colorIdx * 50}, 70%, 50%)` : 'var(--line-color)';
-                    svgPath += `<path d="M ${startX} ${startY} C ${cp1x} ${startY}, ${cp2x} ${endY}, ${endX} ${endY}" class="link" style="stroke:${color};"></path>`;
-                }
-            }
+            if (node.parentId) this.drawLink(node, svgPath, strokeColor);
             if (!node.folded) node.children.forEach(drawRecursive);
         };
 
+        this.svgPathBuffer = "";
+        this.drawLink = (node, pathStr, color) => {
+            const p = this.nodes[node.parentId];
+            if (p) {
+                let startX, startY, endX, endY, cp1x, cp2x;
+                startY = p.y; endY = node.y;
+                const isVisuallyLeft = node.x < p.x;
+                if (isVisuallyLeft) {
+                    startX = p.x; endX = node.x + node.width;
+                    const dist = Math.abs(endX - startX);
+                    cp1x = startX - dist * 0.4; cp2x = endX + dist * 0.4;
+                } else {
+                    startX = p.x + p.width; endX = node.x;
+                    const dist = Math.abs(endX - startX);
+                    cp1x = startX + dist * 0.4; cp2x = endX - dist * 0.4;
+                }
+                this.svgPathBuffer += `<path d="M ${startX} ${startY} C ${cp1x} ${startY}, ${cp2x} ${endY}, ${endX} ${endY}" class="link" style="stroke:${color};"></path>`;
+            }
+        }
+
         if (this.rootId) drawRecursive(this.rootId);
         Object.values(existingEls).forEach(el => el.remove());
-        this.svg.innerHTML = svgPath;
+        this.svg.innerHTML = this.svgPathBuffer;
     }
 
     handleImageDrop(e, id) {
-        e.preventDefault();
-        e.stopPropagation();
+        e.preventDefault(); e.stopPropagation();
         document.getElementById(id).classList.remove('drag-over');
-        
         const file = e.dataTransfer.files[0];
-        if (file && file.type.startsWith('image/')) {
-            this.readAndAttachImage(file, id);
-        }
+        if (file && file.type.startsWith('image/')) this.readAndAttachImage(file, id);
     }
 
-    // 4. Paste Image Support
     handlePaste(e) {
-        if (!this.selectedId) return; // Must have node selected
-        
-        // Check for files in clipboard
+        if (!this.selectedId) return; 
         if (e.clipboardData && e.clipboardData.files.length > 0) {
             const file = e.clipboardData.files[0];
             if (file.type.startsWith('image/')) {
@@ -1179,36 +1162,19 @@ class MinimalMind {
     }
 
     setupEvents() {
-        // 4. Global Paste Listener
         window.addEventListener('paste', (e) => this.handlePaste(e));
 
         this.viewport.onmousedown = (e) => {
             if (e.button === 1) { e.preventDefault(); this.resetZoom(); return; }
             this.hideContextMenu();
-            if(this.stickerPicker.classList.contains('active')) {
-                if(!this.stickerPicker.contains(e.target) && !document.getElementById('btn-sticker').contains(e.target)) {
-                    this.stickerPicker.classList.remove('active');
-                    document.getElementById('btn-sticker').classList.remove('active');
-                }
+            if(this.helpModal.classList.contains('active')) {
+                 if(!this.helpModal.children[0].contains(e.target)) this.toggleHelp();
             }
 
             if (e.target === this.viewport || e.target === this.world) {
-                if (e.shiftKey) {
-                    // 2. Multi-select Box Init
-                    this.isBoxSelecting = true;
-                    this.boxStart = { x: e.clientX, y: e.clientY };
-                    this.selectionBox.style.display = 'block';
-                    this.selectionBox.style.left = e.clientX + 'px';
-                    this.selectionBox.style.top = e.clientY + 'px';
-                    this.selectionBox.style.width = '0';
-                    this.selectionBox.style.height = '0';
-                    return;
-                }
-
                 this.isPanning = true;
                 this.lastMouse = { x: e.clientX, y: e.clientY };
                 this.selectNode(null);
-                this.selectedIds.clear();
                 this.stopEditing();
             }
         };
@@ -1221,31 +1187,12 @@ class MinimalMind {
                 this.view.x += dx; this.view.y += dy;
                 this.lastMouse = { x: e.clientX, y: e.clientY };
                 requestAnimationFrame(() => this.render());
-            } else if (this.isBoxSelecting) {
-                const currentX = e.clientX;
-                const currentY = e.clientY;
-                const width = Math.abs(currentX - this.boxStart.x);
-                const height = Math.abs(currentY - this.boxStart.y);
-                const left = Math.min(currentX, this.boxStart.x);
-                const top = Math.min(currentY, this.boxStart.y);
-                
-                this.selectionBox.style.width = width + 'px';
-                this.selectionBox.style.height = height + 'px';
-                this.selectionBox.style.left = left + 'px';
-                this.selectionBox.style.top = top + 'px';
             } else if (this.dragNodeId) { this.updateDragGhost(e); }
         };
 
         window.onmouseup = (e) => {
             this.isPanning = false; 
             this.isResizing = false;
-            
-            if (this.isBoxSelecting) {
-                this.isBoxSelecting = false;
-                this.selectionBox.style.display = 'none';
-                this.checkSelectionBox(e);
-            }
-
             if (this.dragNodeId) this.endDrag(e);
         };
 
@@ -1273,20 +1220,14 @@ class MinimalMind {
                     e.preventDefault(); 
                     this.startEditing(this.selectedId);
                 }
-                if (e.key === 'F2' && this.selectedId) {
-                    e.preventDefault();
-                    this.startEditing(this.selectedId);
-                }
                 if (e.key === 'Escape') {
                     this.selectNode(null);
-                    this.selectedIds.clear();
                     this.hideContextMenu();
                     this.helpModal.classList.remove('active');
-                    this.stickerPicker.classList.remove('active');
                     this.closeSaveModal();
                 }
                 if (e.key === 'Home') {
-                    this.resetZoom();
+                    this.centerView();
                 }
                 if ((e.ctrlKey || e.metaKey)) {
                     if (e.key === 'z') {
@@ -1296,45 +1237,9 @@ class MinimalMind {
                         e.preventDefault();
                         this.redo();
                     }
-                    // Paste is handled by 'paste' event, but 'v' key fallback just in case? No need.
                 }
             }
         });
-    }
-
-    // 2. Multi-select Fix (Accurate Hit Test)
-    checkSelectionBox(e) {
-        const rect = this.selectionBox.getBoundingClientRect();
-        
-        // Convert selection box to world coordinates
-        // boxWorldX = (boxScreenX - viewX) / scale
-        const startX = (rect.left - this.view.x) / this.view.scale;
-        const startY = (rect.top - this.view.y) / this.view.scale;
-        const endX = startX + (rect.width / this.view.scale);
-        const endY = startY + (rect.height / this.view.scale);
-
-        this.selectedIds.clear();
-        Object.values(this.nodes).forEach(node => {
-            // Node bbox in world coords
-            const nodeLeft = node.x;
-            const nodeTop = node.y;
-            const nodeRight = node.x + (node.width || 100);
-            const nodeBottom = node.y + (node.height || 40);
-            
-            // Box Intersection Logic
-            // If SelectionBox overlaps NodeBox
-            // Overlap condition: !(r2.left > r1.right || r2.right < r1.left || r2.top > r1.bottom || r2.bottom < r1.top)
-            if (startX < nodeRight && endX > nodeLeft && startY < nodeBottom && endY > nodeTop) {
-                this.selectedIds.add(node.id);
-            }
-        });
-        
-        if (this.selectedIds.size > 0) {
-            this.selectNode(this.selectedIds.values().next().value); 
-        } else {
-            this.selectNode(null);
-        }
-        this.render();
     }
 
     startResizing(e, id) {
@@ -1356,15 +1261,7 @@ class MinimalMind {
 
     handleNodeDown(e, id) {
         if(e.button !== 0) return;
-        
-        // 3. Alt Click Check (If not editing)
-        if (e.altKey) {
-            // Let click event handle it or handle here.
-            // Since drag starts here, better let drag logic fail or pass.
-            // If we want Alt+Click to JUST open link and not drag, we stop here.
-            return; 
-        }
-        
+        if (e.altKey) return; 
         e.stopPropagation();
         this.selectNode(id);
         this.hideContextMenu();
@@ -1419,47 +1316,21 @@ class MinimalMind {
             while(p) { if(p.id === nodeId) isValid = false; p = this.nodes[p.parentId]; }
 
             if (isValid) {
-                const isRootTarget = (targetId === this.rootId);
-                const isSameParent = (movingNode.parentId === targetId);
-                const isReorder = e.shiftKey;
-
-                if (isReorder && !isRootTarget) {
-                    const parentId = this.nodes[targetId].parentId;
-                    if (parentId && parentId !== nodeId) { 
-                        const parent = this.nodes[parentId];
-                        const oldParent = this.nodes[movingNode.parentId];
-                        oldParent.children = oldParent.children.filter(cid => cid !== nodeId);
-                        const targetIdx = parent.children.indexOf(targetId);
-                        parent.children.splice(targetIdx + 1, 0, nodeId);
-                        this.nodes[nodeId].parentId = parentId;
-                        this.nodes[nodeId].direction = this.nodes[targetId].direction; 
-                        this.updateLayout();
-                        this.saveState();
-                    }
+                const oldParent = this.nodes[movingNode.parentId];
+                oldParent.children = oldParent.children.filter(cid => cid !== nodeId);
+                this.nodes[targetId].children.push(nodeId);
+                this.nodes[nodeId].parentId = targetId;
+                this.nodes[nodeId].customWidth = null;
+                
+                if (targetId === this.rootId) {
+                     const rootEl = document.getElementById(this.rootId);
+                     const rootRect = rootEl.getBoundingClientRect();
+                     this.nodes[nodeId].direction = (e.clientX < rootRect.left + rootRect.width/2) ? 'left' : 'right';
                 } else {
-                    if (!isSameParent || isRootTarget) {
-                        const oldParent = this.nodes[movingNode.parentId];
-                        oldParent.children = oldParent.children.filter(cid => cid !== nodeId);
-                        this.nodes[targetId].children.push(nodeId);
-                        this.nodes[nodeId].parentId = targetId;
-                        this.nodes[nodeId].customWidth = null;
-                        if (targetId === this.rootId) {
-                            const rootEl = document.getElementById(this.rootId);
-                            if (rootEl) {
-                                const rootRect = rootEl.getBoundingClientRect();
-                                if (e.clientX < rootRect.left + rootRect.width/2) {
-                                    this.nodes[nodeId].direction = 'left';
-                                } else {
-                                    this.nodes[nodeId].direction = 'right';
-                                }
-                            }
-                        } else {
-                            this.nodes[nodeId].direction = this.nodes[targetId].direction;
-                        }
-                        this.updateLayout();
-                        this.saveState();
-                    }
+                    this.nodes[nodeId].direction = this.nodes[targetId].direction;
                 }
+                this.updateLayout();
+                this.saveState();
             }
         }
         this.dragNodeId = null;
@@ -1471,11 +1342,13 @@ class MinimalMind {
             if (e.key === 'Enter') { 
                 if(!e.shiftKey) { 
                     e.preventDefault(); 
+                    e.stopPropagation();
                     this.stopEditing(); 
                 }
             }
             if (e.key === 'Tab') { 
                 e.preventDefault(); 
+                e.stopPropagation();
                 this.stopEditing(); 
                 this.action('addChild'); 
             }
@@ -1487,7 +1360,6 @@ class MinimalMind {
             case 'Enter': e.preventDefault(); this.action('addSibling'); break;
             case 'Backspace': 
             case 'Delete': 
-                if(e.shiftKey) { }
                 this.deleteNode(this.selectedId); 
                 break;
             case ' ': 
@@ -1503,11 +1375,12 @@ class MinimalMind {
         if (!this.selectedId) return;
         const curr = this.nodes[this.selectedId];
         let nextId = null;
+        
         if (curr.id === this.rootId) {
              if (dir === 'right') nextId = curr.children.find(c => this.nodes[c].direction !== 'left');
              else if (dir === 'left') nextId = curr.children.find(c => this.nodes[c].direction === 'left');
         } else {
-            const isLeft = this.nodes[curr.id].x < this.nodes[curr.parentId].x;
+            const isLeft = this.nodes[curr.id].direction === 'left';
             if (dir === 'right') {
                 if (isLeft) nextId = curr.parentId; 
                 else if (curr.children.length > 0) nextId = curr.children[0]; 
@@ -1516,11 +1389,7 @@ class MinimalMind {
                 else nextId = curr.parentId;
             } else if (dir === 'up' || dir === 'down') {
                 const p = this.nodes[curr.parentId];
-                const sameSideSibs = p.children.filter(cid => {
-                   const sib = this.nodes[cid];
-                   const sibLeft = sib.x < this.nodes[curr.parentId].x;
-                   return sibLeft === isLeft;
-                });
+                const sameSideSibs = p.children.filter(cid => this.nodes[cid].direction === curr.direction);
                 const idx = sameSideSibs.indexOf(this.selectedId);
                 if (dir === 'up' && idx > 0) nextId = sameSideSibs[idx-1];
                 if (dir === 'down' && idx < sameSideSibs.length-1) nextId = sameSideSibs[idx+1];
@@ -1530,9 +1399,7 @@ class MinimalMind {
     }
 
     action(act) {
-        if (act === 'zoomIn') { this.view.scale = Math.min(this.view.scale + 0.2, 5); this.render(); }
-        else if (act === 'zoomOut') { this.view.scale = Math.max(this.view.scale - 0.2, 0.1); this.render(); }
-        else if (act === 'addChild') {
+        if (act === 'addChild') {
             if (!this.selectedId) return;
             const newId = this.createNode(this.selectedId, "새 아이디어");
             this.nodes[this.selectedId].folded = false;
@@ -1558,7 +1425,9 @@ class MinimalMind {
 
     startEditing(id) {
         this.editingId = id;
-        requestAnimationFrame(() => {
+        this.render(); 
+        
+        setTimeout(() => {
             const el = document.getElementById(id);
             if (el) {
                 el.classList.add('editing');
@@ -1569,7 +1438,7 @@ class MinimalMind {
                     document.execCommand('selectAll', false, null);
                 }
             }
-        });
+        }, 50);
     }
 
     stopEditing() {
@@ -1580,11 +1449,11 @@ class MinimalMind {
             if (textEl) {
                 this.nodes[this.editingId].text = textEl.innerText;
                 textEl.contentEditable = false;
+                textEl.blur(); 
             }
             el.classList.remove('editing');
             this.updateLayout();
         }
-        this.refreshTip();
         
         const currentId = this.editingId;
         this.editingId = null;
@@ -1594,7 +1463,7 @@ class MinimalMind {
         setTimeout(() => {
             const nodeEl = document.getElementById(currentId);
             if(nodeEl) nodeEl.focus();
-        }, 0);
+        }, 10);
     }
 
     resetZoom() { this.view.scale = 1; this.centerView(); }
@@ -1603,22 +1472,16 @@ class MinimalMind {
         if (!this.rootId) return;
         let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
         Object.values(this.nodes).forEach(n => {
-            minX = Math.min(minX, n.x);
-            minY = Math.min(minY, n.y);
-            maxX = Math.max(maxX, n.x + n.width);
-            maxY = Math.max(maxY, n.y + n.height);
+            minX = Math.min(minX, n.x); minY = Math.min(minY, n.y);
+            maxX = Math.max(maxX, n.x + n.width); maxY = Math.max(maxY, n.y + n.height);
         });
         const padding = 100;
-        const contentW = maxX - minX + padding * 2;
-        const contentH = maxY - minY + padding * 2;
-        const viewportW = this.viewport.clientWidth;
-        const viewportH = this.viewport.clientHeight;
-        const scale = Math.min(viewportW / contentW, viewportH / contentH, 1.5); 
+        const scale = Math.min(this.viewport.clientWidth / (maxX - minX + padding * 2), this.viewport.clientHeight / (maxY - minY + padding * 2), 1.5); 
         this.view.scale = Math.max(0.1, scale);
         const centerX = (minX + maxX) / 2;
         const centerY = (minY + maxY) / 2;
-        this.view.x = (viewportW / 2) - (centerX * this.view.scale);
-        this.view.y = (viewportH / 2) - (centerY * this.view.scale);
+        this.view.x = (this.viewport.clientWidth / 2) - (centerX * this.view.scale);
+        this.view.y = (this.viewport.clientHeight / 2) - (centerY * this.view.scale);
         this.render();
     }
 
@@ -1631,82 +1494,13 @@ class MinimalMind {
         }
     }
 
-    prepareCapture(callback) {
-        if (typeof html2canvas === 'undefined') {
-            alert('로드 실패'); return;
-        }
-        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-        Object.values(this.nodes).forEach(n => {
-            minX = Math.min(minX, n.x); minY = Math.min(minY, n.y);
-            maxX = Math.max(maxX, n.x + n.width); maxY = Math.max(maxY, n.y + n.height);
-        });
-        
-        const padding = 60;
-        const width = maxX - minX + padding * 2;
-        const height = maxY - minY + padding * 2;
-
-        const cloneContainer = document.createElement('div');
-        cloneContainer.style.position = 'fixed';
-        cloneContainer.style.top = '0'; cloneContainer.style.left = '0';
-        cloneContainer.style.width = width + 'px'; cloneContainer.style.height = height + 'px';
-        cloneContainer.style.zIndex = '-9999';
-        cloneContainer.style.background = getComputedStyle(document.body).backgroundColor;
-        
-        const worldClone = this.world.cloneNode(true);
-        worldClone.style.transform = `translate(${-minX + padding}px, ${-minY + padding}px) scale(1)`;
-        
-        const svgClone = worldClone.querySelector('svg');
-        if(svgClone) {
-            const paths = svgClone.querySelectorAll('path.link');
-            const originalPaths = this.world.querySelectorAll('path.link');
-            paths.forEach((path, i) => {
-                if (originalPaths[i]) {
-                    const comp = getComputedStyle(originalPaths[i]);
-                    path.setAttribute('style', `fill:none; stroke:${comp.stroke}; stroke-width:2px; opacity:${comp.opacity}`);
-                }
-            });
-            const svgData = new XMLSerializer().serializeToString(svgClone);
-            const img = new Image();
-            img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgData)));
-            img.style.position = 'absolute'; img.style.top = '0'; img.style.left = '0'; img.style.width = '100%'; img.style.height = '100%';
-            svgClone.parentNode.replaceChild(img, svgClone);
-        }
-
-        cloneContainer.appendChild(worldClone);
-        document.body.appendChild(cloneContainer);
-
-        setTimeout(() => {
-            html2canvas(cloneContainer, {
-                backgroundColor: null, scale: 2, logging: false, useCORS: true
-            }).then(canvas => {
-                document.body.removeChild(cloneContainer);
-                callback(canvas);
-            });
-        }, 300);
-    }
-
-    exportImage() {
-        this.prepareCapture((canvas) => {
-            const link = document.createElement('a');
-            link.download = 'MinimalMind.png';
-            link.href = canvas.toDataURL();
-            link.click();
-        });
-    }
-
-    exportPDF() {
-        this.prepareCapture((canvas) => {
-            const { jsPDF } = window.jspdf;
-            const pdf = new jsPDF('l', 'px', [canvas.width, canvas.height]);
-            const width = pdf.internal.pageSize.getWidth();
-            const height = pdf.internal.pageSize.getHeight();
-            pdf.addImage(canvas, 'PNG', 0, 0, width, height);
-            pdf.save('MinimalMind.pdf');
-        });
-    }
-
     saveFile(filename) {
-        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify({ nodes: this.nodes, rootId: this.rootId }));
+        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify({ 
+            nodes: this.nodes, 
+            rootId: this.rootId, 
+            docTitle: this.docTitle,
+            isColorMode: this.isColorMode
+        }));
         const anchor = document.createElement('a');
         anchor.href = dataStr;
         anchor.download = filename;
@@ -1714,8 +1508,13 @@ class MinimalMind {
     }
 
     saveToStorage() {
-        const data = { nodes: this.nodes, rootId: this.rootId };
-        localStorage.setItem('minimalMind_final_v17', JSON.stringify(data));
+        const data = { 
+            nodes: this.nodes, 
+            rootId: this.rootId, 
+            docTitle: this.docTitle,
+            isColorMode: this.isColorMode
+        };
+        localStorage.setItem('minimalMind_v6', JSON.stringify(data));
         this.showSaveIndicator();
     }
     
@@ -1728,12 +1527,14 @@ class MinimalMind {
     }
 
     loadFromStorage() {
-        const raw = localStorage.getItem('minimalMind_final_v17');
+        const raw = localStorage.getItem('minimalMind_v6');
         if (raw) {
             try {
                 const data = JSON.parse(raw);
                 this.nodes = data.nodes;
                 this.rootId = data.rootId;
+                this.docTitle = data.docTitle;
+                this.isColorMode = data.isColorMode;
             } catch(e) {}
         }
     }
@@ -1747,11 +1548,11 @@ class MinimalMind {
                 const data = JSON.parse(e.target.result);
                 this.nodes = data.nodes;
                 this.rootId = data.rootId;
-                this.history = [];
-                this.historyIdx = -1;
-                this.updateLayout();
-                this.centerView();
-                this.saveState();
+                this.docTitle = data.docTitle || file.name.replace('.json', '');
+                this.isColorMode = !!data.isColorMode;
+                this.titleInput.value = this.docTitle;
+                this.history = []; this.historyIdx = -1;
+                this.updateLayout(); this.centerView(); this.saveState();
             } catch(e) { alert("파일 오류"); }
         };
         reader.readAsText(file);
@@ -1763,7 +1564,9 @@ class MinimalMind {
         this.rootId = null;
         this.history = [];
         this.historyIdx = -1;
-        this.createNode(null, "Minimal Mind");
+        this.docTitle = this.randomTitles[Math.floor(Math.random() * this.randomTitles.length)];
+        this.titleInput.value = this.docTitle;
+        this.createNode(null, this.docTitle);
         this.updateLayout();
         this.centerView();
         this.saveState();
