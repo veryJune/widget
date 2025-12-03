@@ -1,0 +1,1009 @@
+<!DOCTYPE html>
+<html lang="ko" class="">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MoodGrid</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        apple: {
+                            gray: '#F5F5F7',
+                            dark: '#1C1C1E',
+                            darkCard: '#2C2C2E',
+                        }
+                    },
+                    animation: {
+                        'fade-in': 'fadeIn 0.2s ease-out',
+                        'slide-up': 'slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
+                        'zoom-in': 'zoomIn 0.25s cubic-bezier(0.34, 1.56, 0.64, 1)',
+                        'zoom-out': 'zoomOut 0.2s cubic-bezier(0.4, 0.0, 0.2, 1)',
+                    },
+                    keyframes: {
+                        fadeIn: {
+                            '0%': { opacity: '0' },
+                            '100%': { opacity: '1' },
+                        },
+                        slideUp: {
+                            '0%': { transform: 'translateY(20px)', opacity: '0' },
+                            '100%': { transform: 'translateY(0)', opacity: '1' },
+                        },
+                        zoomIn: {
+                            '0%': { opacity: '0', transform: 'scale(0.9)' },
+                            '100%': { opacity: '1', transform: 'scale(1)' },
+                        },
+                        zoomOut: {
+                            '0%': { opacity: '1', transform: 'scale(1)' },
+                            '100%': { opacity: '0', transform: 'scale(0.9)' },
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    
+    <!-- Libraries -->
+    <script src="https://unpkg.com/dexie/dist/dexie.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: #F5F5F7;
+            color: #1D1D1F;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+        
+        /* Focus Ring Removal */
+        *, *::before, *::after, button, input, textarea, select, a, [tabindex] {
+            outline: none !important;
+            box-shadow: none !important;
+            -webkit-focus-ring-color: transparent !important;
+            -webkit-tap-highlight-color: transparent !important;
+        }
+        
+        /* Dark Mode Styles */
+        html.dark body {
+            background-color: #151515;
+            color: #E5E5E5;
+        }
+        html.dark .glass-header {
+            background: rgba(28, 28, 30, 0.9);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        /* Scrollbar */
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+        /* Header */
+        .glass-header {
+            background: rgba(255, 255, 255, 0.9);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+        }
+
+        /* Masonry Grid Setup */
+        .masonry-grid {
+            display: grid;
+            grid-template-columns: repeat(var(--cols, 5), 1fr);
+            grid-auto-rows: 1px;
+            column-gap: 24px;
+        }
+
+        /* Wrapper for Grid Positioning */
+        .grid-item-wrapper {
+            break-inside: avoid;
+            background: transparent;
+            position: relative; /* Essential for Sortable */
+        }
+
+        /* Content Card */
+        .grid-item-content {
+            position: relative;
+            overflow: hidden;
+            border-radius: 16px;
+            background-color: white;
+            transition: transform 0.2s cubic-bezier(0.2, 0, 0.2, 1), box-shadow 0.2s;
+            cursor: pointer;
+            backface-visibility: hidden;
+            will-change: transform;
+            border: 1px solid rgba(0,0,0,0.05);
+        }
+        
+        html.dark .grid-item-content {
+            background-color: #2C2C2E;
+            border-color: #3A3A3C;
+        }
+
+        .grid-item-content img {
+            display: block;
+            width: 100%;
+            height: auto;
+            vertical-align: top;
+        }
+
+        /* Selection State - Applied to CONTENT */
+        .grid-item-content.selected {
+            box-shadow: 0 0 0 3px #3B82F6 !important;
+            transform: scale(0.98);
+            border-color: #3B82F6;
+        }
+        
+        /* Selection Overlay visible on selection */
+        .grid-item-content.selected .edit-overlay {
+            display: flex !important;
+            background-color: rgba(255,255,255,0.1);
+        }
+        html.dark .grid-item-content.selected .edit-overlay {
+            background-color: rgba(0,0,0,0.2);
+        }
+
+        .grid-item-content:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px -10px rgba(0,0,0,0.1);
+        }
+
+        /* Drag & Drop Visuals */
+        .sortable-ghost { 
+            opacity: 0.4; 
+        }
+        .sortable-ghost .grid-item-content {
+            background: #e5e7eb;
+            border: 2px dashed #9ca3af;
+            box-shadow: none !important;
+        }
+        html.dark .sortable-ghost .grid-item-content {
+            background: #27272a;
+            border-color: #4b5563;
+        }
+        
+        .sortable-drag { 
+            cursor: grabbing; 
+            opacity: 1 !important; 
+            z-index: 50;
+        }
+
+        /* Slider */
+        input[type=range] {
+            -webkit-appearance: none;
+            background: transparent;
+            cursor: pointer;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 14px;
+            width: 14px;
+            border-radius: 50%;
+            background: #888;
+            margin-top: -5px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            transition: transform 0.1s;
+        }
+        input[type=range]:active::-webkit-slider-thumb {
+            transform: scale(1.2);
+        }
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 4px;
+            background: #e5e5e5;
+            border-radius: 2px;
+        }
+        html.dark input[type=range]::-webkit-slider-thumb { background: #bbb; }
+        html.dark input[type=range]::-webkit-slider-runnable-track { background: #444; }
+
+        /* Animation Classes */
+        .animate-enter {
+            animation: zoom-in 0.25s forwards;
+        }
+        .animate-exit {
+            animation: zoom-out 0.2s forwards;
+        }
+
+    </style>
+</head>
+<body class="h-screen flex flex-col overflow-hidden text-gray-900 dark:text-gray-100 bg-[#F5F5F7] dark:bg-[#151515]" onpaste="handlePaste(event)">
+
+    <!-- Header -->
+    <header class="glass-header z-40 fixed top-0 w-full px-4 md:px-6 py-3 flex items-center justify-between">
+        
+        <!-- Left: Branding -->
+        <div class="flex items-center gap-3 w-[30%] min-w-[200px]">
+            <div class="w-9 h-9 bg-black dark:bg-white text-white dark:text-black rounded-xl flex items-center justify-center shrink-0 shadow-sm">
+                <i data-lucide="layout-grid" class="w-5 h-5"></i>
+            </div>
+            <input type="text" id="projectTitle" value="MoodGrid Project" 
+                class="bg-transparent font-bold text-lg tracking-tight border-none focus:ring-0 rounded px-2 -ml-2 w-full truncate dark:text-white select-text"
+                onchange="saveTitle(this.value)">
+        </div>
+
+        <!-- Center: View Controls -->
+        <div class="hidden md:flex items-center gap-4 w-[40%] justify-center px-4">
+            <i data-lucide="image" class="w-4 h-4 text-gray-400 transform scale-75"></i>
+            <input type="range" id="columnRange" min="2" max="8" value="5" class="w-32 max-w-[200px]" oninput="handleRangeInput(this.value)">
+            <i data-lucide="image" class="w-4 h-4 text-gray-400 transform scale-125"></i>
+        </div>
+
+        <!-- Right: Tools -->
+        <div class="flex items-center gap-2 w-[30%] justify-end">
+            <!-- Dark Mode -->
+            <button onclick="toggleDarkMode()" class="p-2 ml-4 rounded-full hover:bg-gray-200 dark:hover:bg-white/10 transition-colors text-gray-500 dark:text-gray-400 flex-shrink-0" title="다크 모드">
+                <i data-lucide="moon" class="w-5 h-5 hidden dark:block"></i>
+                <i data-lucide="sun" class="w-5 h-5 block dark:hidden"></i>
+            </button>
+            <div class="h-5 w-px bg-gray-300 dark:bg-gray-700 mx-2 flex-shrink-0"></div>
+
+            <!-- Add Buttons -->
+            <div class="flex items-center gap-2">
+                <button onclick="document.getElementById('fileInput').click()" tabindex="-1" class="h-9 px-4 bg-white dark:bg-gray-800 rounded-full shadow-sm border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 active:scale-95 transition-transform flex items-center justify-center gap-2 text-sm font-medium whitespace-nowrap">
+                    <i data-lucide="image-plus" class="w-4 h-4 text-blue-500 flex-shrink-0 pointer-events-none"></i>
+                    <span class="hidden lg:inline pt-0.5 pointer-events-none">이미지</span>
+                </button>
+                <input type="file" id="fileInput" multiple accept="image/*" class="hidden" onchange="handleFiles(this.files)">
+
+                <button onclick="openTextModal()" tabindex="-1" class="h-9 px-4 bg-white dark:bg-gray-800 rounded-full shadow-sm border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 active:scale-95 transition-transform flex items-center justify-center gap-2 text-sm font-medium whitespace-nowrap">
+                    <i data-lucide="type" class="w-4 h-4 text-orange-500 flex-shrink-0 pointer-events-none"></i>
+                    <span class="hidden lg:inline pt-0.5 pointer-events-none">텍스트</span>
+                </button>
+            </div>
+
+            <!-- Random Inspiration -->
+            <button onclick="openRandomModal()" class="ml-1 p-2 rounded-full hover:bg-purple-50 dark:hover:bg-purple-900/30 text-purple-500 transition-colors active:scale-95" title="랜덤 영감 이미지">
+                <i data-lucide="sparkles" class="w-5 h-5"></i>
+            </button>
+
+            <!-- Project Menu -->
+            <div class="relative ml-1">
+                <button id="menuBtn" onclick="toggleMenu()" class="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-white/10 transition-colors active:scale-95">
+                    <i data-lucide="menu" class="w-5 h-5 text-gray-700 dark:text-gray-300"></i>
+                </button>
+                <div id="projectMenu" class="absolute right-0 mt-3 w-60 bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-100 dark:border-gray-700 overflow-hidden hidden animate-fade-in z-50 origin-top-right">
+                    <div class="px-5 py-3 border-b border-gray-100 dark:border-gray-700 bg-gray-50/50 dark:bg-white/5">
+                        <p class="text-xs font-bold text-gray-400 dark:text-gray-500 tracking-wider">MOODGRID ACTIONS</p>
+                    </div>
+                    <div class="p-1">
+                        <button onclick="undoLastAction()" class="w-full text-left px-4 py-2.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg text-sm flex items-center gap-3 transition-colors">
+                            <i data-lucide="undo-2" class="w-4 h-4 text-gray-500"></i> 실행 취소 (Ctrl+Z)
+                        </button>
+                        <button onclick="toggleEditMode()" class="w-full text-left px-4 py-2.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg text-sm flex items-center gap-3 transition-colors">
+                            <i data-lucide="check-square" class="w-4 h-4 text-gray-500"></i> 선택 및 삭제
+                        </button>
+                        <button onclick="shuffleBoard()" class="w-full text-left px-4 py-2.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg text-sm flex items-center gap-3 transition-colors">
+                            <i data-lucide="shuffle" class="w-4 h-4 text-gray-500"></i> 순서 섞기
+                        </button>
+                    </div>
+                    <div class="h-px bg-gray-100 dark:bg-gray-700 mx-4"></div>
+                    <div class="p-1">
+                        <button onclick="saveProject()" class="w-full text-left px-4 py-2.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg text-sm flex items-center gap-3 transition-colors">
+                            <i data-lucide="save" class="w-4 h-4 text-gray-500"></i> 저장 (.json)
+                        </button>
+                        <button onclick="document.getElementById('loadInput').click()" class="w-full text-left px-4 py-2.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg text-sm flex items-center gap-3 transition-colors">
+                            <i data-lucide="folder-open" class="w-4 h-4 text-gray-500"></i> 불러오기
+                        </button>
+                        <button onclick="exportToPNG()" class="w-full text-left px-4 py-2.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg text-sm flex items-center gap-3 transition-colors">
+                            <i data-lucide="image-down" class="w-4 h-4 text-gray-500"></i> PNG 내보내기
+                        </button>
+                    </div>
+                    <div class="h-px bg-gray-100 dark:bg-gray-700 mx-4"></div>
+                    <div class="p-1">
+                        <button onclick="clearBoard()" class="w-full text-left px-4 py-2.5 hover:bg-red-50 dark:hover:bg-red-900/20 text-red-500 rounded-lg text-sm flex items-center gap-3 transition-colors">
+                            <i data-lucide="trash" class="w-4 h-4"></i> 모두 지우기
+                        </button>
+                    </div>
+                </div>
+                <input type="file" id="loadInput" accept=".json" class="hidden" onchange="loadProject(this.files[0])">
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Canvas -->
+    <main class="flex-1 overflow-y-auto pt-24 pb-32 px-4 md:px-10 no-scrollbar bg-transparent"
+          id="scrollContainer"
+          ondragover="handleDragOver(event)" 
+          ondrop="handleDrop(event)"
+          ondragleave="handleDragLeave(event)">
+        
+        <div id="emptyState" class="hidden fixed inset-0 flex flex-col items-center justify-center text-gray-400 dark:text-gray-600 select-none pointer-events-none z-0">
+            <div class="bg-gray-50 dark:bg-gray-800/50 p-10 rounded-3xl border border-gray-100 dark:border-gray-800 flex flex-col items-center animate-fade-in">
+                <i data-lucide="layers" class="w-16 h-16 mb-4 opacity-30"></i>
+                <p class="text-lg font-medium text-gray-500 dark:text-gray-400">비어있는 캔버스</p>
+                <p class="text-sm mt-2 opacity-60">이미지를 드래그하거나 Ctrl+V로 붙여넣으세요</p>
+            </div>
+        </div>
+
+        <div id="gridContainer" class="masonry-grid max-w-[2400px] mx-auto relative z-10 pb-40">
+            <!-- Items injected here -->
+        </div>
+    </main>
+
+    <!-- Floating Edit Bar -->
+    <div id="editBar" class="fixed bottom-8 left-1/2 transform -translate-x-1/2 bg-white/90 dark:bg-gray-800/90 backdrop-blur-md shadow-2xl border border-gray-200/50 dark:border-gray-700/50 px-6 py-3 rounded-full flex items-center gap-5 z-40 transition-all duration-300 translate-y-40">
+        <span id="selectedCount" class="text-sm font-semibold text-gray-600 dark:text-gray-300">0개 선택됨</span>
+        <div class="h-4 w-px bg-gray-300 dark:bg-gray-600"></div>
+        <button onclick="deleteSelectedItems()" class="text-red-500 hover:text-red-600 text-sm font-medium flex items-center gap-1.5 transition-colors">
+            <i data-lucide="trash-2" class="w-4 h-4"></i> 삭제
+        </button>
+        <button onclick="toggleEditMode()" class="bg-black dark:bg-white text-white dark:text-black px-4 py-1.5 rounded-full text-sm font-medium hover:opacity-90 transition-opacity ml-2">
+            완료
+        </button>
+    </div>
+
+    <!-- Random Inspiration Modal -->
+    <div id="randomModal" class="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm hidden flex items-center justify-center animate-fade-in" onclick="if(event.target === this) closeRandomModal()">
+        <div class="relative w-full max-w-sm rounded-3xl overflow-hidden shadow-2xl transform transition-all scale-100 animate-slide-up group" onclick="event.stopPropagation()">
+            <div class="w-full aspect-[3/4] bg-gray-900 relative">
+                <img id="randomPreviewImg" class="w-full h-full object-cover opacity-0 transition-opacity duration-500" onload="this.classList.remove('opacity-0')">
+                <div id="randomLoader" class="absolute inset-0 flex items-center justify-center">
+                    <i data-lucide="loader-2" class="w-8 h-8 animate-spin text-white/50"></i>
+                </div>
+            </div>
+            <div class="absolute bottom-6 left-1/2 transform -translate-x-1/2 w-[90%] bg-black/30 backdrop-blur-md border border-white/20 rounded-2xl p-2 flex items-center justify-between shadow-lg">
+                <button onclick="closeRandomModal()" class="p-3 rounded-xl hover:bg-white/20 transition text-white/80 hover:text-white" title="닫기">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+                <div class="h-6 w-px bg-white/20"></div>
+                <button onclick="fetchRandomImage()" class="p-3 rounded-xl hover:bg-white/20 transition text-white/80 hover:text-white flex-1 flex justify-center" title="새로고침">
+                    <i data-lucide="refresh-cw" class="w-5 h-5"></i>
+                </button>
+                <div class="h-6 w-px bg-white/20"></div>
+                <!-- Keep modal open after adding -->
+                <button onclick="confirmRandomImage()" class="p-3 rounded-xl bg-white/20 hover:bg-white/30 transition text-white flex-1 flex justify-center shadow-sm" title="추가하기">
+                    <i data-lucide="plus" class="w-5 h-5"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Text Input Modal -->
+    <div id="textModal" class="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm hidden flex items-center justify-center animate-fade-in" onclick="if(event.target === this) closeTextModal()">
+        <div class="bg-white dark:bg-gray-800 rounded-3xl shadow-2xl w-full max-w-md p-6 transform transition-all scale-100 animate-slide-up" onclick="event.stopPropagation()">
+            <h3 class="text-lg font-bold mb-4 dark:text-white" id="textModalTitle">메모 추가</h3>
+            <textarea id="textInputArea" class="w-full h-32 p-4 rounded-2xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 focus:border-blue-500 focus:bg-white dark:focus:bg-black transition-all resize-none dark:text-white text-lg select-text" placeholder="아이디어를 기록하세요..."></textarea>
+            
+            <div class="flex items-center gap-2 mt-4 mb-6" id="colorPickerContainer">
+                <span class="text-xs font-bold text-gray-400 uppercase tracking-wider mr-2">Color</span>
+                <button onclick="selectColor('white', this)" class="w-8 h-8 rounded-full bg-white border border-gray-200 shadow-sm hover:scale-110 transition ring-offset-2 ring-gray-400 dark:ring-gray-600"></button>
+                <button onclick="selectColor('yellow', this)" class="w-8 h-8 rounded-full bg-[#FFF8C5] border border-yellow-100 shadow-sm hover:scale-110 transition ring-offset-2 ring-yellow-400"></button>
+                <button onclick="selectColor('blue', this)" class="w-8 h-8 rounded-full bg-[#E3F2FD] border border-blue-100 shadow-sm hover:scale-110 transition ring-offset-2 ring-blue-400"></button>
+                <button onclick="selectColor('green', this)" class="w-8 h-8 rounded-full bg-[#E8F5E9] border border-green-100 shadow-sm hover:scale-110 transition ring-offset-2 ring-green-400"></button>
+                <button onclick="selectColor('dark', this)" class="w-8 h-8 rounded-full bg-[#2C2C2E] border border-gray-700 shadow-sm hover:scale-110 transition ring-offset-2 ring-gray-500"></button>
+            </div>
+
+            <div class="flex justify-end gap-2">
+                <button onclick="closeTextModal()" class="px-5 py-2.5 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-xl text-sm font-medium transition">취소</button>
+                <button onclick="submitTextNote()" class="px-6 py-2.5 bg-black dark:bg-white text-white dark:text-black rounded-xl text-sm font-bold hover:opacity-90 transition">저장</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Viewer (Updated with click outside & animation) -->
+    <div id="viewer" class="fixed inset-0 z-50 bg-white/95 dark:bg-black/95 backdrop-blur-xl hidden flex items-center justify-center opacity-0 transition-opacity duration-300" tabindex="0">
+        <!-- Close Button -->
+        <button onclick="closeViewer()" class="absolute top-6 right-6 p-3 bg-gray-100 dark:bg-gray-800 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 transition z-50">
+            <i data-lucide="x" class="w-6 h-6 text-gray-800 dark:text-white"></i>
+        </button>
+        <div class="absolute top-6 left-6 text-gray-400 text-xs bg-gray-100 dark:bg-gray-900 px-3 py-1.5 rounded-full font-medium tracking-wide pointer-events-none">
+            ESC / Arrow Keys
+        </div>
+        
+        <button onclick="navigateViewer(-1)" class="absolute left-4 top-1/2 -translate-y-1/2 p-3 bg-white/10 hover:bg-white/20 dark:bg-black/10 dark:hover:bg-white/10 rounded-full text-gray-800 dark:text-white transition z-50 hidden md:block">
+            <i data-lucide="chevron-left" class="w-8 h-8"></i>
+        </button>
+        <button onclick="navigateViewer(1)" class="absolute right-4 top-1/2 -translate-y-1/2 p-3 bg-white/10 hover:bg-white/20 dark:bg-black/10 dark:hover:bg-white/10 rounded-full text-gray-800 dark:text-white transition z-50 hidden md:block">
+            <i data-lucide="chevron-right" class="w-8 h-8"></i>
+        </button>
+
+        <!-- Viewer Container -->
+        <div id="viewer-container" class="w-full h-full flex items-center justify-center overflow-hidden cursor-grab active:cursor-grabbing" onmousedown="startPan(event)" ondblclick="resetZoom()">
+            <img id="viewer-img" src="" class="max-w-[90vw] max-h-[90vh] object-contain shadow-2xl rounded-lg select-none origin-top-left" alt="Preview">
+        </div>
+    </div>
+
+    <!-- Toast -->
+    <div id="toast" class="fixed bottom-10 left-1/2 transform -translate-x-1/2 bg-black/80 dark:bg-white/90 text-white dark:text-black px-6 py-3 rounded-full shadow-2xl backdrop-blur text-sm font-medium transition-all translate-y-24 opacity-0 duration-300 z-[70] flex items-center gap-2">
+        <i data-lucide="info" class="w-4 h-4"></i> <span id="toastMsg">알림</span>
+    </div>
+
+    <script>
+        const db = new Dexie("MoodGridDB");
+        db.version(1).stores({ items: "++id, type, content, meta, order, timestamp" });
+
+        let isEditMode = false;
+        let selectedItems = new Set();
+        let selectedColor = 'white';
+        let actionHistory = [];
+        let currentZoom = 1;
+        let isPanning = false;
+        let startX = 0, startY = 0, translateX = 0, translateY = 0;
+        let sliderTimeout;
+        let currentRandomBlob = null;
+        let currentViewerId = null; 
+        let editingTextId = null;
+
+        const VISUAL_GAP = 24; 
+
+        window.addEventListener('DOMContentLoaded', async () => {
+            if (localStorage.getItem('darkMode') === 'true' || 
+               (!('darkMode' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+                document.documentElement.classList.add('dark');
+            }
+            if (localStorage.getItem('projectTitle')) {
+                document.getElementById('projectTitle').value = localStorage.getItem('projectTitle');
+            } else {
+                document.getElementById('projectTitle').value = "MoodGrid Project";
+            }
+
+            await loadBoard();
+            lucide.createIcons();
+            initSortable();
+
+            const grid = document.getElementById('gridContainer');
+            const ro = new ResizeObserver(entries => {
+                window.requestAnimationFrame(() => {
+                    for (let entry of entries) resizeAllGridItems();
+                });
+            });
+            ro.observe(grid);
+
+            document.addEventListener('click', (e) => {
+                const menu = document.getElementById('projectMenu');
+                const btn = document.getElementById('menuBtn');
+                if (!menu.classList.contains('hidden') && !menu.contains(e.target) && !btn.contains(e.target)) {
+                    menu.classList.add('hidden');
+                }
+            });
+
+            document.addEventListener('keydown', handleKeyDown);
+            document.fonts.ready.then(resizeAllGridItems);
+        });
+
+        // --- Grid Logic ---
+        function resizeGridItem(wrapper) {
+            const rowHeight = 1; 
+            const content = wrapper.querySelector('.grid-item-content');
+            if(!content) return;
+            const img = content.querySelector('img');
+            if(img && !img.complete && img.naturalHeight === 0) return;
+
+            const contentHeight = content.getBoundingClientRect().height;
+            const totalHeight = contentHeight + VISUAL_GAP;
+            const spanNeeded = Math.ceil(totalHeight / rowHeight); 
+            wrapper.style.gridRowEnd = `span ${spanNeeded}`;
+        }
+
+        function resizeAllGridItems() {
+            const allItems = document.getElementsByClassName("grid-item-wrapper");
+            for (let x = 0; x < allItems.length; x++) {
+                resizeGridItem(allItems[x]);
+            }
+        }
+
+        async function loadBoard() {
+            const items = await db.items.orderBy('order').toArray();
+            const container = document.getElementById('gridContainer');
+            const emptyState = document.getElementById('emptyState');
+            
+            container.innerHTML = '';
+            if (items.length === 0) {
+                emptyState.classList.remove('hidden');
+            } else {
+                emptyState.classList.add('hidden');
+            }
+
+            items.forEach(item => createDOMElement(item));
+            lucide.createIcons();
+            setTimeout(resizeAllGridItems, 50);
+            setTimeout(resizeAllGridItems, 500); 
+        }
+
+        function createDOMElement(item) {
+            const container = document.getElementById('gridContainer');
+            const wrapper = document.createElement('div');
+            wrapper.className = 'grid-item-wrapper';
+            wrapper.dataset.id = item.id;
+            wrapper.dataset.type = item.type; 
+
+            const contentDiv = document.createElement('div');
+            contentDiv.className = 'grid-item-content group animate-fade-in relative';
+            const contentInner = document.createElement('div');
+            contentInner.className = 'content-inner'; 
+
+            if (item.type === 'image') {
+                const img = document.createElement('img');
+                img.src = item.content;
+                img.className = 'w-full min-h-[50px] select-none block'; 
+                img.onload = () => resizeGridItem(wrapper);
+                contentInner.appendChild(img);
+                contentDiv.onclick = (e) => handleItemClick(e, item.id, item.content, 'image');
+
+            } else if (item.type === 'text') {
+                const p = document.createElement('div');
+                const colors = {
+                    'white': 'bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-200',
+                    'yellow': 'bg-[#FFF8C5] text-yellow-900',
+                    'blue': 'bg-[#E3F2FD] text-blue-900',
+                    'green': 'bg-[#E8F5E9] text-green-900',
+                    'dark': 'bg-[#2C2C2E] text-white'
+                };
+                const bgClass = colors[item.meta?.color || 'white'];
+                p.className = `p-6 min-h-[120px] flex items-center justify-center text-center font-medium whitespace-pre-wrap ${bgClass}`;
+                p.innerText = item.content;
+                p.style.fontSize = item.content.length < 30 ? '1.5rem' : '1.1rem';
+                p.style.lineHeight = '1.4';
+                
+                contentInner.appendChild(p);
+                contentDiv.onclick = (e) => handleItemClick(e, item.id, item.content, 'text');
+                contentDiv.ondblclick = (e) => {
+                    if (!isEditMode) openTextModal(item.id, item.content, item.meta?.color);
+                };
+            }
+
+            contentDiv.appendChild(contentInner);
+            const checkOverlay = document.createElement('div');
+            checkOverlay.className = 'absolute inset-0 bg-white/30 dark:bg-black/40 backdrop-blur-[2px] hidden items-start justify-end p-3 pointer-events-none edit-overlay transition-opacity z-20';
+            checkOverlay.innerHTML = `<div class="w-6 h-6 rounded-full bg-white border border-gray-200 flex items-center justify-center shadow-sm check-circle transition-transform duration-200 scale-90"><i data-lucide="check" class="w-3.5 h-3.5 text-blue-500 opacity-0 font-bold"></i></div>`;
+            contentDiv.appendChild(checkOverlay);
+
+            wrapper.appendChild(contentDiv);
+            container.appendChild(wrapper);
+            resizeGridItem(wrapper);
+        }
+
+        // --- Interaction Logic ---
+        function handleItemClick(e, id, content, type) {
+            if (isEditMode) {
+                toggleSelection(id);
+            } else {
+                if (type === 'image') openViewer(content, id);
+            }
+        }
+
+        function toggleSelection(id) {
+            const numericId = parseInt(id);
+            const wrapper = document.querySelector(`.grid-item-wrapper[data-id="${numericId}"]`);
+            if (!wrapper) return;
+            const content = wrapper.querySelector('.grid-item-content');
+            
+            if (selectedItems.has(numericId)) {
+                selectedItems.delete(numericId);
+                content.classList.remove('selected');
+                content.querySelector('.edit-overlay').style.display = '';
+            } else {
+                selectedItems.add(numericId);
+                content.classList.add('selected');
+                content.querySelector('.edit-overlay').style.display = 'flex';
+            }
+            updateEditBar();
+        }
+
+        function toggleEditMode() {
+            isEditMode = !isEditMode;
+            const editBar = document.getElementById('editBar');
+            const overlays = document.querySelectorAll('.edit-overlay');
+            
+            if (isEditMode) {
+                editBar.classList.remove('translate-y-40');
+                overlays.forEach(o => o.classList.remove('hidden', 'pointer-events-none'));
+                overlays.forEach(o => o.classList.add('flex'));
+                if(window.sortableInstance) window.sortableInstance.option("disabled", true);
+            } else {
+                editBar.classList.add('translate-y-40');
+                overlays.forEach(o => o.classList.add('hidden', 'pointer-events-none'));
+                document.querySelectorAll('.grid-item-content.selected').forEach(el => {
+                    el.classList.remove('selected');
+                    el.querySelector('.edit-overlay').style.display = '';
+                });
+                selectedItems.clear();
+                updateEditBar();
+                if(window.sortableInstance) window.sortableInstance.option("disabled", false);
+            }
+        }
+
+        function updateEditBar() {
+            document.getElementById('selectedCount').innerText = `${selectedItems.size}개 선택됨`;
+        }
+
+        async function deleteSelectedItems() {
+            if (selectedItems.size === 0) return;
+            if (confirm(`${selectedItems.size}개의 항목을 삭제하시겠습니까?`)) {
+                const ids = Array.from(selectedItems).map(id => parseInt(id));
+                const itemsToDelete = [];
+                for(let id of ids) {
+                    const item = await db.items.get(id);
+                    if(item) itemsToDelete.push(item);
+                }
+                pushAction({ type: 'delete', items: itemsToDelete });
+                await db.items.bulkDelete(ids);
+                toggleEditMode();
+                loadBoard();
+                showToast("삭제되었습니다.");
+            }
+        }
+
+        // --- Modals ---
+        function openRandomModal() {
+            document.getElementById('randomModal').classList.remove('hidden');
+            fetchRandomImage();
+        }
+        function closeRandomModal() {
+            document.getElementById('randomModal').classList.add('hidden');
+            currentRandomBlob = null;
+        }
+        async function fetchRandomImage() {
+            const img = document.getElementById('randomPreviewImg');
+            const loader = document.getElementById('randomLoader');
+            img.classList.add('opacity-0');
+            loader.classList.remove('hidden');
+            try {
+                const randomId = Math.floor(Math.random() * 1000);
+                const url = `https://picsum.photos/seed/${randomId}/600/800`;
+                const response = await fetch(url);
+                currentRandomBlob = await response.blob();
+                img.src = URL.createObjectURL(currentRandomBlob);
+                img.onload = () => { img.classList.remove('opacity-0'); loader.classList.add('hidden'); }
+            } catch(e) {
+                showToast("이미지를 불러오는데 실패했습니다.");
+                loader.classList.add('hidden');
+            }
+        }
+        async function confirmRandomImage() {
+            if(!currentRandomBlob) return;
+            const reader = new FileReader();
+            reader.onloadend = async () => {
+                await addItemToDb('image', reader.result);
+                showToast("랜덤 이미지가 추가되었습니다.");
+                fetchRandomImage();
+            };
+            reader.readAsDataURL(currentRandomBlob);
+        }
+
+        function openTextModal(id = null, text = '', color = 'white') {
+            editingTextId = id;
+            document.getElementById('textModal').classList.remove('hidden');
+            document.getElementById('textInputArea').value = text;
+            document.getElementById('textModalTitle').innerText = id ? '메모 수정' : '메모 추가';
+            document.getElementById('textInputArea').focus();
+            
+            // Visual reset
+            const btns = document.querySelectorAll('#textModal button[onclick^="selectColor"]');
+            btns.forEach(b => {
+                // Find matching button to select visual
+                if (b.getAttribute('onclick').includes(color)) selectColor(color, b);
+            });
+            // Default select if not found
+            if(!id) selectColor('white', btns[0]);
+        }
+        
+        function closeTextModal() { 
+            document.getElementById('textModal').classList.add('hidden'); 
+            editingTextId = null;
+        }
+        
+        function selectColor(color, btn) {
+            selectedColor = color;
+            const btns = document.querySelectorAll('#textModal button[onclick^="selectColor"]');
+            btns.forEach(b => b.classList.remove('ring-2', 'ring-black', 'dark:ring-white'));
+            if(btn) btn.classList.add('ring-2', 'ring-black', 'dark:ring-white');
+        }
+        
+        async function submitTextNote() {
+            const text = document.getElementById('textInputArea').value;
+            if (!text.trim()) return;
+            if (editingTextId) {
+                await db.items.update(editingTextId, { content: text, meta: { color: selectedColor } });
+                loadBoard(); showToast("메모가 수정되었습니다.");
+            } else {
+                await addItemToDb('text', text, { color: selectedColor });
+                showToast("메모가 추가되었습니다.");
+            }
+            closeTextModal();
+        }
+
+        // --- Core Helpers ---
+        async function addItemToDb(type, content, meta = {}) {
+            const count = await db.items.count();
+            const item = { type, content, meta, order: count, timestamp: Date.now() };
+            const id = await db.items.add(item);
+            pushAction({ type: 'add', ids: [id] });
+            document.getElementById('emptyState').classList.add('hidden');
+            createDOMElement({ ...item, id });
+        }
+
+        async function handleFiles(files) {
+            if (!files.length) return;
+            const addedIds = [];
+            for (let file of files) {
+                if (file.type.startsWith('image/')) {
+                    const reader = new FileReader();
+                    reader.onload = async (e) => {
+                        const id = await db.items.add({
+                            type: 'image', content: e.target.result, order: await db.items.count(), timestamp: Date.now()
+                        });
+                        addedIds.push(id);
+                        document.getElementById('emptyState').classList.add('hidden');
+                        createDOMElement({ id, type: 'image', content: e.target.result });
+                    };
+                    reader.readAsDataURL(file);
+                }
+            }
+            setTimeout(() => { if(addedIds.length) pushAction({ type: 'add', ids: addedIds }); }, 300);
+        }
+
+        function handlePaste(e) {
+            const items = (e.clipboardData || e.originalEvent.clipboardData).items;
+            const files = [];
+            for (let item of items) {
+                if (item.type.indexOf("image") === 0) files.push(item.getAsFile());
+            }
+            if (files.length > 0) return handleFiles(files);
+
+            const text = e.clipboardData.getData('text');
+            if (text) {
+                const urlPattern = /^(https?:\/\/[^\s]+)/;
+                if (urlPattern.test(text.trim())) {
+                    submitUrlImage(text.trim());
+                }
+            }
+        }
+        
+        async function submitUrlImage(url) {
+            showToast("URL 이미지 로딩 중...");
+            try {
+                const response = await fetch(url);
+                const blob = await response.blob();
+                const reader = new FileReader();
+                reader.onloadend = async () => {
+                    await addItemToDb('image', reader.result);
+                    showToast("이미지 추가 완료");
+                };
+                reader.readAsDataURL(blob);
+            } catch(e) {
+                await addItemToDb('image', url);
+                showToast("링크로 이미지가 추가되었습니다.");
+            }
+        }
+
+        // --- Tools ---
+        function toggleMenu() { document.getElementById('projectMenu').classList.toggle('hidden'); }
+        function toggleDarkMode() {
+            document.documentElement.classList.toggle('dark');
+            localStorage.setItem('darkMode', document.documentElement.classList.contains('dark'));
+        }
+        function saveTitle(val) { localStorage.setItem('projectTitle', val); }
+        function handleRangeInput(val) {
+            const cols = 10 - val; 
+            cancelAnimationFrame(sliderTimeout);
+            sliderTimeout = requestAnimationFrame(() => {
+                document.getElementById('gridContainer').style.setProperty('--cols', cols);
+                resizeAllGridItems();
+            });
+        }
+
+        function initSortable() {
+            const el = document.getElementById('gridContainer');
+            window.sortableInstance = Sortable.create(el, {
+                animation: 200, delay: 100, delayOnTouchOnly: true,
+                ghostClass: 'sortable-ghost', dragClass: 'sortable-drag', forceFallback: true,
+                onStart: function() { document.body.style.cursor = 'grabbing'; },
+                onEnd: async function (evt) {
+                    document.body.style.cursor = '';
+                    const wrapperEls = document.querySelectorAll('.grid-item-wrapper');
+                    const updates = [];
+                    wrapperEls.forEach((el, idx) => updates.push(db.items.update(parseInt(el.dataset.id), { order: idx })));
+                    await Promise.all(updates);
+                }
+            });
+        }
+        
+        function pushAction(action) {
+            actionHistory.push(action);
+            if(actionHistory.length > 20) actionHistory.shift();
+        }
+        async function undoLastAction() {
+            if (actionHistory.length === 0) return showToast("되돌릴 작업이 없습니다.");
+            const action = actionHistory.pop();
+            if (action.type === 'delete') {
+                for(let item of action.items) { delete item.id; await db.items.add(item); }
+                loadBoard(); showToast("삭제 취소됨");
+            } else if (action.type === 'add') {
+                await db.items.bulkDelete(action.ids);
+                loadBoard(); showToast("추가 취소됨");
+            }
+        }
+
+        // --- Viewer Logic (Updated) ---
+        const viewer = document.getElementById('viewer');
+        const viewerImg = document.getElementById('viewer-img');
+        
+        function openViewer(src, id) {
+            currentViewerId = parseInt(id);
+            viewerImg.src = src;
+            viewer.classList.remove('hidden');
+            viewerImg.classList.add('animate-enter'); // Zoom In Animation
+            
+            // Allow transitions after initial open
+            setTimeout(() => {
+                viewer.classList.remove('opacity-0');
+                viewerImg.classList.remove('animate-enter');
+            }, 10);
+            
+            resetZoom();
+            viewer.focus();
+        }
+
+        function closeViewer() {
+            viewerImg.classList.add('animate-exit'); // Zoom Out Animation
+            viewer.classList.add('opacity-0');
+            setTimeout(() => {
+                viewer.classList.add('hidden');
+                viewerImg.classList.remove('animate-exit');
+                viewerImg.src = "";
+                currentViewerId = null;
+            }, 200);
+        }
+        
+        function resetZoom() {
+            currentZoom = 1; translateX = 0; translateY = 0;
+            viewerImg.style.transformOrigin = "center center";
+            updateTransform();
+        }
+        
+        function updateTransform() {
+            viewerImg.style.transform = `translate(${translateX}px, ${translateY}px) scale(${currentZoom})`;
+        }
+        
+        viewer.addEventListener('wheel', (e) => {
+            e.preventDefault();
+            const rect = viewerImg.getBoundingClientRect();
+            // Zoom logic same as before...
+            const oldZoom = currentZoom;
+            if (e.deltaY < 0) currentZoom += 0.2;
+            else currentZoom = Math.max(0.2, currentZoom - 0.2);
+            
+            const scaleRatio = currentZoom / oldZoom;
+            translateX -= (e.clientX - window.innerWidth / 2 - translateX) * (scaleRatio - 1);
+            translateY -= (e.clientY - window.innerHeight / 2 - translateY) * (scaleRatio - 1);
+            updateTransform();
+        });
+        
+        function startPan(e) {
+            e.preventDefault(); isPanning = true;
+            startX = e.clientX - translateX; startY = e.clientY - translateY;
+            viewerImg.style.transition = 'none';
+        }
+        window.addEventListener('mousemove', (e) => {
+            if (!isPanning) return;
+            e.preventDefault();
+            translateX = e.clientX - startX; translateY = e.clientY - startY;
+            updateTransform();
+        });
+        window.addEventListener('mouseup', () => {
+            isPanning = false;
+            viewerImg.style.transition = 'transform 0.1s ease-out';
+        });
+        
+        // Click outside logic
+        viewer.addEventListener('click', (e) => {
+            if (e.target === viewer || e.target.id === 'viewer-container') closeViewer();
+        });
+
+        function navigateViewer(direction) {
+            const wrappers = Array.from(document.querySelectorAll('.grid-item-wrapper'));
+            if (wrappers.length === 0) return;
+            let currentIndex = wrappers.findIndex(el => parseInt(el.dataset.id) === currentViewerId);
+            if (currentIndex === -1) currentIndex = 0;
+            let newIndex = currentIndex;
+            for (let i = 0; i < wrappers.length; i++) {
+                newIndex = newIndex + direction;
+                if (newIndex < 0) newIndex = wrappers.length - 1;
+                if (newIndex >= wrappers.length) newIndex = 0;
+                const nextWrapper = wrappers[newIndex];
+                if (nextWrapper.dataset.type === 'image') {
+                    openViewer(nextWrapper.querySelector('img').src, nextWrapper.dataset.id);
+                    break;
+                }
+            }
+        }
+        
+        function handleKeyDown(e) {
+            if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+            if (e.key === 'Escape') {
+                if(!document.getElementById('viewer').classList.contains('hidden')) closeViewer();
+                else if(!document.getElementById('randomModal').classList.contains('hidden')) closeRandomModal();
+                else if(!document.getElementById('textModal').classList.contains('hidden')) closeTextModal();
+                else if(isEditMode) toggleEditMode();
+            }
+            if ((e.ctrlKey || e.metaKey) && e.key === 'z') { e.preventDefault(); undoLastAction(); }
+            if (!document.getElementById('viewer').classList.contains('hidden')) {
+                if (e.key === 'ArrowLeft') navigateViewer(-1);
+                if (e.key === 'ArrowRight') navigateViewer(1);
+            }
+        }
+
+        async function shuffleBoard() {
+            showToast("섞는 중...");
+            try {
+                const items = await db.items.toArray();
+                items.sort(() => Math.random() - 0.5);
+                const updates = items.map((item, idx) => { item.order = idx; return item; });
+                await db.items.bulkPut(updates);
+                loadBoard(); showToast("Shuffle!");
+            } catch (error) { console.error("Shuffle failed:", error); }
+            toggleMenu();
+        }
+
+        function exportToPNG() { /* ... kept simple for brevity, same logic as before ... */ 
+            toggleMenu();
+            const grid = document.getElementById('gridContainer');
+            if(grid.children.length === 0) return showToast("내용이 없습니다.");
+            showToast("이미지 생성 중...");
+            const title = document.getElementById('projectTitle').value || 'moodboard';
+            const originalWidth = grid.style.width;
+            grid.style.width = grid.scrollWidth + "px"; 
+            html2canvas(grid, {
+                backgroundColor: document.documentElement.classList.contains('dark') ? '#151515' : '#F5F5F7',
+                scale: 2, useCORS: true, logging: false
+            }).then(canvas => {
+                grid.style.width = originalWidth;
+                const link = document.createElement('a');
+                link.download = `${title}.png`;
+                link.href = canvas.toDataURL();
+                link.click();
+                showToast("저장 완료");
+            });
+        }
+        async function saveProject() { 
+            toggleMenu();
+            const items = await db.items.toArray();
+            const title = document.getElementById('projectTitle').value;
+            const data = { title, items, version: 3 };
+            const blob = new Blob([JSON.stringify(data)], {type: "application/json"});
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url; a.download = `${title}.json`; a.click();
+            URL.revokeObjectURL(url);
+        }
+        function loadProject(file) {
+            toggleMenu(); if (!file) return;
+            const reader = new FileReader();
+            reader.onload = async (e) => {
+                try {
+                    const data = JSON.parse(e.target.result);
+                    await db.items.clear();
+                    if(data.title) {
+                        document.getElementById('projectTitle').value = data.title;
+                        saveTitle(data.title);
+                    }
+                    const items = Array.isArray(data) ? data : data.items;
+                    for(let item of items) { delete item.id; await db.items.add(item); }
+                    loadBoard(); showToast("프로젝트 로드 완료");
+                } catch(err) { showToast("파일 오류"); }
+            };
+            reader.readAsText(file);
+        }
+        async function clearBoard() {
+             if(confirm("모든 내용을 지우시겠습니까?")) {
+                const items = await db.items.toArray();
+                pushAction({ type: 'delete', items: items });
+                await db.items.clear(); loadBoard(); toggleMenu();
+            }
+        }
+        function showToast(msg) {
+            const toast = document.getElementById('toast');
+            document.getElementById('toastMsg').innerText = msg;
+            toast.classList.remove('translate-y-24', 'opacity-0');
+            setTimeout(() => toast.classList.add('translate-y-24', 'opacity-0'), 2500);
+        }
+    </script>
+</body>
+</html>
