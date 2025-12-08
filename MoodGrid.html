@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MoodGrid</title>
+    <title>MoodGrid v2.0</title>
     
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -107,6 +107,15 @@
             background: transparent;
             position: relative; /* Essential for Sortable */
         }
+        
+        /* Divider Item Specifics - Fixed for Overlap Issues */
+        .grid-item-wrapper.divider-wrapper {
+            grid-column: 1 / -1; /* Span full width */
+            width: 100%;
+            z-index: 20; /* Keep above images */
+            margin-top: 10px;
+            margin-bottom: 10px;
+        }
 
         /* Content Card */
         .grid-item-content {
@@ -121,11 +130,23 @@
             border: 1px solid rgba(0,0,0,0.05);
         }
         
+        /* Divider Content Style */
+        .divider-content {
+            background: transparent;
+            border: none;
+            box-shadow: none !important;
+            border-radius: 0;
+            display: flex;
+            align-items: center;
+            padding: 10px 0;
+            cursor: move; /* Indicate draggable */
+        }
+
         html.dark .grid-item-content {
             background-color: #2C2C2E;
             border-color: #3A3A3C;
         }
-
+        
         .grid-item-content img {
             display: block;
             width: 100%;
@@ -153,7 +174,7 @@
             transform: translateY(-2px);
             box-shadow: 0 10px 20px -10px rgba(0,0,0,0.1);
         }
-
+        
         /* Drag & Drop Visuals */
         .sortable-ghost { 
             opacity: 0.4; 
@@ -163,6 +184,13 @@
             border: 2px dashed #9ca3af;
             box-shadow: none !important;
         }
+        .sortable-ghost.divider-wrapper {
+            opacity: 0.5;
+            background: rgba(59, 130, 246, 0.1);
+            border: 1px dashed #3B82F6;
+            border-radius: 8px;
+        }
+
         html.dark .sortable-ghost .grid-item-content {
             background: #27272a;
             border-color: #4b5563;
@@ -218,17 +246,17 @@
     <header class="glass-header z-40 fixed top-0 w-full px-4 md:px-6 py-3 flex items-center justify-between">
         
         <!-- Left: Branding -->
-        <div class="flex items-center gap-3 w-[30%] min-w-[200px]">
+        <div class="flex items-center gap-3 w-[25%] min-w-[180px]">
             <div class="w-9 h-9 bg-black dark:bg-white text-white dark:text-black rounded-xl flex items-center justify-center shrink-0 shadow-sm">
                 <i data-lucide="layout-grid" class="w-5 h-5"></i>
             </div>
-            <input type="text" id="projectTitle" value="MoodGrid Project" 
+            <input type="text" id="projectTitle" value="MoodGrid v2.0" 
                 class="bg-transparent font-bold text-lg tracking-tight border-none focus:ring-0 rounded px-2 -ml-2 w-full truncate dark:text-white select-text"
                 onchange="saveTitle(this.value)">
         </div>
 
         <!-- Center: View Controls -->
-        <div class="hidden md:flex items-center gap-4 w-[40%] justify-center px-4">
+        <div class="hidden md:flex items-center gap-4 w-[45%] justify-center px-4">
             <i data-lucide="image" class="w-4 h-4 text-gray-400 transform scale-75"></i>
             <input type="range" id="columnRange" min="2" max="8" value="5" class="w-32 max-w-[200px]" oninput="handleRangeInput(this.value)">
             <i data-lucide="image" class="w-4 h-4 text-gray-400 transform scale-125"></i>
@@ -237,28 +265,39 @@
         <!-- Right: Tools -->
         <div class="flex items-center gap-2 w-[30%] justify-end">
             <!-- Dark Mode -->
-            <button onclick="toggleDarkMode()" class="p-2 ml-4 rounded-full hover:bg-gray-200 dark:hover:bg-white/10 transition-colors text-gray-500 dark:text-gray-400 flex-shrink-0" title="다크 모드">
+            <button onclick="toggleDarkMode()" class="p-2 ml-2 rounded-full hover:bg-gray-200 dark:hover:bg-white/10 transition-colors text-gray-500 dark:text-gray-400 flex-shrink-0" title="다크 모드">
                 <i data-lucide="moon" class="w-5 h-5 hidden dark:block"></i>
                 <i data-lucide="sun" class="w-5 h-5 block dark:hidden"></i>
             </button>
+            
             <div class="h-5 w-px bg-gray-300 dark:bg-gray-700 mx-2 flex-shrink-0"></div>
 
             <!-- Add Buttons -->
             <div class="flex items-center gap-2">
-                <button onclick="document.getElementById('fileInput').click()" tabindex="-1" class="h-9 px-4 bg-white dark:bg-gray-800 rounded-full shadow-sm border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 active:scale-95 transition-transform flex items-center justify-center gap-2 text-sm font-medium whitespace-nowrap">
+                <button onclick="document.getElementById('fileInput').click()" tabindex="-1" class="h-9 px-3 lg:px-4 bg-white dark:bg-gray-800 rounded-full shadow-sm border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 active:scale-95 transition-transform flex items-center justify-center gap-2 text-sm font-medium whitespace-nowrap">
                     <i data-lucide="image-plus" class="w-4 h-4 text-blue-500 flex-shrink-0 pointer-events-none"></i>
                     <span class="hidden lg:inline pt-0.5 pointer-events-none">이미지</span>
                 </button>
                 <input type="file" id="fileInput" multiple accept="image/*" class="hidden" onchange="handleFiles(this.files)">
 
-                <button onclick="openTextModal()" tabindex="-1" class="h-9 px-4 bg-white dark:bg-gray-800 rounded-full shadow-sm border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 active:scale-95 transition-transform flex items-center justify-center gap-2 text-sm font-medium whitespace-nowrap">
+                <button onclick="openTextModal()" tabindex="-1" class="h-9 px-3 lg:px-4 bg-white dark:bg-gray-800 rounded-full shadow-sm border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 active:scale-95 transition-transform flex items-center justify-center gap-2 text-sm font-medium whitespace-nowrap">
                     <i data-lucide="type" class="w-4 h-4 text-orange-500 flex-shrink-0 pointer-events-none"></i>
                     <span class="hidden lg:inline pt-0.5 pointer-events-none">텍스트</span>
                 </button>
+
+                <!-- Divider Button -->
+                <button onclick="addDivider()" tabindex="-1" class="h-9 w-9 bg-white dark:bg-gray-800 rounded-full shadow-sm border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 active:scale-95 transition-transform flex items-center justify-center" title="섹션 추가">
+                    <i data-lucide="split" class="w-4 h-4 text-gray-500 pointer-events-none"></i>
+                </button>
             </div>
 
+            <!-- Resource Shortcuts -->
+            <button onclick="openResourcesModal()" class="ml-1 p-2 rounded-full hover:bg-blue-50 dark:hover:bg-blue-900/30 text-blue-500 transition-colors active:scale-95" title="외부 리소스">
+                <i data-lucide="globe" class="w-5 h-5"></i>
+            </button>
+
             <!-- Random Inspiration -->
-            <button onclick="openRandomModal()" class="ml-1 p-2 rounded-full hover:bg-purple-50 dark:hover:bg-purple-900/30 text-purple-500 transition-colors active:scale-95" title="랜덤 영감 이미지">
+            <button onclick="openRandomModal()" class="p-2 rounded-full hover:bg-purple-50 dark:hover:bg-purple-900/30 text-purple-500 transition-colors active:scale-95" title="랜덤 영감 이미지">
                 <i data-lucide="sparkles" class="w-5 h-5"></i>
             </button>
 
@@ -317,7 +356,7 @@
             <div class="bg-gray-50 dark:bg-gray-800/50 p-10 rounded-3xl border border-gray-100 dark:border-gray-800 flex flex-col items-center animate-fade-in">
                 <i data-lucide="layers" class="w-16 h-16 mb-4 opacity-30"></i>
                 <p class="text-lg font-medium text-gray-500 dark:text-gray-400">비어있는 캔버스</p>
-                <p class="text-sm mt-2 opacity-60">이미지를 드래그하거나 Ctrl+V로 붙여넣으세요</p>
+                <p class="text-sm mt-2 opacity-60">이미지, 링크, 텍스트를 드래그하거나 Ctrl+V 하세요</p>
             </div>
         </div>
 
@@ -356,11 +395,51 @@
                     <i data-lucide="refresh-cw" class="w-5 h-5"></i>
                 </button>
                 <div class="h-6 w-px bg-white/20"></div>
-                <!-- Keep modal open after adding -->
                 <button onclick="confirmRandomImage()" class="p-3 rounded-xl bg-white/20 hover:bg-white/30 transition text-white flex-1 flex justify-center shadow-sm" title="추가하기">
                     <i data-lucide="plus" class="w-5 h-5"></i>
                 </button>
             </div>
+        </div>
+    </div>
+
+    <!-- Resources Shortcuts Modal -->
+    <div id="resourcesModal" class="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm hidden flex items-center justify-center animate-fade-in" onclick="if(event.target === this) closeResourcesModal()">
+        <div class="bg-white dark:bg-gray-800 rounded-3xl shadow-2xl w-full max-w-2xl p-8 transform transition-all scale-100 animate-slide-up" onclick="event.stopPropagation()">
+            <div class="flex justify-between items-center mb-6">
+                <h3 class="text-xl font-bold dark:text-white flex items-center gap-2">
+                    <i data-lucide="globe" class="w-5 h-5 text-blue-500"></i> 외부 리소스
+                </h3>
+                <button onclick="closeResourcesModal()" class="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition text-gray-500">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+            <div class="grid grid-cols-2 md:grid-cols-3 gap-4">
+                <a href="https://unsplash.com" target="_blank" class="p-4 bg-gray-50 dark:bg-gray-700/50 rounded-2xl border border-gray-100 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700 hover:scale-[1.02] transition flex flex-col items-center gap-3 group">
+                    <img src="https://cdn.simpleicons.org/unsplash" class="w-8 h-8 group-hover:scale-110 transition opacity-80 dark:invert">
+                    <span class="font-medium text-sm dark:text-gray-200">Unsplash</span>
+                </a>
+                <a href="https://www.pinterest.com" target="_blank" class="p-4 bg-gray-50 dark:bg-gray-700/50 rounded-2xl border border-gray-100 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700 hover:scale-[1.02] transition flex flex-col items-center gap-3 group">
+                    <img src="https://cdn.simpleicons.org/pinterest/E60023" class="w-8 h-8 group-hover:scale-110 transition">
+                    <span class="font-medium text-sm dark:text-gray-200">Pinterest</span>
+                </a>
+                <a href="https://www.behance.net" target="_blank" class="p-4 bg-gray-50 dark:bg-gray-700/50 rounded-2xl border border-gray-100 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700 hover:scale-[1.02] transition flex flex-col items-center gap-3 group">
+                    <img src="https://cdn.simpleicons.org/behance/1769FF" class="w-8 h-8 group-hover:scale-110 transition">
+                    <span class="font-medium text-sm dark:text-gray-200">Behance</span>
+                </a>
+                <a href="https://dribbble.com" target="_blank" class="p-4 bg-gray-50 dark:bg-gray-700/50 rounded-2xl border border-gray-100 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700 hover:scale-[1.02] transition flex flex-col items-center gap-3 group">
+                    <img src="https://cdn.simpleicons.org/dribbble/EA4C89" class="w-8 h-8 group-hover:scale-110 transition">
+                    <span class="font-medium text-sm dark:text-gray-200">Dribbble</span>
+                </a>
+                <a href="https://www.pexels.com" target="_blank" class="p-4 bg-gray-50 dark:bg-gray-700/50 rounded-2xl border border-gray-100 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700 hover:scale-[1.02] transition flex flex-col items-center gap-3 group">
+                    <img src="https://cdn.simpleicons.org/pexels/05A081" class="w-8 h-8 group-hover:scale-110 transition">
+                    <span class="font-medium text-sm dark:text-gray-200">Pexels</span>
+                </a>
+                <a href="https://pixabay.com" target="_blank" class="p-4 bg-gray-50 dark:bg-gray-700/50 rounded-2xl border border-gray-100 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700 hover:scale-[1.02] transition flex flex-col items-center gap-3 group">
+                    <img src="https://cdn.simpleicons.org/pixabay/00AB6C" class="w-8 h-8 group-hover:scale-110 transition">
+                    <span class="font-medium text-sm dark:text-gray-200">Pixabay</span>
+                </a>
+            </div>
+            <p class="mt-6 text-center text-xs text-gray-400">클릭하면 새 탭에서 열립니다.</p>
         </div>
     </div>
 
@@ -376,7 +455,7 @@
                 <button onclick="selectColor('yellow', this)" class="w-8 h-8 rounded-full bg-[#FFF8C5] border border-yellow-100 shadow-sm hover:scale-110 transition ring-offset-2 ring-yellow-400"></button>
                 <button onclick="selectColor('blue', this)" class="w-8 h-8 rounded-full bg-[#E3F2FD] border border-blue-100 shadow-sm hover:scale-110 transition ring-offset-2 ring-blue-400"></button>
                 <button onclick="selectColor('green', this)" class="w-8 h-8 rounded-full bg-[#E8F5E9] border border-green-100 shadow-sm hover:scale-110 transition ring-offset-2 ring-green-400"></button>
-                <button onclick="selectColor('dark', this)" class="w-8 h-8 rounded-full bg-[#2C2C2E] border border-gray-700 shadow-sm hover:scale-110 transition ring-offset-2 ring-gray-500"></button>
+                <button onclick="selectColor('dark', this)" class="w-8 h-8 rounded-full bg-[#2C2C2E] border border-gray-700 shadow-sm hover:scale-110 transition ring-offset-2 ring-gray500"></button>
             </div>
 
             <div class="flex justify-end gap-2">
@@ -415,7 +494,7 @@
     </div>
 
     <script>
-        const db = new Dexie("MoodGridDB");
+        const db = new Dexie("MoodGridDB_v5"); // Version Update for 2.0
         db.version(1).stores({ items: "++id, type, content, meta, order, timestamp" });
 
         let isEditMode = false;
@@ -440,7 +519,7 @@
             if (localStorage.getItem('projectTitle')) {
                 document.getElementById('projectTitle').value = localStorage.getItem('projectTitle');
             } else {
-                document.getElementById('projectTitle').value = "MoodGrid Project";
+                document.getElementById('projectTitle').value = "MoodGrid v2.0";
             }
 
             await loadBoard();
@@ -470,10 +549,22 @@
         // --- Grid Logic ---
         function resizeGridItem(wrapper) {
             const rowHeight = 1; 
-            const content = wrapper.querySelector('.grid-item-content');
+            const content = wrapper.querySelector('.grid-item-content') || wrapper.querySelector('.divider-content');
             if(!content) return;
+
+            // --- Fix for Divider Overlap ---
+            // Explicitly calculate height for divider to ensure masonry grid allocates space
+            if (wrapper.classList.contains('divider-wrapper')) {
+                // Approximate height of divider + margins
+                const totalHeight = 60; // 40px content + 20px margins
+                const spanNeeded = Math.ceil(totalHeight / rowHeight);
+                wrapper.style.gridRowEnd = `span ${spanNeeded}`;
+                return;
+            }
+
             const img = content.querySelector('img');
-            if(img && !img.complete && img.naturalHeight === 0) return;
+            // Optimization: If aspect ratio is known via inline style, we trust it
+            if(img && !img.complete && img.naturalHeight === 0 && !img.style.aspectRatio) return;
 
             const contentHeight = content.getBoundingClientRect().height;
             const totalHeight = contentHeight + VISUAL_GAP;
@@ -488,6 +579,25 @@
             }
         }
 
+        // Divider Logic: Toggle Visibility
+        async function toggleSection(dividerId) {
+            const items = await db.items.orderBy('order').toArray();
+            const dividerIndex = items.findIndex(i => i.id === dividerId);
+            if (dividerIndex === -1) return;
+
+            const divider = items[dividerIndex];
+            const newCollapsedState = !divider.meta?.collapsed;
+
+            // Update divider state
+            await db.items.update(dividerId, { meta: { ...divider.meta, collapsed: newCollapsedState } });
+            
+            loadBoard();
+        }
+
+        async function updateDividerTitle(id, newTitle) {
+            await db.items.update(id, { content: newTitle });
+        }
+
         async function loadBoard() {
             const items = await db.items.orderBy('order').toArray();
             const container = document.getElementById('gridContainer');
@@ -500,7 +610,22 @@
                 emptyState.classList.add('hidden');
             }
 
-            items.forEach(item => createDOMElement(item));
+            // --- Robust Folding Logic (State Machine) ---
+            let currentSectionCollapsed = false;
+            
+            items.forEach(item => {
+                if (item.type === 'divider') {
+                    // New section starts, update state based on THIS divider
+                    currentSectionCollapsed = item.meta?.collapsed || false;
+                    createDOMElement(item); // Always render divider
+                } else {
+                    // Item belongs to current section
+                    if (!currentSectionCollapsed) {
+                        createDOMElement(item);
+                    }
+                }
+            });
+
             lucide.createIcons();
             setTimeout(resizeAllGridItems, 50);
             setTimeout(resizeAllGridItems, 500); 
@@ -513,48 +638,137 @@
             wrapper.dataset.id = item.id;
             wrapper.dataset.type = item.type; 
 
-            const contentDiv = document.createElement('div');
-            contentDiv.className = 'grid-item-content group animate-fade-in relative';
-            const contentInner = document.createElement('div');
-            contentInner.className = 'content-inner'; 
-
-            if (item.type === 'image') {
-                const img = document.createElement('img');
-                img.src = item.content;
-                img.className = 'w-full min-h-[50px] select-none block'; 
-                img.onload = () => resizeGridItem(wrapper);
-                contentInner.appendChild(img);
-                contentDiv.onclick = (e) => handleItemClick(e, item.id, item.content, 'image');
-
-            } else if (item.type === 'text') {
-                const p = document.createElement('div');
-                const colors = {
-                    'white': 'bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-200',
-                    'yellow': 'bg-[#FFF8C5] text-yellow-900',
-                    'blue': 'bg-[#E3F2FD] text-blue-900',
-                    'green': 'bg-[#E8F5E9] text-green-900',
-                    'dark': 'bg-[#2C2C2E] text-white'
-                };
-                const bgClass = colors[item.meta?.color || 'white'];
-                p.className = `p-6 min-h-[120px] flex items-center justify-center text-center font-medium whitespace-pre-wrap ${bgClass}`;
-                p.innerText = item.content;
-                p.style.fontSize = item.content.length < 30 ? '1.5rem' : '1.1rem';
-                p.style.lineHeight = '1.4';
+            if (item.type === 'divider') {
+                wrapper.classList.add('divider-wrapper');
                 
-                contentInner.appendChild(p);
-                contentDiv.onclick = (e) => handleItemClick(e, item.id, item.content, 'text');
-                contentDiv.ondblclick = (e) => {
-                    if (!isEditMode) openTextModal(item.id, item.content, item.meta?.color);
+                const dividerLine = document.createElement('div');
+                dividerLine.className = 'divider-content w-full flex items-center justify-between group py-2';
+                
+                const leftLine = document.createElement('div');
+                leftLine.className = 'h-px bg-gray-300 dark:bg-gray-700 flex-1 group-hover:bg-blue-300 transition-colors';
+                
+                // Content Wrapper for Controls
+                const controls = document.createElement('div');
+                controls.className = 'flex items-center gap-2 mx-3';
+
+                // Toggle Button
+                const btn = document.createElement('button');
+                btn.className = 'w-8 h-8 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-500 hover:bg-blue-100 hover:text-blue-600 transition-colors flex items-center justify-center';
+                btn.innerHTML = item.meta?.collapsed 
+                    ? `<i data-lucide="chevron-down" class="w-4 h-4"></i>` 
+                    : `<i data-lucide="chevron-up" class="w-4 h-4"></i>`;
+                btn.onclick = (e) => {
+                    e.stopPropagation();
+                    toggleSection(item.id);
                 };
+
+                // Editable Title Input
+                const titleInput = document.createElement('input');
+                titleInput.type = 'text';
+                titleInput.value = item.content === 'divider' ? '새 섹션' : item.content;
+                titleInput.className = 'bg-transparent border-none text-sm font-bold text-gray-600 dark:text-gray-300 focus:ring-0 text-center w-32 hover:bg-gray-100 dark:hover:bg-gray-800 rounded px-2 py-1 transition-colors';
+                titleInput.onclick = (e) => e.stopPropagation();
+                titleInput.onmousedown = (e) => e.stopPropagation(); // Prevent drag start from input
+                titleInput.onchange = (e) => updateDividerTitle(item.id, e.target.value);
+
+                // Delete Button
+                const delBtn = document.createElement('button');
+                delBtn.className = 'w-8 h-8 rounded-full text-gray-300 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition flex items-center justify-center opacity-0 group-hover:opacity-100';
+                delBtn.innerHTML = `<i data-lucide="x" class="w-4 h-4"></i>`;
+                delBtn.onclick = async (e) => {
+                    e.stopPropagation();
+                    if(confirm('이 섹션 구분선을 삭제하시겠습니까? (포함된 이미지는 삭제되지 않습니다)')) {
+                        await db.items.delete(item.id);
+                        loadBoard();
+                    }
+                };
+
+                controls.appendChild(btn);
+                controls.appendChild(titleInput);
+                controls.appendChild(delBtn);
+
+                const rightLine = document.createElement('div');
+                rightLine.className = 'h-px bg-gray-300 dark:bg-gray-700 flex-1 group-hover:bg-blue-300 transition-colors';
+
+                dividerLine.appendChild(leftLine);
+                dividerLine.appendChild(controls);
+                dividerLine.appendChild(rightLine);
+                wrapper.appendChild(dividerLine);
+
+            } else {
+                const contentDiv = document.createElement('div');
+                contentDiv.className = 'grid-item-content group animate-fade-in relative';
+                const contentInner = document.createElement('div');
+                contentInner.className = 'content-inner'; 
+
+                if (item.type === 'image') {
+                    const img = document.createElement('img');
+                    img.src = item.content;
+                    img.className = 'w-full min-h-[50px] select-none block';
+                    img.loading = "lazy"; // Lazy Loading
+                    
+                    // Optimization: Use aspect ratio from meta if available to prevent layout shift
+                    if (item.meta && item.meta.width && item.meta.height) {
+                        const aspect = item.meta.width / item.meta.height;
+                        img.style.aspectRatio = `${aspect}`;
+                    }
+
+                    img.onload = () => resizeGridItem(wrapper);
+                    contentInner.appendChild(img);
+                    contentDiv.onclick = (e) => handleItemClick(e, item.id, item.content, 'image');
+
+                } else if (item.type === 'bookmark') {
+                    // Bookmark Card
+                    const card = document.createElement('div');
+                    card.className = 'p-4 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors';
+                    
+                    let domain = "Link";
+                    try { domain = new URL(item.content).hostname; } catch(e){}
+
+                    card.innerHTML = `
+                        <div class="flex items-start gap-3">
+                            <div class="w-10 h-10 rounded-lg bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center shrink-0 text-blue-500">
+                                <i data-lucide="link" class="w-5 h-5"></i>
+                            </div>
+                            <div class="flex-1 min-w-0 overflow-hidden">
+                                <h4 class="font-bold text-sm text-gray-900 dark:text-gray-100 truncate">${domain}</h4>
+                                <p class="text-xs text-gray-500 truncate mt-0.5">${item.content}</p>
+                            </div>
+                        </div>
+                    `;
+                    contentInner.appendChild(card);
+                    contentDiv.onclick = () => window.open(item.content, '_blank');
+
+                } else if (item.type === 'text') {
+                    const p = document.createElement('div');
+                    const colors = {
+                        'white': 'bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-200',
+                        'yellow': 'bg-[#FFF8C5] text-yellow-900',
+                        'blue': 'bg-[#E3F2FD] text-blue-900',
+                        'green': 'bg-[#E8F5E9] text-green-900',
+                        'dark': 'bg-[#2C2C2E] text-white'
+                    };
+                    const bgClass = colors[item.meta?.color || 'white'];
+                    p.className = `p-6 min-h-[120px] flex items-center justify-center text-center font-medium whitespace-pre-wrap ${bgClass}`;
+                    p.innerText = item.content;
+                    p.style.fontSize = item.content.length < 30 ? '1.5rem' : '1.1rem';
+                    p.style.lineHeight = '1.4';
+                    
+                    contentInner.appendChild(p);
+                    contentDiv.onclick = (e) => handleItemClick(e, item.id, item.content, 'text');
+                    contentDiv.ondblclick = (e) => {
+                        if (!isEditMode) openTextModal(item.id, item.content, item.meta?.color);
+                    };
+                }
+
+                contentDiv.appendChild(contentInner);
+                const checkOverlay = document.createElement('div');
+                checkOverlay.className = 'absolute inset-0 bg-white/30 dark:bg-black/40 backdrop-blur-[2px] hidden items-start justify-end p-3 pointer-events-none edit-overlay transition-opacity z-20';
+                checkOverlay.innerHTML = `<div class="w-6 h-6 rounded-full bg-white border border-gray-200 flex items-center justify-center shadow-sm check-circle transition-transform duration-200 scale-90"><i data-lucide="check" class="w-3.5 h-3.5 text-blue-500 opacity-0 font-bold"></i></div>`;
+                contentDiv.appendChild(checkOverlay);
+                wrapper.appendChild(contentDiv);
             }
 
-            contentDiv.appendChild(contentInner);
-            const checkOverlay = document.createElement('div');
-            checkOverlay.className = 'absolute inset-0 bg-white/30 dark:bg-black/40 backdrop-blur-[2px] hidden items-start justify-end p-3 pointer-events-none edit-overlay transition-opacity z-20';
-            checkOverlay.innerHTML = `<div class="w-6 h-6 rounded-full bg-white border border-gray-200 flex items-center justify-center shadow-sm check-circle transition-transform duration-200 scale-90"><i data-lucide="check" class="w-3.5 h-3.5 text-blue-500 opacity-0 font-bold"></i></div>`;
-            contentDiv.appendChild(checkOverlay);
-
-            wrapper.appendChild(contentDiv);
             container.appendChild(wrapper);
             resizeGridItem(wrapper);
         }
@@ -639,6 +853,13 @@
             document.getElementById('randomModal').classList.add('hidden');
             currentRandomBlob = null;
         }
+        function openResourcesModal() {
+            document.getElementById('resourcesModal').classList.remove('hidden');
+        }
+        function closeResourcesModal() {
+            document.getElementById('resourcesModal').classList.add('hidden');
+        }
+
         async function fetchRandomImage() {
             const img = document.getElementById('randomPreviewImg');
             const loader = document.getElementById('randomLoader');
@@ -658,13 +879,13 @@
         }
         async function confirmRandomImage() {
             if(!currentRandomBlob) return;
-            const reader = new FileReader();
-            reader.onloadend = async () => {
-                await addItemToDb('image', reader.result);
-                showToast("랜덤 이미지가 추가되었습니다.");
-                fetchRandomImage();
-            };
-            reader.readAsDataURL(currentRandomBlob);
+            
+            // Compress random image too
+            const compressedUrl = await compressImageBlob(currentRandomBlob);
+            await addItemToDb('image', compressedUrl.url, { width: compressedUrl.width, height: compressedUrl.height });
+            
+            showToast("랜덤 이미지가 추가되었습니다.");
+            fetchRandomImage();
         }
 
         function openTextModal(id = null, text = '', color = 'white') {
@@ -709,6 +930,13 @@
             closeTextModal();
         }
 
+        async function addDivider() {
+            // Default title "새 섹션"
+            await addItemToDb('divider', '새 섹션');
+            showToast("새 섹션이 추가되었습니다.");
+            loadBoard();
+        }
+
         // --- Core Helpers ---
         async function addItemToDb(type, content, meta = {}) {
             const count = await db.items.count();
@@ -716,27 +944,119 @@
             const id = await db.items.add(item);
             pushAction({ type: 'add', ids: [id] });
             document.getElementById('emptyState').classList.add('hidden');
-            createDOMElement({ ...item, id });
+            // If it's a divider, we need to reload to re-sort visually properly
+            if (type === 'divider') loadBoard(); 
+            else createDOMElement({ ...item, id });
+        }
+
+        // Optimization: Image Compression & Dimension Extraction
+        function compressImage(file, maxWidth = 1200, quality = 0.8) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.readAsDataURL(file);
+                reader.onload = (event) => {
+                    const img = new Image();
+                    img.src = event.target.result;
+                    img.onload = () => {
+                        const canvas = document.createElement('canvas');
+                        let width = img.width;
+                        let height = img.height;
+
+                        if (width > maxWidth) {
+                            height *= maxWidth / width;
+                            width = maxWidth;
+                        }
+
+                        canvas.width = width;
+                        canvas.height = height;
+                        const ctx = canvas.getContext('2d');
+                        ctx.drawImage(img, 0, 0, width, height);
+                        resolve({
+                            url: canvas.toDataURL('image/jpeg', quality),
+                            width: width,
+                            height: height
+                        });
+                    };
+                    img.onerror = reject;
+                };
+                reader.onerror = reject;
+            });
+        }
+        
+        // Wrapper for blob (used in random image)
+        function compressImageBlob(blob) {
+            return compressImage(new File([blob], "temp.jpg", { type: "image/jpeg" }));
         }
 
         async function handleFiles(files) {
             if (!files.length) return;
             const addedIds = [];
+            showToast("이미지 최적화 중...");
+
             for (let file of files) {
                 if (file.type.startsWith('image/')) {
-                    const reader = new FileReader();
-                    reader.onload = async (e) => {
+                    try {
+                        const compressed = await compressImage(file);
                         const id = await db.items.add({
-                            type: 'image', content: e.target.result, order: await db.items.count(), timestamp: Date.now()
+                            type: 'image', 
+                            content: compressed.url, 
+                            meta: { width: compressed.width, height: compressed.height },
+                            order: await db.items.count(), 
+                            timestamp: Date.now()
                         });
                         addedIds.push(id);
                         document.getElementById('emptyState').classList.add('hidden');
-                        createDOMElement({ id, type: 'image', content: e.target.result });
-                    };
-                    reader.readAsDataURL(file);
+                        createDOMElement({ id, type: 'image', content: compressed.url, meta: { width: compressed.width, height: compressed.height } });
+                    } catch (e) {
+                        console.error("Image processing error", e);
+                        showToast("이미지 처리 실패");
+                    }
                 }
             }
             setTimeout(() => { if(addedIds.length) pushAction({ type: 'add', ids: addedIds }); }, 300);
+            showToast("이미지 추가 완료");
+        }
+
+        // Drag & Drop Handlers (Fixed)
+        function handleDragOver(e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+
+        function handleDragLeave(e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+
+        function handleDrop(e) {
+            e.preventDefault();
+            e.stopPropagation();
+
+            // 1. Files dropped
+            if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+                handleFiles(e.dataTransfer.files);
+                return;
+            }
+
+            // 2. Text/URL dropped
+            const text = e.dataTransfer.getData('text/plain');
+            if (text) {
+                const trimmed = text.trim();
+                const urlPattern = /^(https?:\/\/[^\s]+)/;
+                if (urlPattern.test(trimmed)) {
+                    // It is a URL
+                    if (trimmed.match(/\.(jpeg|jpg|gif|png|webp)$/i)) {
+                        submitUrlImage(trimmed);
+                    } else {
+                        addItemToDb('bookmark', trimmed);
+                        showToast("북마크가 추가되었습니다.");
+                    }
+                } else {
+                    // It is plain text
+                    addItemToDb('text', trimmed, { color: 'white' });
+                    showToast("메모가 추가되었습니다.");
+                }
+            }
         }
 
         function handlePaste(e) {
@@ -749,9 +1069,17 @@
 
             const text = e.clipboardData.getData('text');
             if (text) {
+                const trimmed = text.trim();
                 const urlPattern = /^(https?:\/\/[^\s]+)/;
-                if (urlPattern.test(text.trim())) {
-                    submitUrlImage(text.trim());
+                if (urlPattern.test(trimmed)) {
+                    // Check if it is an image URL roughly
+                    if (trimmed.match(/\.(jpeg|jpg|gif|png|webp)$/i)) {
+                        submitUrlImage(trimmed);
+                    } else {
+                        // It's a general link -> Bookmark
+                        addItemToDb('bookmark', trimmed);
+                        showToast("북마크가 추가되었습니다.");
+                    }
                 }
             }
         }
@@ -759,15 +1087,15 @@
         async function submitUrlImage(url) {
             showToast("URL 이미지 로딩 중...");
             try {
+                // Try to fetch to compress
                 const response = await fetch(url);
                 const blob = await response.blob();
-                const reader = new FileReader();
-                reader.onloadend = async () => {
-                    await addItemToDb('image', reader.result);
-                    showToast("이미지 추가 완료");
-                };
-                reader.readAsDataURL(blob);
+                const compressed = await compressImageBlob(blob);
+                
+                await addItemToDb('image', compressed.url, { width: compressed.width, height: compressed.height });
+                showToast("이미지 추가 완료");
             } catch(e) {
+                // Fallback to direct URL if fetch fails (CORS)
                 await addItemToDb('image', url);
                 showToast("링크로 이미지가 추가되었습니다.");
             }
@@ -794,13 +1122,17 @@
             window.sortableInstance = Sortable.create(el, {
                 animation: 200, delay: 100, delayOnTouchOnly: true,
                 ghostClass: 'sortable-ghost', dragClass: 'sortable-drag', forceFallback: true,
+                handle: '.grid-item-wrapper', /* Drag entire wrapper to allow divider dragging */
                 onStart: function() { document.body.style.cursor = 'grabbing'; },
                 onEnd: async function (evt) {
                     document.body.style.cursor = '';
+                    // Re-order in DB
                     const wrapperEls = document.querySelectorAll('.grid-item-wrapper');
                     const updates = [];
                     wrapperEls.forEach((el, idx) => updates.push(db.items.update(parseInt(el.dataset.id), { order: idx })));
                     await Promise.all(updates);
+                    // Reload to apply divider folding logic if order changed
+                    loadBoard();
                 }
             });
         }
@@ -920,6 +1252,7 @@
             if (e.key === 'Escape') {
                 if(!document.getElementById('viewer').classList.contains('hidden')) closeViewer();
                 else if(!document.getElementById('randomModal').classList.contains('hidden')) closeRandomModal();
+                else if(!document.getElementById('resourcesModal').classList.contains('hidden')) closeResourcesModal();
                 else if(!document.getElementById('textModal').classList.contains('hidden')) closeTextModal();
                 else if(isEditMode) toggleEditMode();
             }
