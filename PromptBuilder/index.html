@@ -1,0 +1,234 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Prompt Dock</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="app-header">
+        <div>
+          <p class="eyebrow">Personal AI Prompt Launcher</p>
+          <h1>Prompt Dock</h1>
+        </div>
+        <div class="header-actions">
+          <button class="icon-button" id="importBtn" type="button" title="가져오기" aria-label="가져오기">
+            <span class="icon" aria-hidden="true">↥</span>
+          </button>
+          <button class="icon-button" id="exportBtn" type="button" title="내보내기" aria-label="내보내기">
+            <span class="icon" aria-hidden="true">↧</span>
+          </button>
+          <button class="icon-button" id="categoryBtn" type="button" title="카테고리 관리" aria-label="카테고리 관리">
+            <span class="icon" aria-hidden="true">▦</span>
+          </button>
+          <button class="icon-button" id="themeToggleBtn" type="button" title="테마 변경" aria-label="테마 변경">
+            <span class="icon" id="themeIcon" aria-hidden="true">☾</span>
+          </button>
+          <button class="primary-action" id="newItemBtn" type="button">새 항목</button>
+          <input id="importInput" class="hidden-input" type="file" accept=".json,.csv,application/json,text/csv" />
+        </div>
+      </header>
+
+      <section class="search-hero" aria-label="검색">
+        <label class="search-box">
+          <span class="search-icon">⌕</span>
+          <input id="searchInput" type="search" placeholder="무엇을 하려고 하나요? 예: 회의록 요약, 상세페이지 작성" />
+        </label>
+      </section>
+
+      <main class="layout">
+        <section class="toolbar" aria-label="필터">
+          <div class="view-toggle" role="group" aria-label="보기 방식">
+            <button class="seg active" data-view="card" type="button">카드</button>
+            <button class="seg" data-view="list" type="button">리스트</button>
+            <button class="seg" data-view="compact" type="button">컴팩트</button>
+          </div>
+          <details class="filter-details" open>
+            <summary>필터</summary>
+            <div class="filter-grid">
+              <div>
+                <span class="filter-label">플랫폼</span>
+                <div id="platformFilters" class="chip-row"></div>
+              </div>
+              <div>
+                <span class="filter-label">목적/카테고리</span>
+                <div id="categoryFilters" class="chip-row"></div>
+              </div>
+              <label>
+                정렬
+                <select id="sortSelect">
+                  <option value="recent">최근 사용</option>
+                  <option value="favorite">즐겨찾기</option>
+                  <option value="updated">업데이트순</option>
+                  <option value="title">제목순</option>
+                </select>
+              </label>
+            </div>
+          </details>
+        </section>
+
+        <section class="content-area">
+          <div class="content-head">
+            <div>
+              <h2>보관함</h2>
+              <p id="resultCount">0개 항목</p>
+            </div>
+            <button class="text-button" id="resetSampleBtn" type="button">샘플 다시 불러오기</button>
+          </div>
+
+          <div id="favoriteSection" class="dock-section"></div>
+          <div id="itemsView" class="items-grid"></div>
+        </section>
+      </main>
+    </div>
+
+    <div id="hoverPreview" class="hover-preview" role="dialog" aria-hidden="true"></div>
+
+    <dialog id="itemDialog" class="dialog">
+      <form id="itemForm" method="dialog" class="dialog-inner">
+        <div class="dialog-head">
+          <div>
+            <p class="eyebrow">Prompt Dock</p>
+            <h2 id="dialogTitle">새 항목</h2>
+          </div>
+          <button class="icon-button ghost" id="closeItemBtn" type="button" aria-label="닫기">×</button>
+        </div>
+
+        <input id="itemId" type="hidden" />
+
+        <div class="form-grid">
+          <label>
+            제목
+            <input id="titleInput" required maxlength="80" placeholder="예: 회의록 핵심 요약" />
+          </label>
+          <label>
+            유형
+            <select id="typeInput">
+              <option value="text_prompt">텍스트 프롬프트</option>
+              <option value="gpt">GPTs 링크</option>
+              <option value="gem">Gems 링크</option>
+              <option value="link">참고 링크</option>
+              <option value="workflow">워크플로우</option>
+            </select>
+          </label>
+          <label>
+            플랫폼
+            <select id="platformInput"></select>
+          </label>
+          <label>
+            요약
+            <input id="summaryInput" maxlength="140" placeholder="한 줄로 언제 쓰는지 적어주세요" />
+          </label>
+        </div>
+
+        <div class="field-block">
+          <div class="field-head">
+            <span>카테고리</span>
+            <button id="quickCategoryBtn" class="mini-button" type="button">추가</button>
+          </div>
+          <div id="formCategories" class="chip-row selectable"></div>
+        </div>
+
+        <div class="field-block">
+          <div class="field-head">
+            <span>태그</span>
+            <small>Enter로 추가</small>
+          </div>
+          <div class="tag-input-wrap">
+            <div id="selectedTags" class="selected-tags"></div>
+            <input id="tagInput" autocomplete="off" placeholder="태그 입력: 요약, summary, 회의..." />
+          </div>
+          <div id="tagSuggestions" class="suggestions"></div>
+        </div>
+
+        <label>
+          링크
+          <input id="urlInput" type="url" placeholder="GPTs, Gems, Perplexity, 참고 URL" />
+        </label>
+
+        <label>
+          프롬프트
+          <textarea id="promptInput" rows="7" placeholder="텍스트 프롬프트를 붙여넣으세요. {주제}, {톤} 같은 변수는 자동으로 입력칸이 만들어집니다."></textarea>
+        </label>
+
+        <section class="advanced-fields">
+          <div class="field-head">
+            <span>상세 정보</span>
+          </div>
+          <div class="form-grid">
+            <label>
+              사용 목적
+              <textarea id="useCaseInput" rows="3" placeholder="언제 쓰면 좋은지"></textarea>
+            </label>
+            <label>
+              메모
+              <textarea id="notesInput" rows="3" placeholder="활용 팁, 주의사항, 변형 아이디어"></textarea>
+            </label>
+          </div>
+        </section>
+
+        <div class="dialog-actions">
+          <button class="danger-button" id="deleteItemBtn" type="button">삭제</button>
+          <div>
+            <button class="secondary-action" id="cancelItemBtn" type="button">취소</button>
+            <button class="primary-action" id="saveItemBtn" type="button">저장</button>
+          </div>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="detailDialog" class="dialog detail-dialog">
+      <div class="dialog-inner">
+        <div class="dialog-head">
+          <div>
+            <p class="eyebrow">상세 보기</p>
+            <h2 id="detailTitle"></h2>
+          </div>
+          <button class="icon-button ghost" id="closeDetailBtn" type="button" aria-label="닫기">×</button>
+        </div>
+        <div id="detailBody"></div>
+      </div>
+    </dialog>
+
+    <dialog id="categoryDialog" class="dialog">
+      <div class="dialog-inner small-dialog">
+        <div class="dialog-head">
+          <div>
+            <p class="eyebrow">분류 관리</p>
+            <h2>카테고리</h2>
+          </div>
+          <button class="icon-button ghost" id="closeCategoryBtn" type="button" aria-label="닫기">×</button>
+        </div>
+        <div class="category-editor">
+          <div class="inline-add">
+            <input id="categoryNameInput" placeholder="새 카테고리 이름" />
+            <button id="addCategoryBtn" class="secondary-action" type="button">추가</button>
+          </div>
+          <div id="categoryList" class="category-list"></div>
+        </div>
+      </div>
+    </dialog>
+
+    <dialog id="exportDialog" class="dialog">
+      <div class="dialog-inner small-dialog">
+        <div class="dialog-head">
+          <div>
+            <p class="eyebrow">백업</p>
+            <h2>내보내기</h2>
+          </div>
+          <button class="icon-button ghost" id="closeExportBtn" type="button" aria-label="닫기">×</button>
+        </div>
+        <div class="export-actions">
+          <button class="primary-action" id="downloadJsonBtn" type="button">JSON 다운로드</button>
+          <button class="secondary-action" id="downloadCsvBtn" type="button">CSV 다운로드</button>
+        </div>
+      </div>
+    </dialog>
+
+    <div id="toast" class="toast" role="status"></div>
+
+    <script src="app.js"></script>
+  </body>
+</html>
