@@ -23,6 +23,9 @@
           <button class="icon-button" id="categoryBtn" type="button" title="카테고리 관리" aria-label="카테고리 관리">
             <span class="icon" aria-hidden="true">▦</span>
           </button>
+          <button class="icon-button" id="syncBtn" type="button" title="동기화" aria-label="동기화">
+            <span class="icon" aria-hidden="true">⇄</span>
+          </button>
           <button class="icon-button" id="themeToggleBtn" type="button" title="테마 변경" aria-label="테마 변경">
             <span class="icon" id="themeIcon" aria-hidden="true">☾</span>
           </button>
@@ -46,7 +49,6 @@
           <div class="view-toggle" role="group" aria-label="보기 방식">
             <button class="seg active" data-view="card" type="button">카드</button>
             <button class="seg" data-view="list" type="button">리스트</button>
-            <button class="seg" data-view="compact" type="button">컴팩트</button>
           </div>
           <details class="filter-details" open>
             <summary>필터</summary>
@@ -56,7 +58,7 @@
                 <div id="platformFilters" class="chip-row"></div>
               </div>
               <div>
-                <span class="filter-label">목적/카테고리</span>
+                <span class="filter-label">카테고리</span>
                 <div id="categoryFilters" class="chip-row"></div>
               </div>
               <label>
@@ -212,6 +214,50 @@
             <button id="addCategoryBtn" class="secondary-action" type="button">추가</button>
           </div>
           <div id="categoryList" class="category-list"></div>
+          <section class="summary-editor">
+            <div class="field-head">
+              <span>상단 요약 카테고리</span>
+              <small>드래그로 순서 변경</small>
+            </div>
+            <div class="inline-add">
+              <select id="summaryCategorySelect"></select>
+              <button id="addSummaryCategoryBtn" class="secondary-action" type="button">추가</button>
+            </div>
+            <div id="summaryCategoryList" class="category-list"></div>
+          </section>
+        </div>
+      </div>
+    </dialog>
+
+    <dialog id="syncDialog" class="dialog">
+      <div class="dialog-inner small-dialog">
+        <div class="dialog-head">
+          <div>
+            <p class="eyebrow">Cloud Sync</p>
+            <h2>동기화</h2>
+          </div>
+          <button class="icon-button ghost" id="closeSyncBtn" type="button" aria-label="닫기">×</button>
+        </div>
+        <div class="sync-panel">
+          <p class="help-text">GitHub Gist에 프롬프트 데이터를 저장합니다. 같은 Gist ID와 토큰을 다른 PC에 입력하면 같은 데이터로 동기화됩니다.</p>
+          <label>
+            GitHub 토큰
+            <input id="syncTokenInput" type="password" autocomplete="off" placeholder="gist 권한이 있는 fine-grained token" />
+          </label>
+          <label>
+            Gist ID
+            <input id="syncGistInput" placeholder="비워두고 새 저장소 만들기 가능" />
+          </label>
+          <label class="checkbox-row">
+            <input id="syncAutoInput" type="checkbox" />
+            <span>저장할 때 자동 업로드</span>
+          </label>
+          <div class="sync-actions">
+            <button class="secondary-action" id="createSyncBtn" type="button">새 Gist 만들기</button>
+            <button class="secondary-action" id="pullSyncBtn" type="button">온라인에서 불러오기</button>
+            <button class="primary-action" id="pushSyncBtn" type="button">온라인에 저장</button>
+          </div>
+          <p class="help-text" id="syncStatusText">동기화 설정 없음</p>
         </div>
       </div>
     </dialog>

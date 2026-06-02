@@ -655,8 +655,7 @@ label,
   gap: 18px;
 }
 
-.items-grid.list-view,
-.items-grid.compact-view {
+.items-grid.list-view {
   display: grid;
   grid-template-columns: 1fr;
   gap: 8px;
@@ -898,8 +897,7 @@ label,
   box-shadow: 0 8px 18px rgba(255, 159, 67, 0.28);
 }
 
-.list-row,
-.compact-row {
+.list-row {
   display: grid;
   align-items: center;
   gap: 10px;
@@ -915,8 +913,7 @@ label,
     border-color 160ms ease;
 }
 
-.list-row:hover,
-.compact-row:hover {
+.list-row:hover {
   border-color: color-mix(in srgb, var(--accent-3) 34%, var(--line-strong));
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.24),
@@ -928,12 +925,6 @@ label,
   grid-template-columns: 1fr 120px 160px 250px;
   min-height: 78px;
   padding: 10px 12px;
-}
-
-.compact-row {
-  grid-template-columns: 1fr 90px 160px 190px;
-  min-height: 48px;
-  padding: 7px 10px;
 }
 
 .row-title {
@@ -968,11 +959,8 @@ label,
 }
 
 .list-row:hover .row-actions,
-.compact-row:hover .row-actions,
 .list-row:focus .row-actions,
-.compact-row:focus .row-actions,
-.list-row:focus-within .row-actions,
-.compact-row:focus-within .row-actions {
+.list-row:focus-within .row-actions {
   opacity: 1;
   pointer-events: auto;
   transform: translateX(0);
@@ -1077,6 +1065,18 @@ label,
 
 .small-dialog {
   width: min(560px, calc(100vw - 26px));
+}
+
+#categoryDialog,
+#syncDialog,
+#exportDialog {
+  width: min(560px, calc(100vw - 26px));
+}
+
+#categoryDialog .dialog-inner,
+#syncDialog .dialog-inner,
+#exportDialog .dialog-inner {
+  width: 100%;
 }
 
 .dialog-head,
@@ -1272,6 +1272,29 @@ label,
   gap: 8px;
 }
 
+.category-editor,
+.sync-panel {
+  display: grid;
+  gap: 14px;
+}
+
+.summary-editor {
+  display: grid;
+  gap: 10px;
+  border-top: 1px solid var(--line);
+  padding-top: 14px;
+}
+
+.summary-row-label {
+  display: flex;
+  min-height: 38px;
+  align-items: center;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 0 10px;
+  background: var(--surface-solid);
+}
+
 .category-list {
   display: grid;
   gap: 8px;
@@ -1296,6 +1319,40 @@ label,
   cursor: grab;
   font-size: 15px;
   letter-spacing: 0;
+}
+
+.sync-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.checkbox-row {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.checkbox-row input {
+  width: auto;
+  margin: 0;
+}
+
+.help-text {
+  margin: 0;
+  font-size: 12px;
+}
+
+button:disabled,
+select:disabled {
+  cursor: not-allowed;
+  opacity: 0.52;
+}
+
+.icon-button.active {
+  border-color: color-mix(in srgb, var(--accent-3) 36%, var(--line));
+  color: var(--accent-3);
 }
 
 .hidden-input {
@@ -1391,8 +1448,7 @@ label,
   }
 
   .form-grid,
-  .list-row,
-  .compact-row {
+    .list-row {
     grid-template-columns: 1fr;
   }
 

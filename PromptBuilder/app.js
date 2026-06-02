@@ -1,5 +1,7 @@
 const STORAGE_KEY = "prompt-dock-v1";
 const THEME_KEY = "prompt-dock-theme";
+const SYNC_CONFIG_KEY = "prompt-dock-sync-config";
+const SYNC_FILE_NAME = "prompt-dock-data.json";
 const PLATFORM_ORDER = ["Any", "GPTs", "Gems", "Perplexity", "ChatGPT", "Gemini", "Claude", "Other"];
 const DEFAULT_CATEGORIES = ["요약", "글쓰기", "리서치", "업무", "코딩", "마케팅", "이미지", "학습"];
 
@@ -134,7 +136,11 @@ let hoverTimer = null;
 let platformExpanded = false;
 let currentTheme = localStorage.getItem(THEME_KEY) || "dark";
 let draggedCategory = "";
+let draggedSummaryCategory = "";
 let suppressCategoryClick = false;
+let syncConfig = loadSyncConfig();
+let syncTimer = null;
+let applyingRemoteState = false;
 
 const $ = (selector) => document.querySelector(selector);
 
@@ -185,6 +191,7 @@ const elements = {
   detailBody: $("#detailBody"),
   closeDetailBtn: $("#closeDetailBtn"),
   categoryBtn: $("#categoryBtn"),
+  syncBtn: $("#syncBtn"),
   themeToggleBtn: $("#themeToggleBtn"),
   themeIcon: $("#themeIcon"),
   categoryDialog: $("#categoryDialog"),
@@ -192,12 +199,25 @@ const elements = {
   categoryNameInput: $("#categoryNameInput"),
   addCategoryBtn: $("#addCategoryBtn"),
   categoryList: $("#categoryList"),
+  summaryCategorySelect: $("#summaryCategorySelect"),
+  addSummaryCategoryBtn: $("#addSummaryCategoryBtn"),
+  summaryCategoryList: $("#summaryCategoryList"),
+  syncDialog: $("#syncDialog"),
+  closeSyncBtn: $("#closeSyncBtn"),
+  syncTokenInput: $("#syncTokenInput"),
+  syncGistInput: $("#syncGistInput"),
+  syncAutoInput: $("#syncAutoInput"),
+  createSyncBtn: $("#createSyncBtn"),
+  pullSyncBtn: $("#pullSyncBtn"),
+  pushSyncBtn: $("#pushSyncBtn"),
+  syncStatusText: $("#syncStatusText"),
   resetSampleBtn: $("#resetSampleBtn"),
 };
 
 bindEvents();
 applyTheme(currentTheme);
 render();
+initAutoSync();
 
 function bindEvents() {
   elements.platformInput.innerHTML = PLATFORM_ORDER.map((platform) => `<option value="${platform}">${platform}</option>`).join("");
@@ -238,8 +258,10 @@ function bindEvents() {
   elements.deleteItemBtn.addEventListener("click", deleteCurrentItem);
   elements.quickCategoryBtn.addEventListener("click", () => openCategoryDialog());
   elements.categoryBtn.addEventListener("click", openCategoryDialog);
+  elements.syncBtn.addEventListener("click", openSyncDialog);
   elements.closeCategoryBtn.addEventListener("click", () => elements.categoryDialog.close());
   elements.addCategoryBtn.addEventListener("click", addCategoryFromInput);
+  elements.addSummaryCategoryBtn.addEventListener("click", addSummaryCategoryFromSelect);
   elements.categoryNameInput.addEventListener("keydown", (event) => {
     if (event.key === "Enter") {
       event.preventDefault();
@@ -271,10 +293,18 @@ function bindEvents() {
   elements.downloadJsonBtn.addEventListener("click", exportJson);
   elements.downloadCsvBtn.addEventListener("click", exportCsv);
   elements.closeDetailBtn.addEventListener("click", () => elements.detailDialog.close());
+  elements.closeSyncBtn.addEventListener("click", () => elements.syncDialog.close());
+  elements.createSyncBtn.addEventListener("click", createSyncGist);
+  elements.pullSyncBtn.addEventListener("click", pullSync);
+  elements.pushSyncBtn.addEventListener("click", () => pushSync({ force: true }));
+  [elements.syncTokenInput, elements.syncGistInput, elements.syncAutoInput].forEach((input) => {
+    input.addEventListener("change", saveSyncConfigFromForm);
+  });
   bindBackdropClose(elements.itemDialog);
   bindBackdropClose(elements.categoryDialog);
   bindBackdropClose(elements.exportDialog);
   bindBackdropClose(elements.detailDialog);
+  bindBackdropClose(elements.syncDialog);
 
   elements.resetSampleBtn.addEventListener("click", () => {
     const confirmed = window.confirm("현재 데이터를 샘플 데이터로 교체할까요? 먼저 내보내기로 백업해두는 것을 권장합니다.");
@@ -301,9 +331,12 @@ function normalizeState(input) {
   const discoveredCategories = [...new Set(items.flatMap((item) => splitList(item.categories)))];
   const inputCategories = Array.isArray(input?.categories) ? input.categories : splitList(input?.categories);
   const categories = [...new Set([...(inputCategories.length ? inputCategories : DEFAULT_CATEGORIES), ...discoveredCategories])].filter(Boolean);
+  const summaryCategories = [...new Set(splitList(input?.summaryCategories))].filter((category) => categories.includes(category));
   return {
     categories,
     items: items.map(normalizeItem),
+    summaryCategories,
+    updatedAt: input?.updatedAt || new Date().toISOString(),
   };
 }
 
@@ -330,11 +363,232 @@ function normalizeItem(item = {}) {
   };
 }
 
-function saveState() {
+function saveState(options = {}) {
+  state.updatedAt = new Date().toISOString();
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    if (!options.skipSync) scheduleAutoSync();
   } catch {
     showToast("저장 공간이 부족합니다. 먼저 내보내기로 백업해주세요.");
+  }
+}
+
+function loadSyncConfig() {
+  try {
+    const stored = JSON.parse(localStorage.getItem(SYNC_CONFIG_KEY) || "{}");
+    return {
+      token: stored.token || "",
+      gistId: stored.gistId || "",
+      autoSync: Boolean(stored.autoSync),
+      lastPulledAt: stored.lastPulledAt || "",
+      lastPushedAt: stored.lastPushedAt || "",
+    };
+  } catch {
+    return { token: "", gistId: "", autoSync: false, lastPulledAt: "", lastPushedAt: "" };
+  }
+}
+
+function saveSyncConfig() {
+  localStorage.setItem(SYNC_CONFIG_KEY, JSON.stringify(syncConfig));
+}
+
+function initAutoSync() {
+  updateSyncStatus();
+  if (syncConfig.autoSync && syncConfig.token && syncConfig.gistId) {
+    window.setTimeout(() => pullSync({ silent: true }), 500);
+    window.setInterval(() => pullSync({ silent: true, onlyNewer: true }), 90000);
+  }
+}
+
+function openSyncDialog() {
+  elements.syncTokenInput.value = syncConfig.token;
+  elements.syncGistInput.value = syncConfig.gistId;
+  elements.syncAutoInput.checked = syncConfig.autoSync;
+  updateSyncStatus();
+  showDialog(elements.syncDialog);
+  elements.syncTokenInput.focus();
+}
+
+function saveSyncConfigFromForm() {
+  syncConfig = {
+    ...syncConfig,
+    token: elements.syncTokenInput.value.trim(),
+    gistId: elements.syncGistInput.value.trim(),
+    autoSync: elements.syncAutoInput.checked,
+  };
+  saveSyncConfig();
+  updateSyncStatus();
+}
+
+function updateSyncStatus(message = "") {
+  if (elements.syncBtn) {
+    elements.syncBtn.classList.toggle("active", Boolean(syncConfig.gistId));
+  }
+  if (!elements.syncStatusText) return;
+  if (message) {
+    elements.syncStatusText.textContent = message;
+    return;
+  }
+  if (!syncConfig.gistId) {
+    elements.syncStatusText.textContent = "동기화 설정 없음";
+    return;
+  }
+  const pushed = syncConfig.lastPushedAt ? `저장 ${formatSyncTime(syncConfig.lastPushedAt)}` : "";
+  const pulled = syncConfig.lastPulledAt ? `불러옴 ${formatSyncTime(syncConfig.lastPulledAt)}` : "";
+  elements.syncStatusText.textContent = [pushed, pulled].filter(Boolean).join(" · ") || "동기화 준비됨";
+}
+
+function scheduleAutoSync() {
+  if (applyingRemoteState || !syncConfig.autoSync || !syncConfig.token || !syncConfig.gistId) return;
+  window.clearTimeout(syncTimer);
+  syncTimer = window.setTimeout(() => pushSync({ silent: true }), 1200);
+}
+
+function getSyncPayload() {
+  return {
+    app: "prompt-dock",
+    version: 1,
+    categories: state.categories,
+    summaryCategories: state.summaryCategories || [],
+    items: state.items,
+    updatedAt: state.updatedAt || new Date().toISOString(),
+  };
+}
+
+async function createSyncGist() {
+  saveSyncConfigFromForm();
+  if (!syncConfig.token) {
+    updateSyncStatus("GitHub 토큰을 먼저 입력해주세요.");
+    return;
+  }
+  setSyncBusy(true);
+  try {
+    const data = await requestGist("/gists", {
+      method: "POST",
+      body: JSON.stringify({
+        description: "PromptBuilder sync data",
+        public: false,
+        files: {
+          [SYNC_FILE_NAME]: {
+            content: JSON.stringify(getSyncPayload(), null, 2),
+          },
+        },
+      }),
+    });
+    syncConfig.gistId = data.id;
+    syncConfig.lastPushedAt = new Date().toISOString();
+    saveSyncConfig();
+    elements.syncGistInput.value = syncConfig.gistId;
+    updateSyncStatus("새 동기화 저장소를 만들었습니다.");
+    showToast("동기화 저장소를 만들었습니다.");
+  } catch (error) {
+    handleSyncError(error);
+  } finally {
+    setSyncBusy(false);
+  }
+}
+
+async function pullSync(options = {}) {
+  if (!options.silent) saveSyncConfigFromForm();
+  if (!syncConfig.token || !syncConfig.gistId) {
+    if (!options.silent) updateSyncStatus("GitHub 토큰과 Gist ID가 필요합니다.");
+    return;
+  }
+  setSyncBusy(true);
+  try {
+    const data = await requestGist(`/gists/${encodeURIComponent(syncConfig.gistId)}`);
+    let content = data.files?.[SYNC_FILE_NAME]?.content || "";
+    if (!content && data.files?.[SYNC_FILE_NAME]?.raw_url) {
+      const rawResponse = await fetch(data.files[SYNC_FILE_NAME].raw_url);
+      if (!rawResponse.ok) throw new Error(`RAW_${rawResponse.status}`);
+      content = await rawResponse.text();
+    }
+    if (!content) throw new Error("EMPTY_SYNC_FILE");
+    const remoteState = normalizeState(JSON.parse(content));
+    if (options.onlyNewer && compareDate(remoteState.updatedAt, state.updatedAt) <= 0) return;
+    applyingRemoteState = true;
+    state = remoteState;
+    saveState({ skipSync: true });
+    applyingRemoteState = false;
+    syncConfig.lastPulledAt = new Date().toISOString();
+    saveSyncConfig();
+    render();
+    updateSyncStatus(options.silent ? "" : "온라인 데이터를 불러왔습니다.");
+    if (!options.silent) showToast("온라인 데이터를 불러왔습니다.");
+  } catch (error) {
+    applyingRemoteState = false;
+    if (!options.silent) handleSyncError(error);
+  } finally {
+    setSyncBusy(false);
+  }
+}
+
+async function pushSync(options = {}) {
+  if (!options.silent) saveSyncConfigFromForm();
+  if (!syncConfig.token || !syncConfig.gistId) {
+    if (!options.silent) updateSyncStatus("GitHub 토큰과 Gist ID가 필요합니다.");
+    return;
+  }
+  setSyncBusy(true);
+  try {
+    await requestGist(`/gists/${encodeURIComponent(syncConfig.gistId)}`, {
+      method: "PATCH",
+      body: JSON.stringify({
+        files: {
+          [SYNC_FILE_NAME]: {
+            content: JSON.stringify(getSyncPayload(), null, 2),
+          },
+        },
+      }),
+    });
+    syncConfig.lastPushedAt = new Date().toISOString();
+    saveSyncConfig();
+    updateSyncStatus(options.silent ? "" : "온라인에 저장했습니다.");
+    if (!options.silent) showToast("온라인에 저장했습니다.");
+  } catch (error) {
+    if (!options.silent) handleSyncError(error);
+  } finally {
+    setSyncBusy(false);
+  }
+}
+
+async function requestGist(path, options = {}) {
+  const response = await fetch(`https://api.github.com${path}`, {
+    ...options,
+    headers: {
+      Accept: "application/vnd.github+json",
+      Authorization: `Bearer ${syncConfig.token}`,
+      "Content-Type": "application/json",
+      "X-GitHub-Api-Version": "2022-11-28",
+      ...(options.headers || {}),
+    },
+  });
+  if (!response.ok) throw new Error(`GIST_${response.status}`);
+  return response.json();
+}
+
+function setSyncBusy(isBusy) {
+  [elements.createSyncBtn, elements.pullSyncBtn, elements.pushSyncBtn].forEach((button) => {
+    button.disabled = isBusy;
+  });
+}
+
+function handleSyncError(error) {
+  const code = error?.message || "";
+  const message = code.includes("401")
+    ? "토큰 권한을 확인해주세요."
+    : code.includes("404")
+      ? "Gist ID를 찾을 수 없습니다."
+      : "동기화에 실패했습니다. 설정과 네트워크를 확인해주세요.";
+  updateSyncStatus(message);
+  showToast(message);
+}
+
+function formatSyncTime(value) {
+  try {
+    return new Date(value).toLocaleString("ko-KR", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" });
+  } catch {
+    return "";
   }
 }
 
@@ -409,13 +663,11 @@ function renderItems() {
     ? `<div class="dock-title"><h3>즐겨찾기</h3><small>${favorites.length}개</small></div><div class="items-grid">${favorites.map(renderCard).join("")}</div>`
     : "";
 
-  elements.itemsView.className = `items-grid ${filters.view === "list" ? "list-view" : ""} ${filters.view === "compact" ? "compact-view" : ""}`;
+  elements.itemsView.className = `items-grid ${filters.view === "list" ? "list-view" : ""}`;
   if (!visible.length) {
     elements.itemsView.innerHTML = `<div class="empty-state"><p>조건에 맞는 항목이 없습니다. 검색어를 줄이거나 새 항목을 추가해보세요.</p></div>`;
   } else if (filters.view === "list") {
     elements.itemsView.innerHTML = visible.map(renderListRow).join("");
-  } else if (filters.view === "compact") {
-    elements.itemsView.innerHTML = visible.map(renderCompactRow).join("");
   } else {
     elements.itemsView.innerHTML = visible.map(renderCard).join("");
   }
@@ -437,7 +689,10 @@ function getVisibleItems() {
 
 function renderSummaryChips() {
   const stats = getSummaryStats();
-  const categoryChips = stats.topCategories.map(({ category, count }) => {
+  const categorySource = state.summaryCategories.length
+    ? state.summaryCategories.map((category) => ({ category, count: stats.categoryCounts.get(category) || 0 }))
+    : stats.topCategories;
+  const categoryChips = categorySource.map(({ category, count }) => {
     const active = filters.categories.includes(category);
     return `
       <button class="summary-chip ${active ? "active" : ""}" data-summary-category="${escapeAttribute(category)}" type="button">
@@ -501,6 +756,7 @@ function getSummaryStats() {
     total: state.items.length,
     favoriteCount: state.items.filter((item) => item.favorite).length,
     recentCount: state.items.filter((item) => item.lastUsedAt).length,
+    categoryCounts,
     topCategories: [...categoryCounts.entries()]
       .map(([category, count]) => ({ category, count }))
       .sort((a, b) => b.count - a.count || a.category.localeCompare(b.category, "ko"))
@@ -565,24 +821,6 @@ function renderListRow(item) {
   `;
 }
 
-function renderCompactRow(item) {
-  const id = escapeAttribute(item.id);
-  const platformBadgeClass = platformClass[item.platform] || platformClass.Other;
-  return `
-    <article class="compact-row" data-id="${id}" tabindex="0">
-      <div class="row-title"><strong>${highlightMatches(item.title)}</strong><small>${highlightMatches(item.summary || item.useCase || "")}</small></div>
-      <span class="platform-badge ${platformBadgeClass}">${escapeHtml(item.platform)}</span>
-      <div class="meta-line">${item.categories.slice(0, 2).map((category) => `<span class="category-pill">${escapeHtml(category)}</span>`).join("")}</div>
-      <div class="row-actions">
-        <button class="star-button ${item.favorite ? "active" : ""}" data-action="favorite" data-id="${id}" type="button" aria-label="${item.favorite ? "즐겨찾기 해제" : "즐겨찾기"}">${item.favorite ? "★" : "☆"}</button>
-        ${item.prompt ? `<button class="tool-button" data-action="copy" data-id="${id}" type="button" aria-label="프롬프트 복사">⧉</button>` : ""}
-        ${item.url ? `<button class="tool-button" data-action="open" data-id="${id}" type="button" aria-label="링크 열기">↗</button>` : ""}
-        ${item.url ? `<button class="tool-button" data-action="copyLink" data-id="${id}" type="button" aria-label="링크 복사">⌁</button>` : ""}
-      </div>
-    </article>
-  `;
-}
-
 function attachItemEvents() {
   document.querySelectorAll("[data-action]").forEach((button) => {
     button.addEventListener("click", (event) => {
@@ -599,7 +837,7 @@ function attachItemEvents() {
     });
   });
 
-  document.querySelectorAll("[data-id].prompt-card, [data-id].list-row, [data-id].compact-row").forEach((card) => {
+  document.querySelectorAll("[data-id].prompt-card, [data-id].list-row").forEach((card) => {
     card.addEventListener("mouseenter", (event) => {
       const item = findItem(card.dataset.id);
       if (item) showHoverPreview(item, card, event);
@@ -1082,12 +1320,15 @@ function renderCategoryEditor() {
   elements.categoryList.querySelectorAll("[data-category-delete]").forEach((button) => {
     button.addEventListener("click", () => deleteCategory(button.dataset.categoryDelete));
   });
+
+  renderSummaryCategoryEditor();
 }
 
 function addCategoryFromInput() {
   const category = elements.categoryNameInput.value.trim();
   if (!category) return;
   if (!state.categories.includes(category)) state.categories.push(category);
+  if (!state.summaryCategories.includes(category)) state.summaryCategories.push(category);
   if (!formDraft.categories.includes(category)) formDraft.categories.push(category);
   elements.categoryNameInput.value = "";
   saveState();
@@ -1104,6 +1345,7 @@ function renameCategory(oldName, newName) {
     return;
   }
   state.categories = state.categories.map((category) => category === oldName ? newName : category);
+  state.summaryCategories = state.summaryCategories.map((category) => category === oldName ? newName : category);
   state.items.forEach((item) => {
     item.categories = item.categories.map((category) => category === oldName ? newName : category);
   });
@@ -1118,6 +1360,7 @@ function deleteCategory(category) {
   const confirmed = window.confirm(`"${category}" 카테고리를 삭제할까요? 항목에서는 이 카테고리만 제거됩니다.`);
   if (!confirmed) return;
   state.categories = state.categories.filter((item) => item !== category);
+  state.summaryCategories = state.summaryCategories.filter((entry) => entry !== category);
   state.items.forEach((item) => {
     item.categories = item.categories.filter((entry) => entry !== category);
   });
@@ -1127,6 +1370,81 @@ function deleteCategory(category) {
   render();
   renderFormCategories();
   showToast("카테고리를 삭제했습니다.");
+}
+
+function renderSummaryCategoryEditor() {
+  const available = state.categories.filter((category) => !state.summaryCategories.includes(category));
+  elements.summaryCategorySelect.innerHTML = available.length
+    ? available.map((category) => `<option value="${escapeAttribute(category)}">${escapeHtml(category)}</option>`).join("")
+    : `<option value="">추가할 카테고리 없음</option>`;
+  elements.addSummaryCategoryBtn.disabled = !available.length;
+
+  elements.summaryCategoryList.innerHTML = state.summaryCategories.length
+    ? state.summaryCategories.map((category) => `
+      <div class="category-edit-row summary-edit-row" draggable="true" data-summary-row="${escapeAttribute(category)}">
+        <span class="drag-handle" aria-hidden="true">⋮⋮</span>
+        <span class="summary-row-label">${escapeHtml(category)}</span>
+        <button class="danger-button" data-summary-delete="${escapeAttribute(category)}" type="button">제거</button>
+      </div>
+    `).join("")
+    : `<p class="help-text">비워두면 사용 빈도순 카테고리가 자동으로 표시됩니다.</p>`;
+
+  elements.summaryCategoryList.querySelectorAll("[data-summary-row]").forEach((row) => {
+    row.addEventListener("dragstart", (event) => {
+      draggedSummaryCategory = row.dataset.summaryRow;
+      row.classList.add("dragging");
+      event.dataTransfer.effectAllowed = "move";
+      event.dataTransfer.setData("text/plain", draggedSummaryCategory);
+    });
+    row.addEventListener("dragend", () => {
+      row.classList.remove("dragging");
+      draggedSummaryCategory = "";
+    });
+    row.addEventListener("dragover", (event) => {
+      if (!draggedSummaryCategory || draggedSummaryCategory === row.dataset.summaryRow) return;
+      event.preventDefault();
+      row.classList.add("drop-target");
+    });
+    row.addEventListener("dragleave", () => row.classList.remove("drop-target"));
+    row.addEventListener("drop", (event) => {
+      event.preventDefault();
+      row.classList.remove("drop-target");
+      reorderSummaryCategory(draggedSummaryCategory || event.dataTransfer.getData("text/plain"), row.dataset.summaryRow);
+    });
+  });
+
+  elements.summaryCategoryList.querySelectorAll("[data-summary-delete]").forEach((button) => {
+    button.addEventListener("click", () => removeSummaryCategory(button.dataset.summaryDelete));
+  });
+}
+
+function addSummaryCategoryFromSelect() {
+  const category = elements.summaryCategorySelect.value;
+  if (!category || state.summaryCategories.includes(category)) return;
+  state.summaryCategories.push(category);
+  saveState();
+  render();
+  renderSummaryCategoryEditor();
+  showToast("상단 요약 카테고리에 추가했습니다.");
+}
+
+function removeSummaryCategory(category) {
+  state.summaryCategories = state.summaryCategories.filter((entry) => entry !== category);
+  saveState();
+  render();
+  renderSummaryCategoryEditor();
+}
+
+function reorderSummaryCategory(fromCategory, toCategory) {
+  if (!fromCategory || !toCategory || fromCategory === toCategory) return;
+  const fromIndex = state.summaryCategories.indexOf(fromCategory);
+  const toIndex = state.summaryCategories.indexOf(toCategory);
+  if (fromIndex < 0 || toIndex < 0) return;
+  const [moved] = state.summaryCategories.splice(fromIndex, 1);
+  state.summaryCategories.splice(toIndex, 0, moved);
+  saveState();
+  render();
+  renderSummaryCategoryEditor();
 }
 
 function bindCategoryFilterDrag() {
