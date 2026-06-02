@@ -122,6 +122,7 @@ let filters = {
   query: "",
   platform: "전체",
   categories: [],
+  favoriteOnly: false,
   view: "card",
   sort: "recent",
 };
@@ -140,6 +141,7 @@ const $ = (selector) => document.querySelector(selector);
 const elements = {
   search: $("#searchInput"),
   searchBtn: $("#searchBtn"),
+  summaryChips: $("#summaryChips"),
   platformFilters: $("#platformFilters"),
   categoryFilters: $("#categoryFilters"),
   sort: $("#sortSelect"),
@@ -264,7 +266,7 @@ function bindEvents() {
 
   elements.importBtn.addEventListener("click", () => elements.importInput.click());
   elements.importInput.addEventListener("change", importFile);
-  elements.exportBtn.addEventListener("click", () => elements.exportDialog.showModal());
+  elements.exportBtn.addEventListener("click", () => showDialog(elements.exportDialog));
   elements.closeExportBtn.addEventListener("click", () => elements.exportDialog.close());
   elements.downloadJsonBtn.addEventListener("click", exportJson);
   elements.downloadCsvBtn.addEventListener("click", exportCsv);
@@ -305,7 +307,8 @@ function normalizeState(input) {
   };
 }
 
-function normalizeItem(item) {
+function normalizeItem(item = {}) {
+  item = item || {};
   const now = new Date().toISOString();
   const platform = PLATFORM_ORDER.includes(item.platform) ? item.platform : "Any";
   return {
@@ -328,13 +331,17 @@ function normalizeItem(item) {
 }
 
 function saveState() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  } catch {
+    showToast("저장 공간이 부족합니다. 먼저 내보내기로 백업해주세요.");
+  }
 }
 
 function render() {
   renderFilters();
   renderItems();
-  renderCategoryEditor();
+  if (elements.categoryDialog.open) renderCategoryEditor();
 }
 
 function renderFilters() {
@@ -393,6 +400,7 @@ function runSearch() {
 }
 
 function renderItems() {
+  renderSummaryChips();
   const visible = getVisibleItems();
   elements.resultCount.textContent = `${visible.length}개 항목`;
 
@@ -418,12 +426,86 @@ function getVisibleItems() {
   const query = normalizeText(filters.query);
   return [...state.items]
     .filter((item) => filters.platform === "전체" || item.platform === filters.platform)
+    .filter((item) => !filters.favoriteOnly || item.favorite)
     .filter((item) => !filters.categories.length || filters.categories.some((category) => item.categories.includes(category)))
     .filter((item) => {
       if (!query) return true;
       return normalizeText(searchBlob(item)).includes(query);
     })
     .sort(sortItems);
+}
+
+function renderSummaryChips() {
+  const stats = getSummaryStats();
+  const categoryChips = stats.topCategories.map(({ category, count }) => {
+    const active = filters.categories.includes(category);
+    return `
+      <button class="summary-chip ${active ? "active" : ""}" data-summary-category="${escapeAttribute(category)}" type="button">
+        <span class="summary-dot"></span>
+        <span>자주 쓰는 ${escapeHtml(category)}</span>
+        <strong>${count}</strong>
+      </button>
+    `;
+  }).join("");
+
+  elements.summaryChips.innerHTML = `
+    <button class="summary-chip ${filters.sort === "recent" && !filters.favoriteOnly ? "active" : ""}" data-summary-action="recent" type="button">
+      <span class="summary-icon">↺</span>
+      <span>최근 사용</span>
+      <strong>${stats.recentCount || stats.total}</strong>
+    </button>
+    <button class="summary-chip ${filters.favoriteOnly ? "active" : ""}" data-summary-action="favorite" type="button">
+      <span class="summary-icon">★</span>
+      <span>즐겨찾기</span>
+      <strong>${stats.favoriteCount}</strong>
+    </button>
+    ${categoryChips}
+  `;
+
+  elements.summaryChips.querySelector("[data-summary-action='recent']")?.addEventListener("click", () => {
+    filters.favoriteOnly = false;
+    filters.sort = "recent";
+    elements.sort.value = "recent";
+    renderItems();
+  });
+  elements.summaryChips.querySelector("[data-summary-action='favorite']")?.addEventListener("click", () => {
+    filters.favoriteOnly = !filters.favoriteOnly;
+    if (filters.favoriteOnly) {
+      filters.sort = "favorite";
+      elements.sort.value = "favorite";
+    }
+    renderItems();
+  });
+  elements.summaryChips.querySelectorAll("[data-summary-category]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const category = button.dataset.summaryCategory;
+      if (filters.categories.includes(category)) {
+        filters.categories = filters.categories.filter((item) => item !== category);
+      } else {
+        filters.categories = [category];
+      }
+      render();
+    });
+  });
+}
+
+function getSummaryStats() {
+  const categoryCounts = new Map();
+  state.items.forEach((item) => {
+    item.categories.forEach((category) => {
+      categoryCounts.set(category, (categoryCounts.get(category) || 0) + 1);
+    });
+  });
+
+  return {
+    total: state.items.length,
+    favoriteCount: state.items.filter((item) => item.favorite).length,
+    recentCount: state.items.filter((item) => item.lastUsedAt).length,
+    topCategories: [...categoryCounts.entries()]
+      .map(([category, count]) => ({ category, count }))
+      .sort((a, b) => b.count - a.count || a.category.localeCompare(b.category, "ko"))
+      .slice(0, 3),
+  };
 }
 
 function sortItems(a, b) {
@@ -627,7 +709,7 @@ function openItemDialog(item = null) {
   renderFormCategories();
   renderSelectedTags();
   renderTagSuggestions();
-  elements.itemDialog.showModal();
+  showDialog(elements.itemDialog);
   elements.titleInput.focus();
 }
 
@@ -813,7 +895,7 @@ function openDetail(item) {
     </div>
   `;
   bindDetailEvents(item);
-  if (!elements.detailDialog.open) elements.detailDialog.showModal();
+  showDialog(elements.detailDialog);
 }
 
 function renderVariablePanel(item, variables) {
@@ -871,6 +953,10 @@ function bindBackdropClose(dialog) {
   dialog.addEventListener("click", (event) => {
     if (event.target === dialog) dialog.close();
   });
+}
+
+function showDialog(dialog) {
+  if (!dialog.open) dialog.showModal();
 }
 
 function applyTheme(theme) {
@@ -953,7 +1039,7 @@ function toggleFavorite(id) {
 
 function openCategoryDialog() {
   renderCategoryEditor();
-  elements.categoryDialog.showModal();
+  showDialog(elements.categoryDialog);
   elements.categoryNameInput.focus();
 }
 
