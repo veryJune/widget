@@ -132,6 +132,8 @@ let formDraft = {
 let hoverTimer = null;
 let platformExpanded = false;
 let currentTheme = localStorage.getItem(THEME_KEY) || "dark";
+let draggedCategory = "";
+let suppressCategoryClick = false;
 
 const $ = (selector) => document.querySelector(selector);
 
@@ -349,10 +351,15 @@ function renderFilters() {
   elements.categoryFilters.innerHTML = categoryOptions.map((category) => {
     const active = category === "전체" ? filters.categories.length === 0 : filters.categories.includes(category);
     const label = category === "전체" ? "모두" : category;
-    return `<button class="chip ${active ? "active" : ""}" data-category="${escapeAttribute(category)}" type="button">${escapeHtml(label)}</button>`;
+    const orderAttrs = category === "전체" ? "" : ` draggable="true" data-category-order="${escapeAttribute(category)}"`;
+    return `<button class="chip category-chip ${active ? "active" : ""}" data-category="${escapeAttribute(category)}" type="button"${orderAttrs}>${escapeHtml(label)}</button>`;
   }).join("");
   elements.categoryFilters.querySelectorAll("[data-category]").forEach((button) => {
-    button.addEventListener("click", () => {
+    button.addEventListener("click", (event) => {
+      if (suppressCategoryClick) {
+        event.preventDefault();
+        return;
+      }
       const category = button.dataset.category;
       if (category === "전체") {
         filters.categories = [];
@@ -364,6 +371,7 @@ function renderFilters() {
       render();
     });
   });
+  bindCategoryFilterDrag();
 }
 
 function renderItems() {
@@ -920,11 +928,36 @@ function openCategoryDialog() {
 
 function renderCategoryEditor() {
   elements.categoryList.innerHTML = state.categories.map((category) => `
-    <div class="category-edit-row">
+    <div class="category-edit-row" draggable="true" data-category-row="${escapeAttribute(category)}">
+      <span class="drag-handle" aria-hidden="true">⋮⋮</span>
       <input value="${escapeAttribute(category)}" data-category-edit="${escapeAttribute(category)}" />
       <button class="danger-button" data-category-delete="${escapeAttribute(category)}" type="button">삭제</button>
     </div>
   `).join("");
+
+  elements.categoryList.querySelectorAll("[data-category-row]").forEach((row) => {
+    row.addEventListener("dragstart", (event) => {
+      draggedCategory = row.dataset.categoryRow;
+      row.classList.add("dragging");
+      event.dataTransfer.effectAllowed = "move";
+      event.dataTransfer.setData("text/plain", draggedCategory);
+    });
+    row.addEventListener("dragend", () => {
+      row.classList.remove("dragging");
+      draggedCategory = "";
+    });
+    row.addEventListener("dragover", (event) => {
+      if (!draggedCategory || draggedCategory === row.dataset.categoryRow) return;
+      event.preventDefault();
+      row.classList.add("drop-target");
+    });
+    row.addEventListener("dragleave", () => row.classList.remove("drop-target"));
+    row.addEventListener("drop", (event) => {
+      event.preventDefault();
+      row.classList.remove("drop-target");
+      reorderCategory(draggedCategory || event.dataTransfer.getData("text/plain"), row.dataset.categoryRow);
+    });
+  });
 
   elements.categoryList.querySelectorAll("[data-category-edit]").forEach((input) => {
     input.addEventListener("change", () => renameCategory(input.dataset.categoryEdit, input.value.trim()));
@@ -979,6 +1012,51 @@ function deleteCategory(category) {
   showToast("카테고리를 삭제했습니다.");
 }
 
+function bindCategoryFilterDrag() {
+  elements.categoryFilters.querySelectorAll("[data-category-order]").forEach((button) => {
+    button.addEventListener("dragstart", (event) => {
+      draggedCategory = button.dataset.categoryOrder;
+      suppressCategoryClick = true;
+      button.classList.add("dragging");
+      event.dataTransfer.effectAllowed = "move";
+      event.dataTransfer.setData("text/plain", draggedCategory);
+    });
+    button.addEventListener("dragend", () => {
+      button.classList.remove("dragging");
+      draggedCategory = "";
+      window.setTimeout(() => {
+        suppressCategoryClick = false;
+      }, 0);
+    });
+    button.addEventListener("dragover", (event) => {
+      if (!draggedCategory || draggedCategory === button.dataset.categoryOrder) return;
+      event.preventDefault();
+      button.classList.add("drop-target");
+    });
+    button.addEventListener("dragleave", () => button.classList.remove("drop-target"));
+    button.addEventListener("drop", (event) => {
+      event.preventDefault();
+      button.classList.remove("drop-target");
+      reorderCategory(draggedCategory || event.dataTransfer.getData("text/plain"), button.dataset.categoryOrder);
+      window.setTimeout(() => {
+        suppressCategoryClick = false;
+      }, 0);
+    });
+  });
+}
+
+function reorderCategory(fromCategory, toCategory) {
+  if (!fromCategory || !toCategory || fromCategory === toCategory) return;
+  const fromIndex = state.categories.indexOf(fromCategory);
+  const toIndex = state.categories.indexOf(toCategory);
+  if (fromIndex < 0 || toIndex < 0) return;
+  const [moved] = state.categories.splice(fromIndex, 1);
+  state.categories.splice(toIndex, 0, moved);
+  saveState();
+  render();
+  renderFormCategories();
+}
+
 function exportJson() {
   downloadFile(
     `prompt-dock-${dateStamp()}.json`,
@@ -994,7 +1072,8 @@ function exportCsv() {
     const value = Array.isArray(item[key]) ? item[key].join("|") : item[key];
     return csvEscape(value ?? "");
   }).join(","));
-  downloadFile(`prompt-dock-${dateStamp()}.csv`, [headers.join(","), ...rows].join("\n"), "text/csv;charset=utf-8");
+  const csvContent = `\uFEFF${[headers.join(","), ...rows].join("\r\n")}`;
+  downloadFile(`prompt-dock-${dateStamp()}.csv`, csvContent, "text/csv;charset=utf-8");
   elements.exportDialog.close();
 }
 
@@ -1031,6 +1110,7 @@ function importCsvText(text) {
 }
 
 function parseCsv(text) {
+  text = String(text || "").replace(/^\uFEFF/, "");
   const rows = [];
   let row = [];
   let value = "";
@@ -1189,7 +1269,9 @@ function downloadFile(filename, content, type) {
   const link = document.createElement("a");
   link.href = url;
   link.download = filename;
+  document.body.appendChild(link);
   link.click();
+  link.remove();
   URL.revokeObjectURL(url);
 }
 
