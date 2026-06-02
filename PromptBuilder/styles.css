@@ -1,23 +1,23 @@
 :root {
   color-scheme: light;
-  --bg: #e8eef7;
-  --page-top: #f9fbff;
-  --surface: rgba(255, 255, 255, 0.78);
+  --bg: #eef2f6;
+  --page-top: #fbfcfe;
+  --surface: rgba(255, 255, 255, 0.82);
   --surface-solid: #ffffff;
-  --surface-alpha: rgba(255, 255, 255, 0.64);
-  --surface-2: rgba(245, 249, 255, 0.76);
-  --soft-button: rgba(255, 255, 255, 0.62);
+  --surface-alpha: rgba(255, 255, 255, 0.68);
+  --surface-2: rgba(247, 249, 252, 0.9);
+  --soft-button: rgba(245, 248, 252, 0.68);
   --ink: #111827;
   --muted: #667085;
-  --line: rgba(135, 153, 176, 0.24);
-  --line-strong: rgba(115, 132, 158, 0.38);
-  --accent: #248cff;
-  --accent-2: #a855f7;
-  --accent-3: #13d7ff;
-  --accent-hot: #ff5b7f;
-  --accent-soft: rgba(36, 140, 255, 0.14);
-  --blue: #2d64a6;
-  --teal: #12787b;
+  --line: rgba(115, 129, 150, 0.2);
+  --line-strong: rgba(92, 107, 130, 0.32);
+  --accent: #3d6f9f;
+  --accent-2: #7a688f;
+  --accent-3: #4d9aa0;
+  --accent-hot: #b96f7f;
+  --accent-soft: rgba(61, 111, 159, 0.13);
+  --blue: #32618f;
+  --teal: #237478;
   --green: #16815f;
   --violet: #7257a8;
   --orange: #a45f2b;
@@ -28,11 +28,11 @@
   --icon-teal: #ccfbf1;
   --icon-orange: #ffedd5;
   --icon-gray: #e8eef2;
-  --glow-a: rgba(36, 140, 255, 0.18);
-  --glow-b: rgba(168, 85, 247, 0.14);
-  --glow-c: rgba(19, 215, 255, 0.12);
-  --shadow: 0 26px 70px rgba(39, 53, 74, 0.18);
-  --small-shadow: 0 16px 34px rgba(39, 53, 74, 0.13);
+  --glow-a: rgba(61, 111, 159, 0.12);
+  --glow-b: rgba(122, 104, 143, 0.08);
+  --glow-c: rgba(77, 154, 160, 0.08);
+  --shadow: 0 24px 64px rgba(31, 42, 58, 0.14);
+  --small-shadow: 0 14px 30px rgba(31, 42, 58, 0.1);
 }
 
 :root[data-theme="dark"] {
@@ -84,9 +84,9 @@ body {
   min-height: 100%;
   margin: 0;
   background:
-    radial-gradient(circle at 18% 14%, var(--glow-a), transparent 32vw),
-    radial-gradient(circle at 82% 28%, var(--glow-b), transparent 30vw),
-    radial-gradient(circle at 54% 74%, var(--glow-c), transparent 34vw),
+    linear-gradient(130deg, var(--glow-a), transparent 34vw),
+    linear-gradient(230deg, var(--glow-b), transparent 36vw),
+    linear-gradient(12deg, transparent 34%, var(--glow-c), transparent 72%),
     linear-gradient(180deg, var(--page-top) 0, var(--bg) 650px),
     var(--bg);
   color: var(--ink);
@@ -320,6 +320,37 @@ p {
   pointer-events: none;
 }
 
+.search-submit {
+  position: absolute;
+  right: 9px;
+  top: 50%;
+  min-width: 74px;
+  min-height: 46px;
+  border: 1px solid color-mix(in srgb, var(--accent) 34%, transparent);
+  border-radius: 18px;
+  padding: 0 18px;
+  background: linear-gradient(135deg, color-mix(in srgb, var(--accent-3) 86%, var(--accent)), var(--accent));
+  color: #fff;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 850;
+  transform: translateY(-50%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.28),
+    0 10px 22px color-mix(in srgb, var(--accent) 20%, transparent);
+  transition:
+    transform 160ms ease,
+    box-shadow 160ms ease,
+    opacity 160ms ease;
+}
+
+.search-submit:hover {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.34),
+    0 14px 26px color-mix(in srgb, var(--accent) 26%, transparent);
+  transform: translateY(-50%) scale(1.02);
+}
+
 input,
 textarea,
 select {
@@ -358,6 +389,7 @@ select:focus {
   border-radius: 24px;
   border-color: color-mix(in srgb, var(--accent-3) 18%, var(--line-strong));
   padding-left: 58px;
+  padding-right: 104px;
   font-size: 17px;
   background:
     linear-gradient(135deg, color-mix(in srgb, var(--surface) 96%, transparent), color-mix(in srgb, var(--surface-2) 86%, transparent)),
@@ -380,7 +412,7 @@ select:focus {
     inset 0 1px 0 rgba(255, 255, 255, 0.52),
     0 24px 58px rgba(0, 0, 0, 0.18),
     0 0 42px color-mix(in srgb, var(--accent-3) 24%, transparent);
-  transform: translateY(-2px);
+  transform: none;
 }
 
 .view-toggle {
@@ -413,13 +445,13 @@ select:focus {
 
 .filter-details,
 .content-area {
-  border: 1px solid var(--line);
+  border: 1px solid color-mix(in srgb, var(--line) 82%, transparent);
   border-radius: 28px;
   background: var(--surface-alpha);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.34),
+    inset 0 1px 0 rgba(255, 255, 255, 0.28),
     var(--shadow);
-  backdrop-filter: blur(22px) saturate(1.16);
+  backdrop-filter: blur(22px) saturate(1.05);
 }
 
 .filter-details {
@@ -436,6 +468,14 @@ select:focus {
   display: grid;
   gap: 18px;
   margin-top: 15px;
+}
+
+.utility-row {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
 }
 
 .filter-label,
@@ -484,6 +524,23 @@ label,
 .chip.active {
   border-color: color-mix(in srgb, var(--accent-3) 42%, var(--accent));
   background: linear-gradient(135deg, color-mix(in srgb, var(--accent-3) 18%, transparent), color-mix(in srgb, var(--accent-2) 18%, transparent));
+  color: var(--ink);
+}
+
+.subtle-button {
+  min-height: 30px;
+  border: 0;
+  border-radius: 8px;
+  padding: 0 8px;
+  background: transparent;
+  color: color-mix(in srgb, var(--muted) 78%, transparent);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 760;
+}
+
+.subtle-button:hover {
+  background: color-mix(in srgb, var(--soft-button) 72%, transparent);
   color: var(--ink);
 }
 
@@ -550,20 +607,18 @@ label,
   display: grid;
   min-height: 190px;
   gap: 11px;
-  border: 1px solid color-mix(in srgb, var(--line-strong) 72%, transparent);
-  border-radius: 24px;
+  border: 1px solid color-mix(in srgb, var(--line-strong) 62%, transparent);
+  border-radius: 22px;
   padding: 17px;
   background:
-    radial-gradient(circle at 72% 22%, color-mix(in srgb, var(--accent-3) 18%, transparent), transparent 28%),
-    radial-gradient(circle at 18% 92%, color-mix(in srgb, var(--accent-hot) 14%, transparent), transparent 34%),
-    linear-gradient(145deg, color-mix(in srgb, var(--surface) 98%, transparent), color-mix(in srgb, var(--surface-2) 92%, transparent)),
+    linear-gradient(145deg, color-mix(in srgb, var(--surface-solid) 74%, transparent), color-mix(in srgb, var(--surface-2) 94%, transparent)),
     var(--surface);
-  backdrop-filter: blur(18px) saturate(1.14);
+  backdrop-filter: blur(18px) saturate(1.06);
   text-align: left;
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.34),
     inset 0 -1px 0 rgba(255, 255, 255, 0.06),
-    0 16px 34px rgba(0, 0, 0, 0.12),
+    0 16px 34px rgba(0, 0, 0, 0.09),
     0 2px 4px rgba(0, 0, 0, 0.06);
   transition:
     transform 180ms ease,
@@ -572,12 +627,11 @@ label,
 }
 
 .prompt-card:hover {
-  border-color: color-mix(in srgb, var(--accent-3) 56%, var(--accent));
+  border-color: color-mix(in srgb, var(--accent-3) 34%, var(--line-strong));
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.42),
-    0 24px 54px rgba(0, 0, 0, 0.2),
-    0 0 36px color-mix(in srgb, var(--accent-3) 18%, transparent);
-  transform: translateY(-4px);
+    inset 0 1px 0 rgba(255, 255, 255, 0.36),
+    0 24px 50px rgba(0, 0, 0, 0.15);
+  transform: translateY(-3px);
 }
 
 .card-top {
@@ -639,6 +693,7 @@ label,
   margin: 0;
   font-size: 21px;
   line-height: 1.32;
+  font-weight: 860;
 }
 
 .prompt-card p {
@@ -678,7 +733,7 @@ label,
 .card-actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 7px;
+  gap: 6px;
   margin-top: auto;
 }
 
@@ -695,12 +750,26 @@ label,
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 38px;
-  height: 38px;
+  width: 34px;
+  height: 34px;
+  min-height: 34px;
   padding: 0;
-  border-radius: 12px;
-  font-size: 15px;
+  border-color: color-mix(in srgb, var(--line) 58%, transparent);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--soft-button) 44%, transparent);
+  color: color-mix(in srgb, var(--muted) 70%, transparent);
+  font-size: 14px;
   line-height: 1;
+  box-shadow: none;
+  opacity: 0.72;
+}
+
+.tool-button:hover {
+  border-color: color-mix(in srgb, var(--accent) 24%, var(--line));
+  background: color-mix(in srgb, var(--surface-solid) 56%, transparent);
+  color: color-mix(in srgb, var(--ink) 72%, var(--muted));
+  opacity: 1;
+  box-shadow: 0 8px 18px rgba(31, 42, 58, 0.08);
 }
 
 .tool-button::after {
@@ -736,10 +805,10 @@ label,
   justify-content: center;
   width: 34px;
   height: 34px;
-  border: 1px solid var(--line);
+  border: 1px solid color-mix(in srgb, var(--line) 70%, transparent);
   border-radius: 8px;
   background: var(--soft-button);
-  color: color-mix(in srgb, var(--muted) 70%, transparent);
+  color: color-mix(in srgb, var(--muted) 60%, transparent);
   cursor: pointer;
   font-size: 19px;
   line-height: 1;
@@ -863,6 +932,14 @@ label,
     inset 0 1px 0 rgba(255, 255, 255, 0.42),
     0 26px 70px rgba(24, 31, 28, 0.2),
     0 8px 18px rgba(24, 31, 28, 0.08);
+}
+
+.search-highlight {
+  border-radius: 5px;
+  padding: 0 2px;
+  background: color-mix(in srgb, #f7d86a 42%, transparent);
+  color: inherit;
+  box-shadow: 0 0 0 1px color-mix(in srgb, #f7d86a 18%, transparent);
 }
 
 .preview-card h3 {
@@ -1192,6 +1269,15 @@ label,
   .search-hero {
     top: 8px;
     width: calc(100% - 24px);
+  }
+
+  .search-submit {
+    min-width: 62px;
+    padding: 0 12px;
+  }
+
+  .search-box input {
+    padding-right: 86px;
   }
 
   .layout {

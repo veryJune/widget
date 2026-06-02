@@ -34,7 +34,8 @@
       <section class="search-hero" aria-label="검색">
         <label class="search-box">
           <span class="search-icon">⌕</span>
-          <input id="searchInput" type="search" placeholder="무엇을 하려고 하나요? 예: 회의록 요약, 상세페이지 작성" />
+          <input id="searchInput" type="search" placeholder="프롬프트 검색" />
+          <button class="search-submit" id="searchBtn" type="button">검색</button>
         </label>
       </section>
 
@@ -66,6 +67,9 @@
                 </select>
               </label>
             </div>
+            <div class="utility-row">
+              <button class="subtle-button" id="resetSampleBtn" type="button">샘플 복원</button>
+            </div>
           </details>
         </section>
 
@@ -75,7 +79,6 @@
               <h2>보관함</h2>
               <p id="resultCount">0개 항목</p>
             </div>
-            <button class="text-button" id="resetSampleBtn" type="button">샘플 다시 불러오기</button>
           </div>
 
           <div id="favoriteSection" class="dock-section"></div>

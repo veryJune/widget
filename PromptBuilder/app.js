@@ -139,6 +139,7 @@ const $ = (selector) => document.querySelector(selector);
 
 const elements = {
   search: $("#searchInput"),
+  searchBtn: $("#searchBtn"),
   platformFilters: $("#platformFilters"),
   categoryFilters: $("#categoryFilters"),
   sort: $("#sortSelect"),
@@ -203,6 +204,13 @@ function bindEvents() {
     filters.query = elements.search.value.trim();
     renderItems();
   });
+  elements.search.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      runSearch();
+    }
+  });
+  elements.searchBtn.addEventListener("click", runSearch);
 
   elements.sort.addEventListener("change", () => {
     filters.sort = elements.sort.value;
@@ -261,6 +269,9 @@ function bindEvents() {
   elements.downloadJsonBtn.addEventListener("click", exportJson);
   elements.downloadCsvBtn.addEventListener("click", exportCsv);
   elements.closeDetailBtn.addEventListener("click", () => elements.detailDialog.close());
+  bindBackdropClose(elements.itemDialog);
+  bindBackdropClose(elements.categoryDialog);
+  bindBackdropClose(elements.exportDialog);
   bindBackdropClose(elements.detailDialog);
 
   elements.resetSampleBtn.addEventListener("click", () => {
@@ -285,8 +296,9 @@ function loadState() {
 
 function normalizeState(input) {
   const items = Array.isArray(input?.items) ? input.items : Array.isArray(input) ? input : sampleItems;
-  const discoveredCategories = [...new Set(items.flatMap((item) => item.categories || []))];
-  const categories = [...new Set([...(input?.categories || DEFAULT_CATEGORIES), ...discoveredCategories])].filter(Boolean);
+  const discoveredCategories = [...new Set(items.flatMap((item) => splitList(item.categories)))];
+  const inputCategories = Array.isArray(input?.categories) ? input.categories : splitList(input?.categories);
+  const categories = [...new Set([...(inputCategories.length ? inputCategories : DEFAULT_CATEGORIES), ...discoveredCategories])].filter(Boolean);
   return {
     categories,
     items: items.map(normalizeItem),
@@ -301,7 +313,7 @@ function normalizeItem(item) {
     title: String(item.title || "제목 없음").trim(),
     type: item.type || "text_prompt",
     platform,
-    categories: Array.isArray(item.categories) ? item.categories.filter(Boolean) : [],
+    categories: Array.isArray(item.categories) ? item.categories.filter(Boolean) : splitList(item.categories),
     tags: Array.isArray(item.tags) ? item.tags.filter(Boolean) : splitList(item.tags),
     summary: item.summary || "",
     useCase: item.useCase || "",
@@ -374,6 +386,12 @@ function renderFilters() {
   bindCategoryFilterDrag();
 }
 
+function runSearch() {
+  filters.query = elements.search.value.trim();
+  renderItems();
+  elements.search.focus();
+}
+
 function renderItems() {
   const visible = getVisibleItems();
   elements.resultCount.textContent = `${visible.length}개 항목`;
@@ -417,60 +435,67 @@ function sortItems(a, b) {
 
 function renderCard(item) {
   const summary = item.summary || item.useCase || item.prompt || item.url || "요약을 추가하면 더 빠르게 찾을 수 있습니다.";
+  const id = escapeAttribute(item.id);
+  const platformName = escapeHtml(item.platform);
+  const platformBadgeClass = platformClass[item.platform] || platformClass.Other;
   return `
-    <article class="prompt-card" data-id="${item.id}" tabindex="0">
+    <article class="prompt-card" data-id="${id}" tabindex="0">
       <div class="card-top">
-        <span class="platform-badge ${platformClass[item.platform]}">${escapeHtml(item.platform)}</span>
-        <button class="star-button ${item.favorite ? "active" : ""}" data-action="favorite" data-id="${item.id}" type="button" aria-label="${item.favorite ? "즐겨찾기 해제" : "즐겨찾기"}">${item.favorite ? "★" : "☆"}</button>
+        <span class="platform-badge ${platformBadgeClass}">${platformName}</span>
+        <button class="star-button ${item.favorite ? "active" : ""}" data-action="favorite" data-id="${id}" type="button" aria-label="${item.favorite ? "즐겨찾기 해제" : "즐겨찾기"}">${item.favorite ? "★" : "☆"}</button>
       </div>
       <div>
-        <h3>${escapeHtml(item.title)}</h3>
-        <p>${escapeHtml(shorten(summary, 74))}</p>
+        <h3>${highlightMatches(item.title)}</h3>
+        <p>${highlightMatches(shorten(summary, 74))}</p>
       </div>
       <div class="meta-line">${item.categories.slice(0, 3).map((category) => `<span class="category-pill">${escapeHtml(category)}</span>`).join("")}</div>
       <div class="card-actions">
-        ${item.prompt ? `<button class="tool-button" data-action="copy" data-id="${item.id}" type="button" aria-label="프롬프트 복사">⧉</button>` : ""}
-        ${item.url ? `<button class="tool-button" data-action="open" data-id="${item.id}" type="button" aria-label="링크 열기">↗</button>` : ""}
-        ${item.url ? `<button class="tool-button" data-action="copyLink" data-id="${item.id}" type="button" aria-label="링크 복사">⌁</button>` : ""}
-        <button class="tool-button" data-action="detail" data-id="${item.id}" type="button" aria-label="상세 보기">i</button>
-        <button class="tool-button" data-action="edit" data-id="${item.id}" type="button" aria-label="편집">✎</button>
+        ${item.prompt ? `<button class="tool-button" data-action="copy" data-id="${id}" type="button" aria-label="프롬프트 복사">⧉</button>` : ""}
+        ${item.url ? `<button class="tool-button" data-action="open" data-id="${id}" type="button" aria-label="링크 열기">↗</button>` : ""}
+        ${item.url ? `<button class="tool-button" data-action="copyLink" data-id="${id}" type="button" aria-label="링크 복사">⌁</button>` : ""}
+        <button class="tool-button" data-action="detail" data-id="${id}" type="button" aria-label="상세 보기">i</button>
+        <button class="tool-button" data-action="edit" data-id="${id}" type="button" aria-label="편집">✎</button>
       </div>
     </article>
   `;
 }
 
 function renderListRow(item) {
+  const id = escapeAttribute(item.id);
+  const platformBadgeClass = platformClass[item.platform] || platformClass.Other;
   return `
-    <article class="list-row" data-id="${item.id}" tabindex="0">
+    <article class="list-row" data-id="${id}" tabindex="0">
       <div class="row-title">
-        <strong>${escapeHtml(item.title)}</strong>
-        <small>${escapeHtml(item.summary || item.useCase || "요약 없음")}</small>
+        <strong>${highlightMatches(item.title)}</strong>
+        <small>${highlightMatches(item.summary || item.useCase || "요약 없음")}</small>
       </div>
-      <span class="platform-badge ${platformClass[item.platform]}">${escapeHtml(item.platform)}</span>
+      <span class="platform-badge ${platformBadgeClass}">${escapeHtml(item.platform)}</span>
       <div class="meta-line">${item.categories.slice(0, 2).map((category) => `<span class="category-pill">${escapeHtml(category)}</span>`).join("")}</div>
       <div class="row-actions">
-        <button class="star-button ${item.favorite ? "active" : ""}" data-action="favorite" data-id="${item.id}" type="button" aria-label="${item.favorite ? "즐겨찾기 해제" : "즐겨찾기"}">${item.favorite ? "★" : "☆"}</button>
-        ${item.prompt ? `<button class="tool-button" data-action="copy" data-id="${item.id}" type="button" aria-label="프롬프트 복사">⧉</button>` : ""}
-        ${item.url ? `<button class="tool-button" data-action="open" data-id="${item.id}" type="button" aria-label="링크 열기">↗</button>` : ""}
-        ${item.url ? `<button class="tool-button" data-action="copyLink" data-id="${item.id}" type="button" aria-label="링크 복사">⌁</button>` : ""}
-        <button class="tool-button" data-action="detail" data-id="${item.id}" type="button" aria-label="상세 보기">i</button>
-        <button class="tool-button" data-action="edit" data-id="${item.id}" type="button" aria-label="편집">✎</button>
+        <button class="star-button ${item.favorite ? "active" : ""}" data-action="favorite" data-id="${id}" type="button" aria-label="${item.favorite ? "즐겨찾기 해제" : "즐겨찾기"}">${item.favorite ? "★" : "☆"}</button>
+        ${item.prompt ? `<button class="tool-button" data-action="copy" data-id="${id}" type="button" aria-label="프롬프트 복사">⧉</button>` : ""}
+        ${item.url ? `<button class="tool-button" data-action="open" data-id="${id}" type="button" aria-label="링크 열기">↗</button>` : ""}
+        ${item.url ? `<button class="tool-button" data-action="copyLink" data-id="${id}" type="button" aria-label="링크 복사">⌁</button>` : ""}
+        <button class="tool-button" data-action="detail" data-id="${id}" type="button" aria-label="상세 보기">i</button>
+        <button class="tool-button" data-action="edit" data-id="${id}" type="button" aria-label="편집">✎</button>
       </div>
     </article>
   `;
 }
 
 function renderCompactRow(item) {
+  const id = escapeAttribute(item.id);
+  const platformBadgeClass = platformClass[item.platform] || platformClass.Other;
   return `
-    <article class="compact-row" data-id="${item.id}" tabindex="0">
-      <div class="row-title"><strong>${escapeHtml(item.title)}</strong><small>${escapeHtml(item.summary || item.useCase || "")}</small></div>
-      <span class="platform-badge ${platformClass[item.platform]}">${escapeHtml(item.platform)}</span>
+    <article class="compact-row" data-id="${id}" tabindex="0">
+      <div class="row-title"><strong>${highlightMatches(item.title)}</strong><small>${highlightMatches(item.summary || item.useCase || "")}</small></div>
+      <span class="platform-badge ${platformBadgeClass}">${escapeHtml(item.platform)}</span>
       <div class="meta-line">${item.categories.slice(0, 2).map((category) => `<span class="category-pill">${escapeHtml(category)}</span>`).join("")}</div>
       <div class="row-actions">
-        <button class="star-button ${item.favorite ? "active" : ""}" data-action="favorite" data-id="${item.id}" type="button" aria-label="${item.favorite ? "즐겨찾기 해제" : "즐겨찾기"}">${item.favorite ? "★" : "☆"}</button>
-        ${item.prompt ? `<button class="tool-button" data-action="copy" data-id="${item.id}" type="button" aria-label="프롬프트 복사">⧉</button>` : ""}
-        ${item.url ? `<button class="tool-button" data-action="open" data-id="${item.id}" type="button" aria-label="링크 열기">↗</button>` : ""}
-        ${item.url ? `<button class="tool-button" data-action="copyLink" data-id="${item.id}" type="button" aria-label="링크 복사">⌁</button>` : ""}
+        <button class="star-button ${item.favorite ? "active" : ""}" data-action="favorite" data-id="${id}" type="button" aria-label="${item.favorite ? "즐겨찾기 해제" : "즐겨찾기"}">${item.favorite ? "★" : "☆"}</button>
+        ${item.prompt ? `<button class="tool-button" data-action="copy" data-id="${id}" type="button" aria-label="프롬프트 복사">⧉</button>` : ""}
+        ${item.url ? `<button class="tool-button" data-action="open" data-id="${id}" type="button" aria-label="링크 열기">↗</button>` : ""}
+        ${item.url ? `<button class="tool-button" data-action="copyLink" data-id="${id}" type="button" aria-label="링크 복사">⌁</button>` : ""}
       </div>
     </article>
   `;
@@ -513,10 +538,12 @@ function attachItemEvents() {
 function showHoverPreview(item, anchor, pointerEvent = null) {
   window.clearTimeout(hoverTimer);
   const variables = extractVariables(item.prompt);
+  const id = escapeAttribute(item.id);
+  const platformBadgeClass = platformClass[item.platform] || platformClass.Other;
   elements.hoverPreview.innerHTML = `
     <div class="preview-card">
       <div class="card-top">
-        <span class="platform-badge ${platformClass[item.platform]}">${escapeHtml(item.platform)}</span>
+        <span class="platform-badge ${platformBadgeClass}">${escapeHtml(item.platform)}</span>
         <span class="type-badge">${escapeHtml(typeLabel(item.type))}</span>
       </div>
       <h3>${escapeHtml(item.title)}</h3>
@@ -526,10 +553,10 @@ function showHoverPreview(item, anchor, pointerEvent = null) {
       ${item.prompt ? `<div class="preview-section"><strong>프롬프트</strong><p>${escapeHtml(shorten(item.prompt, 170))}</p></div>` : ""}
       ${item.url ? `<div class="preview-section"><strong>링크</strong><p>${escapeHtml(shorten(item.url, 80))}</p></div>` : ""}
       <div class="card-actions preview-actions">
-        ${item.prompt ? `<button class="tool-button" data-preview-copy="${item.id}" type="button" aria-label="프롬프트 복사">⧉</button>` : ""}
-        ${item.url ? `<button class="tool-button" data-preview-open="${item.id}" type="button" aria-label="링크 열기">↗</button>` : ""}
-        ${item.url ? `<button class="tool-button" data-preview-link-copy="${item.id}" type="button" aria-label="링크 복사">⌁</button>` : ""}
-        <button class="tool-button" data-preview-detail="${item.id}" type="button" aria-label="상세 보기">i</button>
+        ${item.prompt ? `<button class="tool-button" data-preview-copy="${id}" type="button" aria-label="프롬프트 복사">⧉</button>` : ""}
+        ${item.url ? `<button class="tool-button" data-preview-open="${id}" type="button" aria-label="링크 열기">↗</button>` : ""}
+        ${item.url ? `<button class="tool-button" data-preview-link-copy="${id}" type="button" aria-label="링크 복사">⌁</button>` : ""}
+        <button class="tool-button" data-preview-detail="${id}" type="button" aria-label="상세 보기">i</button>
       </div>
     </div>
   `;
@@ -749,18 +776,21 @@ function deleteCurrentItem() {
 }
 
 function openDetail(item) {
+  if (!item) return;
   const variables = extractVariables(item.prompt);
   const similar = getSimilarItems(item).slice(0, 4);
+  const id = escapeAttribute(item.id);
+  const platformBadgeClass = platformClass[item.platform] || platformClass.Other;
   elements.detailTitle.textContent = item.title;
   elements.detailBody.innerHTML = `
     <div class="detail-grid">
       <div class="detail-panel">
         <div class="card-top">
           <div class="meta-line">
-            <span class="platform-badge ${platformClass[item.platform]}">${escapeHtml(item.platform)}</span>
+            <span class="platform-badge ${platformBadgeClass}">${escapeHtml(item.platform)}</span>
             <span class="type-badge">${escapeHtml(typeLabel(item.type))}</span>
           </div>
-          <button class="star-button ${item.favorite ? "active" : ""}" data-detail-favorite="${item.id}" type="button">${item.favorite ? "★" : "☆"}</button>
+          <button class="star-button ${item.favorite ? "active" : ""}" data-detail-favorite="${id}" type="button">${item.favorite ? "★" : "☆"}</button>
         </div>
         <p>${escapeHtml(item.summary || item.useCase || "요약 없음")}</p>
         <div class="meta-line">${item.categories.map((category) => `<span class="category-pill">${escapeHtml(category)}</span>`).join("")}</div>
@@ -775,15 +805,15 @@ function openDetail(item) {
       ${similar.length ? `<div class="detail-panel"><h3>비슷한 항목</h3><div class="similar-list">${similar.map(renderSimilarItem).join("")}</div></div>` : ""}
 
       <div class="card-actions">
-        ${item.prompt ? `<button class="primary-action" data-detail-copy="${item.id}" type="button">완성된 프롬프트 복사</button>` : ""}
-        ${item.url ? `<button class="secondary-action" data-detail-open="${item.id}" type="button">링크 열기</button>` : ""}
-        ${item.url ? `<button class="secondary-action" data-detail-link-copy="${item.id}" type="button">링크 복사</button>` : ""}
-        <button class="secondary-action" data-detail-edit="${item.id}" type="button">편집</button>
+        ${item.prompt ? `<button class="primary-action" data-detail-copy="${id}" type="button">완성된 프롬프트 복사</button>` : ""}
+        ${item.url ? `<button class="secondary-action" data-detail-open="${id}" type="button">링크 열기</button>` : ""}
+        ${item.url ? `<button class="secondary-action" data-detail-link-copy="${id}" type="button">링크 복사</button>` : ""}
+        <button class="secondary-action" data-detail-edit="${id}" type="button">편집</button>
       </div>
     </div>
   `;
   bindDetailEvents(item);
-  elements.detailDialog.showModal();
+  if (!elements.detailDialog.open) elements.detailDialog.showModal();
 }
 
 function renderVariablePanel(item, variables) {
@@ -803,13 +833,14 @@ function renderVariablePanel(item, variables) {
 }
 
 function renderSimilarItem(item) {
+  const id = escapeAttribute(item.id);
   return `
     <div class="similar-item">
       <div class="row-title">
         <strong>${escapeHtml(item.title)}</strong>
         <small>${escapeHtml(item.platform)} · ${escapeHtml(item.categories.slice(0, 2).join(", "))}</small>
       </div>
-      <button class="action-button" data-similar-open="${item.id}" type="button">보기</button>
+      <button class="action-button" data-similar-open="${id}" type="button">보기</button>
     </div>
   `;
 }
@@ -1097,6 +1128,7 @@ async function importFile(event) {
 function importCsvText(text) {
   const rows = parseCsv(text);
   const [headers, ...body] = rows;
+  if (!headers?.length) return { categories: DEFAULT_CATEGORIES, items: [] };
   const items = body.filter((row) => row.some(Boolean)).map((row) => {
     const record = Object.fromEntries(headers.map((header, index) => [header, row[index] || ""]));
     return {
@@ -1242,6 +1274,30 @@ function shorten(text, length) {
   const value = String(text || "");
   if (value.length <= length) return value;
   return `${value.slice(0, length - 1)}...`;
+}
+
+function highlightMatches(text) {
+  const value = String(text ?? "");
+  const terms = getHighlightTerms();
+  if (!terms.length) return escapeHtml(value);
+  const pattern = new RegExp(`(${terms.map(escapeRegExp).join("|")})`, "gi");
+  return value.split(pattern).map((part) => {
+    if (!part) return "";
+    const matched = terms.some((term) => part.toLowerCase() === term.toLowerCase());
+    return matched ? `<mark class="search-highlight">${escapeHtml(part)}</mark>` : escapeHtml(part);
+  }).join("");
+}
+
+function getHighlightTerms() {
+  const query = String(filters.query || "").trim();
+  if (!query) return [];
+  return [...new Set(query.split(/\s+/).concat(query).map((term) => term.trim()).filter(Boolean))]
+    .sort((a, b) => b.length - a.length)
+    .slice(0, 8);
+}
+
+function escapeRegExp(text) {
+  return String(text).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 function escapeHtml(text) {
