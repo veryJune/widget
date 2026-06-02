@@ -1,7 +1,10 @@
 const STORAGE_KEY = "prompt-dock-v1";
 const THEME_KEY = "prompt-dock-theme";
-const SYNC_CONFIG_KEY = "prompt-dock-sync-config";
-const SYNC_FILE_NAME = "prompt-dock-data.json";
+const SYNC_CONFIG_KEY = "prompt-dock-google-drive-sync";
+const SYNC_FILE_NAME = "promptbuilder-data.json";
+const DEFAULT_SYNC_FOLDER_PATH = "8 Vibe coding / GitHub / PromptBuilder";
+const GOOGLE_IDENTITY_SCRIPT = "https://accounts.google.com/gsi/client";
+const GOOGLE_DRIVE_SCOPE = "https://www.googleapis.com/auth/drive.file";
 const PLATFORM_ORDER = ["Any", "GPTs", "Gems", "Perplexity", "ChatGPT", "Gemini", "Claude", "Other"];
 const DEFAULT_CATEGORIES = ["요약", "글쓰기", "리서치", "업무", "코딩", "마케팅", "이미지", "학습"];
 
@@ -141,6 +144,10 @@ let suppressCategoryClick = false;
 let syncConfig = loadSyncConfig();
 let syncTimer = null;
 let applyingRemoteState = false;
+let googleTokenClient = null;
+let googleAccessToken = "";
+let googleTokenExpiresAt = 0;
+let syncPullTimer = null;
 
 const $ = (selector) => document.querySelector(selector);
 
@@ -204,10 +211,10 @@ const elements = {
   summaryCategoryList: $("#summaryCategoryList"),
   syncDialog: $("#syncDialog"),
   closeSyncBtn: $("#closeSyncBtn"),
-  syncTokenInput: $("#syncTokenInput"),
-  syncGistInput: $("#syncGistInput"),
+  syncClientInput: $("#syncClientInput"),
+  syncFolderInput: $("#syncFolderInput"),
   syncAutoInput: $("#syncAutoInput"),
-  createSyncBtn: $("#createSyncBtn"),
+  connectDriveBtn: $("#connectDriveBtn"),
   pullSyncBtn: $("#pullSyncBtn"),
   pushSyncBtn: $("#pushSyncBtn"),
   syncStatusText: $("#syncStatusText"),
@@ -294,10 +301,10 @@ function bindEvents() {
   elements.downloadCsvBtn.addEventListener("click", exportCsv);
   elements.closeDetailBtn.addEventListener("click", () => elements.detailDialog.close());
   elements.closeSyncBtn.addEventListener("click", () => elements.syncDialog.close());
-  elements.createSyncBtn.addEventListener("click", createSyncGist);
+  elements.connectDriveBtn.addEventListener("click", connectGoogleDrive);
   elements.pullSyncBtn.addEventListener("click", pullSync);
   elements.pushSyncBtn.addEventListener("click", () => pushSync({ force: true }));
-  [elements.syncTokenInput, elements.syncGistInput, elements.syncAutoInput].forEach((input) => {
+  [elements.syncClientInput, elements.syncFolderInput, elements.syncAutoInput].forEach((input) => {
     input.addEventListener("change", saveSyncConfigFromForm);
   });
   bindBackdropClose(elements.itemDialog);
@@ -377,14 +384,16 @@ function loadSyncConfig() {
   try {
     const stored = JSON.parse(localStorage.getItem(SYNC_CONFIG_KEY) || "{}");
     return {
-      token: stored.token || "",
-      gistId: stored.gistId || "",
+      clientId: stored.clientId || "",
+      folderPath: stored.folderPath || DEFAULT_SYNC_FOLDER_PATH,
+      folderId: stored.folderId || "",
+      fileId: stored.fileId || "",
       autoSync: Boolean(stored.autoSync),
       lastPulledAt: stored.lastPulledAt || "",
       lastPushedAt: stored.lastPushedAt || "",
     };
   } catch {
-    return { token: "", gistId: "", autoSync: false, lastPulledAt: "", lastPushedAt: "" };
+    return { clientId: "", folderPath: DEFAULT_SYNC_FOLDER_PATH, folderId: "", fileId: "", autoSync: false, lastPulledAt: "", lastPushedAt: "" };
   }
 }
 
@@ -394,54 +403,86 @@ function saveSyncConfig() {
 
 function initAutoSync() {
   updateSyncStatus();
-  if (syncConfig.autoSync && syncConfig.token && syncConfig.gistId) {
-    window.setTimeout(() => pullSync({ silent: true }), 500);
-    window.setInterval(() => pullSync({ silent: true, onlyNewer: true }), 90000);
+  if (syncConfig.autoSync && syncConfig.clientId && syncConfig.fileId) {
+    startAutoPullTimer();
   }
 }
 
 function openSyncDialog() {
-  elements.syncTokenInput.value = syncConfig.token;
-  elements.syncGistInput.value = syncConfig.gistId;
+  elements.syncClientInput.value = syncConfig.clientId;
+  elements.syncFolderInput.value = syncConfig.folderPath || DEFAULT_SYNC_FOLDER_PATH;
   elements.syncAutoInput.checked = syncConfig.autoSync;
   updateSyncStatus();
   showDialog(elements.syncDialog);
-  elements.syncTokenInput.focus();
+  elements.syncClientInput.focus();
 }
 
 function saveSyncConfigFromForm() {
+  const nextClientId = elements.syncClientInput.value.trim();
+  const nextFolderPath = normalizeDrivePath(elements.syncFolderInput.value);
+  const clientChanged = nextClientId !== syncConfig.clientId;
+  const folderChanged = nextFolderPath !== syncConfig.folderPath;
   syncConfig = {
     ...syncConfig,
-    token: elements.syncTokenInput.value.trim(),
-    gistId: elements.syncGistInput.value.trim(),
+    clientId: nextClientId,
+    folderPath: nextFolderPath,
+    folderId: clientChanged || folderChanged ? "" : syncConfig.folderId,
+    fileId: clientChanged || folderChanged ? "" : syncConfig.fileId,
     autoSync: elements.syncAutoInput.checked,
   };
+  if (clientChanged) {
+    googleTokenClient = null;
+    googleAccessToken = "";
+    googleTokenExpiresAt = 0;
+  }
+  if (!syncConfig.autoSync && syncPullTimer) {
+    window.clearInterval(syncPullTimer);
+    syncPullTimer = null;
+  }
   saveSyncConfig();
+  startAutoPullTimer();
   updateSyncStatus();
 }
 
 function updateSyncStatus(message = "") {
   if (elements.syncBtn) {
-    elements.syncBtn.classList.toggle("active", Boolean(syncConfig.gistId));
+    elements.syncBtn.classList.toggle("active", Boolean(syncConfig.fileId));
   }
   if (!elements.syncStatusText) return;
   if (message) {
     elements.syncStatusText.textContent = message;
     return;
   }
-  if (!syncConfig.gistId) {
-    elements.syncStatusText.textContent = "동기화 설정 없음";
+  if (!syncConfig.clientId) {
+    elements.syncStatusText.textContent = "Google OAuth Client ID를 입력해주세요.";
+    return;
+  }
+  if (!syncConfig.fileId) {
+    elements.syncStatusText.textContent = "Google Drive 연결 전";
     return;
   }
   const pushed = syncConfig.lastPushedAt ? `저장 ${formatSyncTime(syncConfig.lastPushedAt)}` : "";
   const pulled = syncConfig.lastPulledAt ? `불러옴 ${formatSyncTime(syncConfig.lastPulledAt)}` : "";
-  elements.syncStatusText.textContent = [pushed, pulled].filter(Boolean).join(" · ") || "동기화 준비됨";
+  elements.syncStatusText.textContent = [pushed, pulled].filter(Boolean).join(" · ") || "Google Drive 연결됨";
 }
 
 function scheduleAutoSync() {
-  if (applyingRemoteState || !syncConfig.autoSync || !syncConfig.token || !syncConfig.gistId) return;
+  if (applyingRemoteState || !syncConfig.autoSync || !googleAccessToken || !syncConfig.fileId) return;
   window.clearTimeout(syncTimer);
   syncTimer = window.setTimeout(() => pushSync({ silent: true }), 1200);
+}
+
+function startAutoPullTimer() {
+  if (syncPullTimer || !syncConfig.autoSync || !syncConfig.fileId) return;
+  syncPullTimer = window.setInterval(() => pullSync({ silent: true, onlyNewer: true }), 90000);
+}
+
+function normalizeDrivePath(value) {
+  return String(value || "")
+    .split("/")
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .join(" / ") || DEFAULT_SYNC_FOLDER_PATH;
 }
 
 function getSyncPayload() {
@@ -455,32 +496,20 @@ function getSyncPayload() {
   };
 }
 
-async function createSyncGist() {
+async function connectGoogleDrive() {
   saveSyncConfigFromForm();
-  if (!syncConfig.token) {
-    updateSyncStatus("GitHub 토큰을 먼저 입력해주세요.");
+  if (!syncConfig.clientId) {
+    updateSyncStatus("Google OAuth Client ID를 먼저 입력해주세요.");
     return;
   }
   setSyncBusy(true);
   try {
-    const data = await requestGist("/gists", {
-      method: "POST",
-      body: JSON.stringify({
-        description: "PromptBuilder sync data",
-        public: false,
-        files: {
-          [SYNC_FILE_NAME]: {
-            content: JSON.stringify(getSyncPayload(), null, 2),
-          },
-        },
-      }),
-    });
-    syncConfig.gistId = data.id;
-    syncConfig.lastPushedAt = new Date().toISOString();
+    await ensureGoogleAccessToken({ interactive: true });
+    await ensureDriveDataFile();
     saveSyncConfig();
-    elements.syncGistInput.value = syncConfig.gistId;
-    updateSyncStatus("새 동기화 저장소를 만들었습니다.");
-    showToast("동기화 저장소를 만들었습니다.");
+    startAutoPullTimer();
+    updateSyncStatus("Google Drive에 연결했습니다.");
+    showToast("Google Drive에 연결했습니다.");
   } catch (error) {
     handleSyncError(error);
   } finally {
@@ -490,19 +519,15 @@ async function createSyncGist() {
 
 async function pullSync(options = {}) {
   if (!options.silent) saveSyncConfigFromForm();
-  if (!syncConfig.token || !syncConfig.gistId) {
-    if (!options.silent) updateSyncStatus("GitHub 토큰과 Gist ID가 필요합니다.");
+  if (!syncConfig.clientId) {
+    if (!options.silent) updateSyncStatus("Google OAuth Client ID가 필요합니다.");
     return;
   }
   setSyncBusy(true);
   try {
-    const data = await requestGist(`/gists/${encodeURIComponent(syncConfig.gistId)}`);
-    let content = data.files?.[SYNC_FILE_NAME]?.content || "";
-    if (!content && data.files?.[SYNC_FILE_NAME]?.raw_url) {
-      const rawResponse = await fetch(data.files[SYNC_FILE_NAME].raw_url);
-      if (!rawResponse.ok) throw new Error(`RAW_${rawResponse.status}`);
-      content = await rawResponse.text();
-    }
+    await ensureGoogleAccessToken({ interactive: !options.silent });
+    await ensureDriveDataFile();
+    const content = await requestDriveText(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(syncConfig.fileId)}?alt=media`);
     if (!content) throw new Error("EMPTY_SYNC_FILE");
     const remoteState = normalizeState(JSON.parse(content));
     if (options.onlyNewer && compareDate(remoteState.updatedAt, state.updatedAt) <= 0) return;
@@ -513,8 +538,8 @@ async function pullSync(options = {}) {
     syncConfig.lastPulledAt = new Date().toISOString();
     saveSyncConfig();
     render();
-    updateSyncStatus(options.silent ? "" : "온라인 데이터를 불러왔습니다.");
-    if (!options.silent) showToast("온라인 데이터를 불러왔습니다.");
+    updateSyncStatus(options.silent ? "" : "Google Drive 데이터를 불러왔습니다.");
+    if (!options.silent) showToast("Google Drive 데이터를 불러왔습니다.");
   } catch (error) {
     applyingRemoteState = false;
     if (!options.silent) handleSyncError(error);
@@ -525,26 +550,23 @@ async function pullSync(options = {}) {
 
 async function pushSync(options = {}) {
   if (!options.silent) saveSyncConfigFromForm();
-  if (!syncConfig.token || !syncConfig.gistId) {
-    if (!options.silent) updateSyncStatus("GitHub 토큰과 Gist ID가 필요합니다.");
+  if (!syncConfig.clientId) {
+    if (!options.silent) updateSyncStatus("Google OAuth Client ID가 필요합니다.");
     return;
   }
   setSyncBusy(true);
   try {
-    await requestGist(`/gists/${encodeURIComponent(syncConfig.gistId)}`, {
+    await ensureGoogleAccessToken({ interactive: !options.silent });
+    await ensureDriveDataFile();
+    await requestDrive(`https://www.googleapis.com/upload/drive/v3/files/${encodeURIComponent(syncConfig.fileId)}?uploadType=media`, {
       method: "PATCH",
-      body: JSON.stringify({
-        files: {
-          [SYNC_FILE_NAME]: {
-            content: JSON.stringify(getSyncPayload(), null, 2),
-          },
-        },
-      }),
+      headers: { "Content-Type": "application/json;charset=utf-8" },
+      body: JSON.stringify(getSyncPayload(), null, 2),
     });
     syncConfig.lastPushedAt = new Date().toISOString();
     saveSyncConfig();
-    updateSyncStatus(options.silent ? "" : "온라인에 저장했습니다.");
-    if (!options.silent) showToast("온라인에 저장했습니다.");
+    updateSyncStatus(options.silent ? "" : "Google Drive에 저장했습니다.");
+    if (!options.silent) showToast("Google Drive에 저장했습니다.");
   } catch (error) {
     if (!options.silent) handleSyncError(error);
   } finally {
@@ -552,34 +574,178 @@ async function pushSync(options = {}) {
   }
 }
 
-async function requestGist(path, options = {}) {
-  const response = await fetch(`https://api.github.com${path}`, {
+async function ensureGoogleAccessToken({ interactive = false } = {}) {
+  if (googleAccessToken && Date.now() < googleTokenExpiresAt - 60000) return googleAccessToken;
+  if (!syncConfig.clientId) throw new Error("MISSING_GOOGLE_CLIENT_ID");
+  await loadGoogleIdentityScript();
+  if (!googleTokenClient) {
+    googleTokenClient = window.google.accounts.oauth2.initTokenClient({
+      client_id: syncConfig.clientId,
+      scope: GOOGLE_DRIVE_SCOPE,
+      callback: () => {},
+    });
+  }
+  return new Promise((resolve, reject) => {
+    googleTokenClient.callback = (response) => {
+      if (response.error) {
+        reject(new Error(response.error));
+        return;
+      }
+      googleAccessToken = response.access_token;
+      googleTokenExpiresAt = Date.now() + Number(response.expires_in || 3600) * 1000;
+      resolve(googleAccessToken);
+    };
+    googleTokenClient.requestAccessToken({ prompt: interactive ? "consent" : "" });
+  });
+}
+
+function loadGoogleIdentityScript() {
+  if (window.google?.accounts?.oauth2) return Promise.resolve();
+  return new Promise((resolve, reject) => {
+    const existing = document.querySelector(`script[src="${GOOGLE_IDENTITY_SCRIPT}"]`);
+    if (existing) {
+      existing.addEventListener("load", resolve, { once: true });
+      existing.addEventListener("error", reject, { once: true });
+      return;
+    }
+    const script = document.createElement("script");
+    script.src = GOOGLE_IDENTITY_SCRIPT;
+    script.async = true;
+    script.defer = true;
+    script.addEventListener("load", resolve, { once: true });
+    script.addEventListener("error", reject, { once: true });
+    document.head.appendChild(script);
+  });
+}
+
+async function ensureDriveDataFile() {
+  if (syncConfig.fileId) return syncConfig.fileId;
+  const folder = await findOrCreateDriveFolderPath(syncConfig.folderPath || DEFAULT_SYNC_FOLDER_PATH);
+  syncConfig.folderId = folder.id;
+  const escapedFileName = escapeDriveQueryValue(SYNC_FILE_NAME);
+  const files = await listDriveFiles(`name='${escapedFileName}' and '${folder.id}' in parents and trashed=false`);
+  if (files.length) {
+    syncConfig.fileId = files[0].id;
+    saveSyncConfig();
+    return syncConfig.fileId;
+  }
+
+  const accessibleFiles = await listDriveFiles(`name='${escapedFileName}' and trashed=false`, 25);
+  if (accessibleFiles.length) {
+    syncConfig.fileId = accessibleFiles[0].id;
+    syncConfig.lastPulledAt = new Date().toISOString();
+    saveSyncConfig();
+    updateSyncStatus("지정한 폴더에는 없어서 Drive에서 기존 동기화 파일을 찾아 연결했습니다.");
+    return syncConfig.fileId;
+  }
+
+  const created = await createDriveJsonFile(folder.id);
+  syncConfig.fileId = created.id;
+  syncConfig.lastPushedAt = new Date().toISOString();
+  saveSyncConfig();
+  return syncConfig.fileId;
+}
+
+async function findOrCreateDriveFolderPath(path) {
+  if (syncConfig.folderId) return { id: syncConfig.folderId };
+  const parts = normalizeDrivePath(path).split("/").map((part) => part.trim()).filter(Boolean);
+  let parentId = "root";
+  let folder = { id: parentId };
+  for (const part of parts) {
+    const escapedFolderName = escapeDriveQueryValue(part);
+    const folders = await listDriveFiles(`name='${escapedFolderName}' and mimeType='application/vnd.google-apps.folder' and '${parentId}' in parents and trashed=false`);
+    folder = folders[0] || await requestDrive("https://www.googleapis.com/drive/v3/files?fields=id,name", {
+      method: "POST",
+      body: JSON.stringify({
+        name: part,
+        mimeType: "application/vnd.google-apps.folder",
+        parents: parentId === "root" ? undefined : [parentId],
+      }),
+    });
+    parentId = folder.id;
+  }
+  return folder;
+}
+
+async function listDriveFiles(query, pageSize = 10) {
+  const params = new URLSearchParams({
+    q: query,
+    spaces: "drive",
+    fields: "files(id,name,modifiedTime,webViewLink)",
+    pageSize: String(pageSize),
+    orderBy: "modifiedTime desc",
+  });
+  const data = await requestDrive(`https://www.googleapis.com/drive/v3/files?${params.toString()}`);
+  return data.files || [];
+}
+
+async function createDriveJsonFile(folderId) {
+  const metadata = {
+    name: SYNC_FILE_NAME,
+    mimeType: "application/json",
+    parents: [folderId],
+  };
+  const boundary = `promptbuilder-${Date.now()}`;
+  const body = [
+    `--${boundary}`,
+    "Content-Type: application/json; charset=UTF-8",
+    "",
+    JSON.stringify(metadata),
+    `--${boundary}`,
+    "Content-Type: application/json; charset=UTF-8",
+    "",
+    JSON.stringify(getSyncPayload(), null, 2),
+    `--${boundary}--`,
+    "",
+  ].join("\r\n");
+  return requestDrive("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,modifiedTime,webViewLink", {
+    method: "POST",
+    headers: { "Content-Type": `multipart/related; boundary=${boundary}` },
+    body,
+  });
+}
+
+async function requestDrive(url, options = {}) {
+  const response = await fetch(url, {
     ...options,
     headers: {
-      Accept: "application/vnd.github+json",
-      Authorization: `Bearer ${syncConfig.token}`,
+      Authorization: `Bearer ${googleAccessToken}`,
       "Content-Type": "application/json",
-      "X-GitHub-Api-Version": "2022-11-28",
       ...(options.headers || {}),
     },
   });
-  if (!response.ok) throw new Error(`GIST_${response.status}`);
+  if (!response.ok) throw new Error(`DRIVE_${response.status}`);
+  if (response.status === 204) return {};
   return response.json();
 }
 
+async function requestDriveText(url) {
+  const response = await fetch(url, {
+    headers: { Authorization: `Bearer ${googleAccessToken}` },
+  });
+  if (!response.ok) throw new Error(`DRIVE_${response.status}`);
+  return response.text();
+}
+
+function escapeDriveQueryValue(value) {
+  return String(value).replaceAll("\\", "\\\\").replaceAll("'", "\\'");
+}
+
 function setSyncBusy(isBusy) {
-  [elements.createSyncBtn, elements.pullSyncBtn, elements.pushSyncBtn].forEach((button) => {
+  [elements.connectDriveBtn, elements.pullSyncBtn, elements.pushSyncBtn].forEach((button) => {
     button.disabled = isBusy;
   });
 }
 
 function handleSyncError(error) {
   const code = error?.message || "";
-  const message = code.includes("401")
-    ? "토큰 권한을 확인해주세요."
-    : code.includes("404")
-      ? "Gist ID를 찾을 수 없습니다."
-      : "동기화에 실패했습니다. 설정과 네트워크를 확인해주세요.";
+  const message = code.includes("MISSING_GOOGLE_CLIENT_ID")
+    ? "Google OAuth Client ID를 입력해주세요."
+    : code.includes("403")
+      ? "Google Drive 권한을 확인해주세요."
+      : code.includes("404")
+        ? "Google Drive 파일을 찾을 수 없습니다."
+        : "동기화에 실패했습니다. 설정과 네트워크를 확인해주세요.";
   updateSyncStatus(message);
   showToast(message);
 }
