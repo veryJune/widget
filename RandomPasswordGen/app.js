@@ -58,11 +58,15 @@ const serviceField = document.querySelector("#serviceField");
 const personalHint = document.querySelector("#personalHint");
 const variantPanel = document.querySelector("#variantPanel");
 const variantList = document.querySelector("#variantList");
+const variantToggle = document.querySelector("#variantToggle");
+const variantCount = document.querySelector("#variantCount");
+const variantToggleLabel = document.querySelector("#variantToggleLabel");
 
 let copyResetTimer;
 let currentMode = "random";
 let latestVariations = [];
 let manualLengthOverride = false;
+let variantExpanded = false;
 const modeInputValues = {
   random: "",
   memorable: "",
@@ -120,8 +124,14 @@ function generateRandomPassword() {
 }
 
 function generateMemorablePassword() {
-  const length = Number(lengthRange.value);
   const userWords = extractWords(customInput.value);
+  const recommendedLength = recommendedMemorableLength(userWords);
+
+  if (userWords.length > 0 && !manualLengthOverride && Number(lengthRange.value) !== recommendedLength) {
+    setLength(recommendedLength, { skipGenerate: true });
+  }
+
+  const length = Number(lengthRange.value);
   const words = userWords.length > 0 ? pickWordsFromInput(userWords, length) : pickMemorableWords(length);
   const separator = optionIsChecked("symbols") && words.join("").length < length ? randomCharacter("-_.$") : "";
   let password = words.map(transformWord).join(separator);
@@ -133,7 +143,7 @@ function generateMemorablePassword() {
 }
 
 function generatePhrasePassword() {
-  const phrase = customInput.value.trim() || "Make today count";
+  const phrase = customInput.value.trim() || "Every small step matters";
   const recommendedLength = recommendedPhraseLength(phrase);
 
   if (!manualLengthOverride && Number(lengthRange.value) !== recommendedLength) {
@@ -265,6 +275,16 @@ function recommendedPhraseLength(phrase) {
   const separatorCount = Math.max(0, words.length - 1);
   const serviceLength = serviceSuffix().length;
   const readableLength = letterCount + separatorCount + serviceLength;
+
+  return Math.min(32, Math.max(16, readableLength));
+}
+
+function recommendedMemorableLength(words) {
+  const selectedWords = words.length > 0 ? words : memorableWords.slice(0, 2);
+  const letterCount = selectedWords.join("").length;
+  const separatorCount = Math.max(0, selectedWords.length - 1);
+  const serviceLength = serviceSuffix().length;
+  const readableLength = letterCount + separatorCount + serviceLength + 2;
 
   return Math.min(32, Math.max(16, readableLength));
 }
@@ -470,6 +490,7 @@ function updateStrength(length, setCount) {
 function renderVariations(variations) {
   latestVariations = variations;
   variantList.innerHTML = "";
+  variantExpanded = false;
 
   if (variations.length <= 1) {
     variantPanel.classList.add("hidden");
@@ -494,6 +515,14 @@ function renderVariations(variations) {
   });
 
   variantPanel.classList.remove("hidden");
+  updateVariantDisclosure();
+}
+
+function updateVariantDisclosure() {
+  variantPanel.classList.toggle("collapsed", !variantExpanded);
+  variantToggle.setAttribute("aria-expanded", String(variantExpanded));
+  variantCount.textContent = String(latestVariations.length);
+  variantToggleLabel.textContent = variantExpanded ? "Hide" : "Show";
 }
 
 function updatePersonalControls() {
@@ -518,7 +547,7 @@ function updatePersonalControls() {
 
   if (currentMode === "phrase") {
     customInputLabel.textContent = "Base phrase";
-    customInput.placeholder = "Do one more than others";
+    customInput.placeholder = "Every small step matters";
     serviceField.classList.remove("hidden");
     personalHint.textContent = "Turn a sentence into several password variations. Add a service name for a site-specific version.";
   }
@@ -594,6 +623,10 @@ modeButtons.forEach((button) => {
       manualLengthOverride = false;
     }
 
+    if (currentMode === "memorable") {
+      manualLengthOverride = false;
+    }
+
     generatePassword();
   });
 });
@@ -608,14 +641,25 @@ optionInputs.forEach((input) => {
 customInput.addEventListener("input", () => {
   modeInputValues[currentMode] = customInput.value;
 
-  if (currentMode === "phrase") {
+  if (currentMode === "phrase" || currentMode === "memorable") {
     manualLengthOverride = false;
   }
 
   generatePassword();
 });
 
-serviceInput.addEventListener("input", generatePassword);
+serviceInput.addEventListener("input", () => {
+  if (currentMode === "phrase" || currentMode === "memorable") {
+    manualLengthOverride = false;
+  }
+
+  generatePassword();
+});
+
+variantToggle.addEventListener("click", () => {
+  variantExpanded = !variantExpanded;
+  updateVariantDisclosure();
+});
 
 variantList.addEventListener("click", (event) => {
   const button = event.target.closest("[data-password]");

@@ -263,16 +263,53 @@ h1 {
   margin-top: 18px;
 }
 
-.variant-panel p {
-  margin: 0 0 10px;
+.variant-toggle {
+  width: 100%;
+  min-height: 42px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 10px;
+  align-items: center;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px 12px 8px 14px;
   color: var(--muted);
+  background: #f5f9fe;
+  cursor: pointer;
   font-size: 0.86rem;
   font-weight: 800;
+  text-align: left;
+  transition: border-color 160ms ease, box-shadow 160ms ease;
+}
+
+.variant-toggle:hover {
+  border-color: var(--blue);
+  box-shadow: 0 8px 18px rgba(5, 114, 247, 0.1);
+}
+
+.variant-count {
+  min-width: 28px;
+  border-radius: 999px;
+  padding: 3px 8px;
+  color: #fff;
+  background: var(--blue);
+  font-size: 0.78rem;
+  text-align: center;
+}
+
+.variant-toggle-label {
+  color: var(--blue);
+  font-size: 0.78rem;
 }
 
 .variant-list {
   display: grid;
   gap: 8px;
+  margin-top: 8px;
+}
+
+.variant-panel.collapsed .variant-list {
+  display: none;
 }
 
 .variant-button {
