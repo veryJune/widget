@@ -6,8 +6,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>CalcDeck</title>
   <meta name="author" content="Very More JUNE">
-  <meta name="description" content="Ratio, percent, and speech time calculators">
-  <meta name="keywords" content="ratio, percent, speech time, calculator">
+  <meta name="description" content="Ratio, percent, text, fuel, estimate, and unit price calculators">
+  <meta name="keywords" content="ratio, percent, text, fuel, video estimate, unit price, calculator">
   <link rel="stylesheet" href="RatioC_style.css">
   <link rel="icon" type="image/png" href="ratio.png">
 </head>
@@ -19,15 +19,27 @@
       <h1>CalcDeck</h1>
       <div class="top-tools">
         <button type="button" class="icon-button" id="theme-toggle" aria-label="Switch to light mode">☀</button>
+        <button type="button" class="icon-button" id="history-toggle" aria-label="Show history">H</button>
         <button type="button" class="icon-button" id="guide-toggle" aria-label="Show guide" aria-expanded="false">?</button>
-        <div id="guide-popover" class="guide-popover is-hidden" role="dialog" aria-label="Quick guide"></div>
+        <div id="guide-popover" class="tool-popover is-hidden" role="dialog" aria-label="Quick guide"></div>
+        <div id="history-popover" class="tool-popover history-popover is-hidden" role="dialog" aria-label="History">
+          <div class="popover-title">History</div>
+          <div id="history-list" class="history-list"></div>
+          <div class="popover-actions">
+            <button type="button" class="mini-button" id="history-copy">Copy</button>
+            <button type="button" class="mini-button" id="history-clear">Clear</button>
+          </div>
+        </div>
       </div>
     </header>
 
     <nav class="tool-tabs" aria-label="Calculator tools">
       <button type="button" class="tab-button is-active" data-tab="ratio">Ratio</button>
       <button type="button" class="tab-button" data-tab="percent">Percent</button>
-      <button type="button" class="tab-button" data-tab="speech">Speech</button>
+      <button type="button" class="tab-button" data-tab="text">Text</button>
+      <button type="button" class="tab-button" data-tab="estimate">Estimate</button>
+      <button type="button" class="tab-button" data-tab="unit">Unit Price</button>
+      <button type="button" class="tab-button" data-tab="fuel">Fuel</button>
     </nav>
 
     <main>
@@ -113,6 +125,7 @@
           <button type="button" class="mode-button" data-percent-mode="adjust">증가/감소</button>
           <button type="button" class="mode-button" data-percent-mode="whole">전체값</button>
         </div>
+        <div class="info-card" id="percent-description"></div>
         <div class="input-grid">
           <div class="input-field">
             <label id="percent-label-a" for="percent-a">Value A</label>
@@ -132,38 +145,95 @@
         </div>
         <div class="result-panel result-strong" id="percent-result"></div>
         <div class="formula-text" id="percent-formula"></div>
+        <div class="use-card">
+          <div class="use-title">Use cases</div>
+          <div class="use-list" id="percent-use-cases"></div>
+        </div>
       </section>
 
-      <section class="tab-panel" id="speech-panel" data-panel="speech">
-        <label for="speech-text">Speech Script</label>
-        <textarea id="speech-text" placeholder="Paste or type your script here."></textarea>
+      <section class="tab-panel" id="text-panel" data-panel="text">
+        <label for="text-input">Text</label>
+        <textarea id="text-input" placeholder="Paste or type your text here."></textarea>
         <div class="range-row">
-          <label for="speech-speed">Speaking speed <span id="speech-speed-label">100%</span></label>
-          <input type="range" id="speech-speed" min="60" max="140" value="100" step="5">
+          <label for="text-speed">Text speed <span id="text-speed-label">100%</span></label>
+          <input type="range" id="text-speed" min="60" max="140" value="100" step="5">
           <div class="range-scale">
             <span>Slow 60%</span>
             <span>Fast 140%</span>
           </div>
         </div>
         <div class="stats-grid">
-          <div class="stat-card">
-            <span>With spaces</span>
-            <strong id="speech-with-spaces">0</strong>
+          <div class="stat-card"><span>With spaces</span><strong id="text-with-spaces">0</strong></div>
+          <div class="stat-card"><span>No spaces</span><strong id="text-no-spaces">0</strong></div>
+          <div class="stat-card"><span>Bytes</span><strong id="text-bytes">0</strong></div>
+          <div class="stat-card"><span>Words</span><strong id="text-words">0</strong></div>
+        </div>
+        <div class="result-panel result-strong" id="text-result">Estimated time: 0:00</div>
+      </section>
+
+      <section class="tab-panel" id="fuel-panel" data-panel="fuel">
+        <div class="input-grid">
+          <div class="input-field"><label for="fuel-distance">Distance (km)</label><input type="number" id="fuel-distance" value="100" step="any"></div>
+          <div class="input-field"><label for="fuel-efficiency">Fuel efficiency (km/L)</label><input type="number" id="fuel-efficiency" value="12" step="any"></div>
+          <div class="input-field"><label for="fuel-price">Fuel price (won/L)</label><input type="number" id="fuel-price" value="1700" step="any"></div>
+          <div class="input-field"><label for="fuel-trip">Trip</label><select id="fuel-trip"><option value="oneway">One-way</option><option value="round">Round trip</option></select></div>
+        </div>
+        <div class="result-panel result-strong" id="fuel-result"></div>
+        <div class="formula-text">Fuel prices are entered manually. Reference: <a href="https://www.opinet.co.kr/" target="_blank" rel="noreferrer">Opinet</a></div>
+      </section>
+
+      <section class="tab-panel" id="estimate-panel" data-panel="estimate">
+        <div class="input-grid">
+          <div class="input-field"><label for="estimate-type">Video type</label><select id="estimate-type"><option value="short">Short/SNS</option><option value="promo">Promo video</option><option value="interview">Interview</option><option value="event">Event recap</option><option value="motion">Motion graphic</option></select></div>
+          <div class="input-field"><label for="estimate-runtime">Runtime (minutes)</label><input type="number" id="estimate-runtime" value="1" step="any"></div>
+          <div class="input-field"><label for="estimate-shoot-days">Shoot days</label><input type="number" id="estimate-shoot-days" value="1" step="any"></div>
+          <div class="input-field"><label for="estimate-edit-days">Edit days</label><input type="number" id="estimate-edit-days" value="2" step="any"></div>
+          <div class="input-field"><label for="estimate-difficulty">Difficulty</label><select id="estimate-difficulty"><option value="0.85">Low</option><option value="1" selected>Standard</option><option value="1.35">High</option><option value="1.7">Expert</option></select></div>
+          <div class="input-field"><label for="estimate-urgency">Urgency</label><select id="estimate-urgency"><option value="1" selected>Normal</option><option value="1.25">Fast</option><option value="1.5">Rush</option></select></div>
+          <div class="input-field"><label for="estimate-revisions">Revision count</label><input type="number" id="estimate-revisions" value="2" step="1"></div>
+          <div class="input-field"><label for="estimate-options">Options</label><select id="estimate-options"><option value="0">None</option><option value="150000">Equipment/props</option><option value="250000">Color/Sound</option><option value="500000">Motion + Color/Sound</option></select></div>
+        </div>
+        <div class="info-card" id="estimate-type-note"></div>
+        <details class="rate-editor">
+          <summary>Editable baseline rates</summary>
+          <div class="input-grid">
+            <div class="input-field"><label for="rate-plan">Planning/PM per day</label><input type="number" id="rate-plan" value="250000" step="10000"></div>
+            <div class="input-field"><label for="rate-shoot">Director/Shoot per day</label><input type="number" id="rate-shoot" value="400000" step="10000"></div>
+            <div class="input-field"><label for="rate-staff">Staff per day</label><input type="number" id="rate-staff" value="180000" step="10000"></div>
+            <div class="input-field"><label for="rate-edit">Editing per day</label><input type="number" id="rate-edit" value="300000" step="10000"></div>
+            <div class="input-field"><label for="rate-motion">Motion per day</label><input type="number" id="rate-motion" value="350000" step="10000"></div>
+            <div class="input-field"><label for="rate-revision">Extra revision fee</label><input type="number" id="rate-revision" value="80000" step="10000"></div>
           </div>
-          <div class="stat-card">
-            <span>No spaces</span>
-            <strong id="speech-no-spaces">0</strong>
+        </details>
+        <div class="estimate-grid">
+          <div class="stat-card"><span>Low</span><strong id="estimate-low">0</strong></div>
+          <div class="stat-card"><span>Standard</span><strong id="estimate-standard">0</strong></div>
+          <div class="stat-card"><span>High</span><strong id="estimate-high">0</strong></div>
+        </div>
+        <div class="formula-text">Formula: labor + equipment/options + extra revisions × difficulty/urgency. Baseline rates are editable, not fixed market standards.</div>
+      </section>
+
+      <section class="tab-panel" id="unit-panel" data-panel="unit">
+        <div class="info-card">Compare products by the same unit family. Amount can differ, such as 500g vs 1kg; the app normalizes both to 100g, 1L, or 1ea.</div>
+        <div class="compare-grid">
+          <div class="compare-card" id="unit-card-a">
+            <h2>Product A</h2>
+            <label for="unit-name-a">Name</label><input type="text" id="unit-name-a" value="A">
+            <label for="unit-price-a">Price</label><input type="number" id="unit-price-a" value="5000" step="any">
+            <label for="unit-amount-a">Amount</label><input type="number" id="unit-amount-a" value="500" step="any">
+            <label for="unit-type-a">Unit</label><select id="unit-type-a"><option value="g">g</option><option value="kg">kg</option><option value="ml">ml</option><option value="l">L</option><option value="ea">ea</option></select>
+            <div class="formula-text" id="unit-result-a"></div>
           </div>
-          <div class="stat-card">
-            <span>Bytes</span>
-            <strong id="speech-bytes">0</strong>
-          </div>
-          <div class="stat-card">
-            <span>Words</span>
-            <strong id="speech-words">0</strong>
+          <div class="compare-card" id="unit-card-b">
+            <h2>Product B</h2>
+            <label for="unit-name-b">Name</label><input type="text" id="unit-name-b" value="B">
+            <label for="unit-price-b">Price</label><input type="number" id="unit-price-b" value="8500" step="any">
+            <label for="unit-amount-b">Amount</label><input type="number" id="unit-amount-b" value="1" step="any">
+            <label for="unit-type-b">Unit</label><select id="unit-type-b"><option value="g">g</option><option value="kg" selected>kg</option><option value="ml">ml</option><option value="l">L</option><option value="ea">ea</option></select>
+            <div class="formula-text" id="unit-result-b"></div>
           </div>
         </div>
-        <div class="result-panel result-strong" id="speech-result">Estimated time: 0:00</div>
+        <div class="result-panel result-strong" id="unit-winner"></div>
       </section>
     </main>
   </div>

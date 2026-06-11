@@ -71,7 +71,7 @@ body {
 .top-bar {
   align-items: start;
   display: grid;
-  grid-template-columns: 44px minmax(0, 1fr) 58px;
+  grid-template-columns: 68px minmax(0, 1fr) 88px;
   margin-bottom: 18px;
 }
 
@@ -133,7 +133,7 @@ button:active {
   color: var(--text);
 }
 
-.guide-popover {
+.tool-popover {
   background: var(--panel-bg);
   border: 1px solid var(--panel-border);
   border-radius: 8px;
@@ -149,37 +149,76 @@ button:active {
   z-index: 2;
 }
 
-.guide-popover.is-hidden,
+.tool-popover.is-hidden,
 .tab-panel,
 .select-row.is-hidden {
   display: none;
 }
 
-.guide-popover p {
+.tool-popover p {
   margin: 0 0 7px;
 }
 
-.guide-popover p:last-child {
+.tool-popover p:last-child {
   margin-bottom: 0;
+}
+
+.history-popover {
+  width: min(280px, calc(100vw - 40px));
+}
+
+.popover-title {
+  color: var(--accent-bright);
+  font-weight: bold;
+  margin-bottom: 8px;
+}
+
+.history-list {
+  display: grid;
+  gap: 6px;
+  max-height: 220px;
+  overflow: auto;
+}
+
+.history-item,
+.history-empty {
+  background: var(--stage-bg);
+  border: 1px solid var(--panel-border);
+  border-radius: 6px;
+  padding: 7px;
+}
+
+.popover-actions {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: 1fr 1fr;
+  margin-top: 10px;
+}
+
+.mini-button {
+  background: var(--button-bg);
+  color: var(--button-text);
+  min-height: 30px;
+  padding: 6px 8px;
 }
 
 .tool-tabs {
   background: var(--stage-bg);
   border: 1px solid var(--panel-border);
-  border-radius: 999px;
+  border-radius: 16px;
   display: grid;
   gap: 4px;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(6, minmax(0, 1fr));
   margin-bottom: 24px;
   padding: 4px;
 }
 
 .tab-button {
   background: transparent;
-  border-radius: 999px;
+  border-radius: 12px;
   color: var(--muted);
   min-height: 34px;
-  padding: 8px 10px;
+  padding: 8px 6px;
 }
 
 .tab-button.is-active {
@@ -336,6 +375,40 @@ button.preset:hover,
   margin-bottom: 18px;
 }
 
+.info-card,
+.use-card,
+.rate-editor,
+.compare-card {
+  background: var(--stage-bg);
+  border: 1px solid var(--panel-border);
+  border-radius: 9px;
+  color: var(--text);
+  margin-bottom: 14px;
+  padding: 12px;
+}
+
+.use-title {
+  color: var(--accent-bright);
+  font-size: 12px;
+  font-weight: bold;
+  margin-bottom: 8px;
+}
+
+.use-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.use-list span {
+  background: var(--button-bg);
+  border: 1px solid var(--panel-border);
+  border-radius: 999px;
+  color: var(--button-text);
+  font-size: 11px;
+  padding: 5px 8px;
+}
+
 .select-row {
   margin-top: 12px;
 }
@@ -441,6 +514,47 @@ input[type="range"] {
   margin-top: 18px;
 }
 
+.estimate-grid,
+.compare-grid {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-top: 18px;
+}
+
+.compare-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.compare-card {
+  margin-bottom: 0;
+}
+
+.compare-card h2 {
+  font-size: 15px;
+  margin: 0 0 12px;
+}
+
+.compare-card label {
+  margin-top: 10px;
+}
+
+.compare-card.is-cheaper {
+  border-color: var(--success);
+  box-shadow: 0 0 0 1px rgba(34, 197, 94, 0.35);
+}
+
+.rate-editor summary {
+  color: var(--accent-bright);
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: bold;
+}
+
+.rate-editor .input-grid {
+  margin-top: 12px;
+}
+
 .stat-card {
   background: var(--stage-bg);
   border: 1px solid var(--panel-border);
@@ -463,8 +577,14 @@ input[type="range"] {
 
 @media (max-width: 560px) {
   .input-grid,
-  .stats-grid {
+  .stats-grid,
+  .estimate-grid,
+  .compare-grid {
     grid-template-columns: 1fr;
+  }
+
+  .tool-tabs {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
@@ -474,7 +594,7 @@ input[type="range"] {
   }
 
   .top-bar {
-    grid-template-columns: 34px minmax(0, 1fr) 58px;
+    grid-template-columns: 42px minmax(0, 1fr) 88px;
     margin-bottom: 16px;
   }
 
