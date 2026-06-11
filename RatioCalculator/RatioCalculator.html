@@ -4,10 +4,10 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Ratio Calculator</title>
+  <title>CalcDeck</title>
   <meta name="author" content="Very More JUNE">
-  <meta name="description" content="ratio calculations">
-  <meta name="keywords" content="ratios, calculations, math">
+  <meta name="description" content="Ratio, percent, and speech time calculators">
+  <meta name="keywords" content="ratio, percent, speech time, calculator">
   <link rel="stylesheet" href="RatioC_style.css">
   <link rel="icon" type="image/png" href="ratio.png">
 </head>
@@ -16,92 +16,159 @@
   <div class="calculator">
     <header class="top-bar">
       <div></div>
-      <h1>Ratio Calculator</h1>
+      <h1>CalcDeck</h1>
       <div class="top-tools">
         <button type="button" class="icon-button" id="theme-toggle" aria-label="Switch to light mode">☀</button>
         <button type="button" class="icon-button" id="guide-toggle" aria-label="Show guide" aria-expanded="false">?</button>
-        <div id="guide-popover" class="guide-popover is-hidden" role="dialog" aria-label="Quick guide">
-          <p>Fill any 3 values, then Calculate.</p>
-          <p>Use presets to set Input 1:Input 2.</p>
-          <p>− / × / + adjusts one field.</p>
-          <p>Flip swaps width and height.</p>
-        </div>
+        <div id="guide-popover" class="guide-popover is-hidden" role="dialog" aria-label="Quick guide"></div>
       </div>
     </header>
-    <form>
-      <div class="input-grid">
-        <div class="input-field">
-          <label for="input1">Input 1</label>
-          <div class="input-control">
-            <input type="number" id="input1" value="16" step="any">
-            <div class="field-tools" aria-label="Input 1 controls">
-              <button type="button" class="step-input" data-target="input1" data-step="-1" aria-label="Decrease Input 1">−</button>
-              <button type="button" class="clear-input" data-clear="input1" aria-label="Clear Input 1">×</button>
-              <button type="button" class="step-input" data-target="input1" data-step="1" aria-label="Increase Input 1">+</button>
-            </div>
-          </div>
-        </div>
-        <div class="input-field">
-          <label for="input2">Input 2</label>
-          <div class="input-control">
-            <input type="number" id="input2" value="9" step="any">
-            <div class="field-tools" aria-label="Input 2 controls">
-              <button type="button" class="step-input" data-target="input2" data-step="-1" aria-label="Decrease Input 2">−</button>
-              <button type="button" class="clear-input" data-clear="input2" aria-label="Clear Input 2">×</button>
-              <button type="button" class="step-input" data-target="input2" data-step="1" aria-label="Increase Input 2">+</button>
-            </div>
-          </div>
-        </div>
-        <div class="input-field">
-          <label for="input3">Input 3</label>
-          <div class="input-control">
-            <input type="number" id="input3" step="any">
-            <div class="field-tools" aria-label="Input 3 controls">
-              <button type="button" class="step-input" data-target="input3" data-step="-1" aria-label="Decrease Input 3">−</button>
-              <button type="button" class="clear-input" data-clear="input3" aria-label="Clear Input 3">×</button>
-              <button type="button" class="step-input" data-target="input3" data-step="1" aria-label="Increase Input 3">+</button>
-            </div>
-          </div>
-        </div>
-        <div class="input-field">
-          <label for="input4">Input 4</label>
-          <div class="input-control">
-            <input type="number" id="input4" step="any">
-            <div class="field-tools" aria-label="Input 4 controls">
-              <button type="button" class="step-input" data-target="input4" data-step="-1" aria-label="Decrease Input 4">−</button>
-              <button type="button" class="clear-input" data-clear="input4" aria-label="Clear Input 4">×</button>
-              <button type="button" class="step-input" data-target="input4" data-step="1" aria-label="Increase Input 4">+</button>
-            </div>
-          </div>
-        </div>
-      </div>
-      <div class="action-row">
-        <button type="button" id="calculate-btn">CALCULATE</button>
-        <button type="button" id="reset-btn">RESET</button>
-      </div>
-      <div class="preset-row" aria-label="Ratio presets">
-        <button type="button" class="preset" data-preset-width="1" data-preset-height="1">1:1</button>
-        <button type="button" class="preset" data-preset-width="4" data-preset-height="3">4:3</button>
-        <button type="button" class="preset" data-preset-width="3" data-preset-height="2">3:2</button>
-        <button type="button" class="preset" data-preset-width="16" data-preset-height="9">16:9</button>
-        <button type="button" class="preset" data-preset-width="1.85" data-preset-height="1">1.85:1</button>
-        <button type="button" class="preset" data-preset-width="2.35" data-preset-height="1">2.35:1</button>
-        <button type="button" class="preset" data-preset-width="8" data-preset-height="1">8:1</button>
-        <button type="button" class="preset utility icon-preset" id="flip-btn" title="Flip width and height" aria-label="Flip width and height">↔</button>
-      </div>
-    </form>
-    <div id="output"></div>
-    <div id="simplified-output" class="simplified-output"></div>
-    <div id="ratio-preview" class="ratio-preview" aria-live="polite">
-      <div class="preview-stage">
-        <div id="preview-box" class="preview-box">
-          <span id="preview-label">16:9</span>
-        </div>
-      </div>
-    </div>
-  </div>
-</body>
 
-<script src="RatioC_script.js"></script>
+    <nav class="tool-tabs" aria-label="Calculator tools">
+      <button type="button" class="tab-button is-active" data-tab="ratio">Ratio</button>
+      <button type="button" class="tab-button" data-tab="percent">Percent</button>
+      <button type="button" class="tab-button" data-tab="speech">Speech</button>
+    </nav>
+
+    <main>
+      <section class="tab-panel is-active" id="ratio-panel" data-panel="ratio">
+        <form>
+          <div class="input-grid">
+            <div class="input-field">
+              <label for="input1">Input 1</label>
+              <div class="input-control">
+                <input type="number" id="input1" value="16" step="any">
+                <div class="field-tools" aria-label="Input 1 controls">
+                  <button type="button" class="step-input" data-target="input1" data-step="-1" aria-label="Decrease Input 1">−</button>
+                  <button type="button" class="clear-input" data-clear="input1" aria-label="Clear Input 1">×</button>
+                  <button type="button" class="step-input" data-target="input1" data-step="1" aria-label="Increase Input 1">+</button>
+                </div>
+              </div>
+            </div>
+            <div class="input-field">
+              <label for="input2">Input 2</label>
+              <div class="input-control">
+                <input type="number" id="input2" value="9" step="any">
+                <div class="field-tools" aria-label="Input 2 controls">
+                  <button type="button" class="step-input" data-target="input2" data-step="-1" aria-label="Decrease Input 2">−</button>
+                  <button type="button" class="clear-input" data-clear="input2" aria-label="Clear Input 2">×</button>
+                  <button type="button" class="step-input" data-target="input2" data-step="1" aria-label="Increase Input 2">+</button>
+                </div>
+              </div>
+            </div>
+            <div class="input-field">
+              <label for="input3">Input 3</label>
+              <div class="input-control">
+                <input type="number" id="input3" step="any">
+                <div class="field-tools" aria-label="Input 3 controls">
+                  <button type="button" class="step-input" data-target="input3" data-step="-1" aria-label="Decrease Input 3">−</button>
+                  <button type="button" class="clear-input" data-clear="input3" aria-label="Clear Input 3">×</button>
+                  <button type="button" class="step-input" data-target="input3" data-step="1" aria-label="Increase Input 3">+</button>
+                </div>
+              </div>
+            </div>
+            <div class="input-field">
+              <label for="input4">Input 4</label>
+              <div class="input-control">
+                <input type="number" id="input4" step="any">
+                <div class="field-tools" aria-label="Input 4 controls">
+                  <button type="button" class="step-input" data-target="input4" data-step="-1" aria-label="Decrease Input 4">−</button>
+                  <button type="button" class="clear-input" data-clear="input4" aria-label="Clear Input 4">×</button>
+                  <button type="button" class="step-input" data-target="input4" data-step="1" aria-label="Increase Input 4">+</button>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="action-row">
+            <button type="button" id="calculate-btn">CALCULATE</button>
+            <button type="button" id="reset-btn">RESET</button>
+          </div>
+          <div class="preset-row" aria-label="Ratio presets">
+            <button type="button" class="preset" data-preset-width="1" data-preset-height="1">1:1</button>
+            <button type="button" class="preset" data-preset-width="4" data-preset-height="3">4:3</button>
+            <button type="button" class="preset" data-preset-width="3" data-preset-height="2">3:2</button>
+            <button type="button" class="preset" data-preset-width="16" data-preset-height="9">16:9</button>
+            <button type="button" class="preset" data-preset-width="1.85" data-preset-height="1">1.85:1</button>
+            <button type="button" class="preset" data-preset-width="2.35" data-preset-height="1">2.35:1</button>
+            <button type="button" class="preset" data-preset-width="8" data-preset-height="1">8:1</button>
+            <button type="button" class="preset utility icon-preset" id="flip-btn" title="Flip width and height" aria-label="Flip width and height">↔</button>
+          </div>
+        </form>
+        <div id="output" class="result-panel"></div>
+        <div id="simplified-output" class="simplified-output"></div>
+        <div id="ratio-preview" class="ratio-preview" aria-live="polite">
+          <div class="preview-stage">
+            <div id="preview-box" class="preview-box">
+              <span id="preview-label">16:9</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="tab-panel" id="percent-panel" data-panel="percent">
+        <div class="mode-row" aria-label="Percent calculation type">
+          <button type="button" class="mode-button is-active" data-percent-mode="part">A의 B%</button>
+          <button type="button" class="mode-button" data-percent-mode="rate">일부는 몇 %</button>
+          <button type="button" class="mode-button" data-percent-mode="change">증감률</button>
+          <button type="button" class="mode-button" data-percent-mode="adjust">증가/감소</button>
+          <button type="button" class="mode-button" data-percent-mode="whole">전체값</button>
+        </div>
+        <div class="input-grid">
+          <div class="input-field">
+            <label id="percent-label-a" for="percent-a">Value A</label>
+            <input type="number" id="percent-a" value="100" step="any">
+          </div>
+          <div class="input-field">
+            <label id="percent-label-b" for="percent-b">Percent B</label>
+            <input type="number" id="percent-b" value="20" step="any">
+          </div>
+        </div>
+        <div class="select-row is-hidden" id="percent-direction-row">
+          <label for="percent-direction">Direction</label>
+          <select id="percent-direction">
+            <option value="increase">Increase</option>
+            <option value="decrease">Decrease</option>
+          </select>
+        </div>
+        <div class="result-panel result-strong" id="percent-result"></div>
+        <div class="formula-text" id="percent-formula"></div>
+      </section>
+
+      <section class="tab-panel" id="speech-panel" data-panel="speech">
+        <label for="speech-text">Speech Script</label>
+        <textarea id="speech-text" placeholder="Paste or type your script here."></textarea>
+        <div class="range-row">
+          <label for="speech-speed">Speaking speed <span id="speech-speed-label">100%</span></label>
+          <input type="range" id="speech-speed" min="60" max="140" value="100" step="5">
+          <div class="range-scale">
+            <span>Slow 60%</span>
+            <span>Fast 140%</span>
+          </div>
+        </div>
+        <div class="stats-grid">
+          <div class="stat-card">
+            <span>With spaces</span>
+            <strong id="speech-with-spaces">0</strong>
+          </div>
+          <div class="stat-card">
+            <span>No spaces</span>
+            <strong id="speech-no-spaces">0</strong>
+          </div>
+          <div class="stat-card">
+            <span>Bytes</span>
+            <strong id="speech-bytes">0</strong>
+          </div>
+          <div class="stat-card">
+            <span>Words</span>
+            <strong id="speech-words">0</strong>
+          </div>
+        </div>
+        <div class="result-panel result-strong" id="speech-result">Estimated time: 0:00</div>
+      </section>
+    </main>
+  </div>
+
+  <script src="RatioC_script.js"></script>
+</body>
 
 </html>

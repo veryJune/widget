@@ -1,7 +1,28 @@
 const EPSILON = 0.000001;
 const MAX_PREVIEW_WIDTH = 320;
 const MAX_PREVIEW_HEIGHT = 180;
-const DEFAULT_HINT = "";
+const SPEECH_CHARS_PER_MINUTE = 300;
+
+const guideMessages = {
+  ratio: [
+    "Fill any 3 values, then Calculate.",
+    "Use presets to set Input 1:Input 2.",
+    "− / × / + adjusts one field.",
+    "↔ swaps width and height."
+  ],
+  percent: [
+    "Choose the percent formula first.",
+    "Enter A and B values.",
+    "The result updates instantly.",
+    "Use Increase/Decrease for adjustment mode."
+  ],
+  speech: [
+    "Paste or type your script.",
+    "Move the speed slider.",
+    "100% uses 300 Korean chars per minute.",
+    "Stats update instantly."
+  ]
+};
 
 const inputElements = [
   document.getElementById("input1"),
@@ -18,19 +39,37 @@ const previewLabel = document.getElementById("preview-label");
 const themeToggle = document.getElementById("theme-toggle");
 const guideToggle = document.getElementById("guide-toggle");
 const guidePopover = document.getElementById("guide-popover");
+const tabButtons = document.querySelectorAll("[data-tab]");
+const tabPanels = document.querySelectorAll("[data-panel]");
+const percentModeButtons = document.querySelectorAll("[data-percent-mode]");
+const percentA = document.getElementById("percent-a");
+const percentB = document.getElementById("percent-b");
+const percentLabelA = document.getElementById("percent-label-a");
+const percentLabelB = document.getElementById("percent-label-b");
+const percentDirection = document.getElementById("percent-direction");
+const percentDirectionRow = document.getElementById("percent-direction-row");
+const percentResult = document.getElementById("percent-result");
+const percentFormula = document.getElementById("percent-formula");
+const speechText = document.getElementById("speech-text");
+const speechSpeed = document.getElementById("speech-speed");
+const speechSpeedLabel = document.getElementById("speech-speed-label");
 
-function getValues() {
-  return inputElements.map(function (input) {
-    return parseFloat(input.value);
-  });
-}
+let activeTab = "ratio";
+let activePercentMode = "part";
 
 function isNumber(value) {
   return !isNaN(value) && isFinite(value);
 }
 
 function formatNumber(value) {
+  if (!isNumber(value)) return "";
   return parseFloat(value.toFixed(6)).toString();
+}
+
+function getValues() {
+  return inputElements.map(function (input) {
+    return parseFloat(input.value);
+  });
 }
 
 function getDecimalPlaces(value) {
@@ -74,9 +113,36 @@ function ratiosMatch(a, b, c, d) {
   return Math.abs(a / b - c / d) < EPSILON;
 }
 
-function setOutput(message, isHint) {
+function setRatioOutput(message, isHint) {
   output.textContent = message;
-  output.className = isHint ? "hint" : "";
+  output.className = isHint ? "result-panel hint" : "result-panel";
+}
+
+function updateGuide() {
+  guidePopover.innerHTML = guideMessages[activeTab]
+    .map(function (message) {
+      return "<p>" + message + "</p>";
+    })
+    .join("");
+}
+
+function setActiveTab(tabName) {
+  activeTab = tabName;
+
+  tabButtons.forEach(function (button) {
+    button.classList.toggle("is-active", button.dataset.tab === tabName);
+  });
+
+  tabPanels.forEach(function (panel) {
+    panel.classList.toggle("is-active", panel.dataset.panel === tabName);
+  });
+
+  updateGuide();
+  closeGuide();
+
+  if (tabName === "ratio") updatePreview();
+  if (tabName === "percent") updatePercent();
+  if (tabName === "speech") updateSpeech();
 }
 
 function updateTargetHighlight() {
@@ -137,7 +203,7 @@ function hasZeroDenominator(values, missingIndex) {
   return false;
 }
 
-function calculate() {
+function calculateRatio() {
   var values = getValues();
   var filledIndexes = values
     .map(function (value, index) {
@@ -148,7 +214,7 @@ function calculate() {
     });
 
   if (filledIndexes.length < 3) {
-    setOutput("Please enter at least 3 values.", false);
+    setRatioOutput("Please enter at least 3 values.", false);
     updatePreview();
     return;
   }
@@ -158,13 +224,13 @@ function calculate() {
   });
 
   if (hasZeroDenominator(values, missingIndex)) {
-    setOutput("Cannot divide by zero. Please change any zero denominator values.", false);
+    setRatioOutput("Cannot divide by zero. Please change any zero denominator values.", false);
     updatePreview();
     return;
   }
 
   if (filledIndexes.length === 4 && !ratiosMatch(values[0], values[1], values[2], values[3])) {
-    setOutput("Inputs are not in the same ratio.", false);
+    setRatioOutput("Inputs are not in the same ratio.", false);
     updatePreview();
     return;
   }
@@ -184,30 +250,30 @@ function calculate() {
   }
 
   if (ratiosMatch(values[0], values[1], values[2], values[3])) {
-    setOutput(
+    setRatioOutput(
       formatNumber(values[0]) + ":" + formatNumber(values[1]) + " = " +
       formatNumber(values[2]) + ":" + formatNumber(values[3]),
       false
     );
   } else {
-    setOutput("Inputs are not in the same ratio.", false);
+    setRatioOutput("Inputs are not in the same ratio.", false);
   }
 
   updatePreview();
 }
 
-function reset() {
+function resetRatio() {
   inputElements.forEach(function (input) {
     input.value = "";
   });
-  setOutput(DEFAULT_HINT, true);
+  setRatioOutput("", true);
   updatePreview();
 }
 
 function setPreset(width, height) {
   inputElements[0].value = width;
   inputElements[1].value = height;
-  setOutput(DEFAULT_HINT, true);
+  setRatioOutput("", true);
   updatePreview();
 }
 
@@ -224,8 +290,148 @@ function flipRatio() {
     flipPair(inputElements[2], inputElements[3]);
   }
 
-  setOutput(DEFAULT_HINT, true);
+  setRatioOutput("", true);
   updatePreview();
+}
+
+function setPercentMode(mode) {
+  activePercentMode = mode;
+
+  percentModeButtons.forEach(function (button) {
+    button.classList.toggle("is-active", button.dataset.percentMode === mode);
+  });
+
+  percentDirectionRow.classList.toggle("is-hidden", mode !== "adjust");
+  updatePercent();
+}
+
+function updatePercentLabels() {
+  var labels = {
+    part: ["Value A", "Percent B"],
+    rate: ["Whole A", "Part B"],
+    change: ["Before A", "After B"],
+    adjust: ["Value A", "Percent B"],
+    whole: ["Percent A", "Part B"]
+  };
+
+  percentLabelA.textContent = labels[activePercentMode][0];
+  percentLabelB.textContent = labels[activePercentMode][1];
+}
+
+function updatePercent() {
+  var a = parseFloat(percentA.value);
+  var b = parseFloat(percentB.value);
+  var result = "";
+  var formula = "";
+
+  updatePercentLabels();
+
+  if (!isNumber(a) || !isNumber(b)) {
+    percentResult.textContent = "Enter both values.";
+    percentFormula.textContent = "";
+    return;
+  }
+
+  if (activePercentMode === "part") {
+    result = formatNumber(a * b / 100);
+    formula = a + " × " + b + "% = " + result;
+  } else if (activePercentMode === "rate") {
+    if (a === 0) {
+      result = "Cannot divide by zero.";
+      formula = "";
+    } else {
+      result = formatNumber(b / a * 100) + "%";
+      formula = b + " ÷ " + a + " × 100 = " + result;
+    }
+  } else if (activePercentMode === "change") {
+    if (a === 0) {
+      result = "Cannot divide by zero.";
+      formula = "";
+    } else {
+      var change = (b - a) / a * 100;
+      var direction = change >= 0 ? "increase" : "decrease";
+      result = formatNumber(Math.abs(change)) + "% " + direction;
+      formula = "(" + b + " − " + a + ") ÷ " + a + " × 100";
+    }
+  } else if (activePercentMode === "adjust") {
+    var multiplier = percentDirection.value === "increase" ? 1 + b / 100 : 1 - b / 100;
+    result = formatNumber(a * multiplier);
+    formula = percentDirection.value === "increase" ? a + " × (1 + " + b + "%)" : a + " × (1 − " + b + "%)";
+  } else if (activePercentMode === "whole") {
+    if (a === 0) {
+      result = "Cannot divide by zero.";
+      formula = "";
+    } else {
+      result = formatNumber(b / (a / 100));
+      formula = b + " ÷ (" + a + "%) = " + result;
+    }
+  }
+
+  percentResult.textContent = result;
+  percentFormula.textContent = formula;
+}
+
+function countBytes(text) {
+  return new Blob([text]).size;
+}
+
+function formatDuration(totalSeconds) {
+  var minutes = Math.floor(totalSeconds / 60);
+  var seconds = Math.round(totalSeconds % 60);
+
+  if (seconds === 60) {
+    minutes++;
+    seconds = 0;
+  }
+
+  return minutes + ":" + seconds.toString().padStart(2, "0");
+}
+
+function updateSpeech() {
+  var text = speechText.value;
+  var speed = parseFloat(speechSpeed.value);
+  var charsWithSpaces = text.length;
+  var charsNoSpaces = text.replace(/\s/g, "").length;
+  var words = text.trim() ? text.trim().split(/\s+/).length : 0;
+  var charsPerMinute = SPEECH_CHARS_PER_MINUTE * (speed / 100);
+  var seconds = charsPerMinute ? charsWithSpaces / charsPerMinute * 60 : 0;
+
+  speechSpeedLabel.textContent = speed + "%";
+  document.getElementById("speech-with-spaces").textContent = charsWithSpaces;
+  document.getElementById("speech-no-spaces").textContent = charsNoSpaces;
+  document.getElementById("speech-bytes").textContent = countBytes(text);
+  document.getElementById("speech-words").textContent = words;
+  document.getElementById("speech-result").textContent = "Estimated time: " + formatDuration(seconds);
+}
+
+function setTheme(theme) {
+  var isLight = theme === "light";
+
+  document.body.classList.toggle("light-mode", isLight);
+  themeToggle.textContent = isLight ? "☾" : "☀";
+  themeToggle.setAttribute("aria-label", isLight ? "Switch to dark mode" : "Switch to light mode");
+
+  try {
+    localStorage.setItem("calcDeckTheme", isLight ? "light" : "dark");
+  } catch (error) {
+    return;
+  }
+}
+
+function toggleTheme() {
+  setTheme(document.body.classList.contains("light-mode") ? "dark" : "light");
+}
+
+function closeGuide() {
+  guidePopover.classList.add("is-hidden");
+  guideToggle.setAttribute("aria-expanded", "false");
+}
+
+function toggleGuide() {
+  var isHidden = guidePopover.classList.contains("is-hidden");
+
+  guidePopover.classList.toggle("is-hidden", !isHidden);
+  guideToggle.setAttribute("aria-expanded", isHidden ? "true" : "false");
 }
 
 inputElements.forEach(function (input) {
@@ -271,38 +477,25 @@ document.querySelectorAll("[data-preset-width][data-preset-height]").forEach(fun
   });
 });
 
-function setTheme(theme) {
-  var isLight = theme === "light";
+tabButtons.forEach(function (button) {
+  button.addEventListener("click", function () {
+    setActiveTab(button.dataset.tab);
+  });
+});
 
-  document.body.classList.toggle("light-mode", isLight);
-  themeToggle.textContent = isLight ? "☾" : "☀";
-  themeToggle.setAttribute("aria-label", isLight ? "Switch to dark mode" : "Switch to light mode");
+percentModeButtons.forEach(function (button) {
+  button.addEventListener("click", function () {
+    setPercentMode(button.dataset.percentMode);
+  });
+});
 
-  try {
-    localStorage.setItem("ratioCalculatorTheme", isLight ? "light" : "dark");
-  } catch (error) {
-    return;
-  }
-}
-
-function toggleTheme() {
-  setTheme(document.body.classList.contains("light-mode") ? "dark" : "light");
-}
-
-function closeGuide() {
-  guidePopover.classList.add("is-hidden");
-  guideToggle.setAttribute("aria-expanded", "false");
-}
-
-function toggleGuide() {
-  var isHidden = guidePopover.classList.contains("is-hidden");
-
-  guidePopover.classList.toggle("is-hidden", !isHidden);
-  guideToggle.setAttribute("aria-expanded", isHidden ? "true" : "false");
-}
-
-document.getElementById("calculate-btn").addEventListener("click", calculate);
-document.getElementById("reset-btn").addEventListener("click", reset);
+percentA.addEventListener("input", updatePercent);
+percentB.addEventListener("input", updatePercent);
+percentDirection.addEventListener("change", updatePercent);
+speechText.addEventListener("input", updateSpeech);
+speechSpeed.addEventListener("input", updateSpeech);
+document.getElementById("calculate-btn").addEventListener("click", calculateRatio);
+document.getElementById("reset-btn").addEventListener("click", resetRatio);
 document.getElementById("flip-btn").addEventListener("click", flipRatio);
 themeToggle.addEventListener("click", toggleTheme);
 guideToggle.addEventListener("click", function (event) {
@@ -314,8 +507,8 @@ guidePopover.addEventListener("click", function (event) {
 });
 
 document.addEventListener("keydown", function (event) {
-  if (event.key === "Enter") {
-    calculate();
+  if (event.key === "Enter" && activeTab === "ratio") {
+    calculateRatio();
   } else if (event.key === "Escape") {
     closeGuide();
   }
@@ -325,9 +518,12 @@ document.addEventListener("click", closeGuide);
 window.addEventListener("resize", updatePreview);
 
 try {
-  setTheme(localStorage.getItem("ratioCalculatorTheme") === "light" ? "light" : "dark");
+  setTheme(localStorage.getItem("calcDeckTheme") === "light" ? "light" : "dark");
 } catch (error) {
   setTheme("dark");
 }
 
+updateGuide();
 updatePreview();
+updatePercent();
+updateSpeech();
