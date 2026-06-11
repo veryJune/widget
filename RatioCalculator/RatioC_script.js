@@ -1,7 +1,7 @@
 const EPSILON = 0.000001;
 const MAX_PREVIEW_WIDTH = 320;
 const MAX_PREVIEW_HEIGHT = 180;
-const DEFAULT_HINT = "Middle click an input to clear it, or use Reset to clear all values.";
+const DEFAULT_HINT = "";
 
 const inputElements = [
   document.getElementById("input1"),
@@ -10,10 +10,14 @@ const inputElements = [
   document.getElementById("input4")
 ];
 const output = document.getElementById("output");
+const simplifiedOutput = document.getElementById("simplified-output");
 const preview = document.getElementById("ratio-preview");
 const previewStage = document.querySelector(".preview-stage");
 const previewBox = document.getElementById("preview-box");
 const previewLabel = document.getElementById("preview-label");
+const themeToggle = document.getElementById("theme-toggle");
+const guideToggle = document.getElementById("guide-toggle");
+const guidePopover = document.getElementById("guide-popover");
 
 function getValues() {
   return inputElements.map(function (input) {
@@ -29,6 +33,42 @@ function formatNumber(value) {
   return parseFloat(value.toFixed(6)).toString();
 }
 
+function getDecimalPlaces(value) {
+  var text = value.toString();
+
+  if (text.indexOf("e-") !== -1) {
+    return parseInt(text.split("e-")[1], 10);
+  }
+
+  if (text.indexOf(".") === -1) return 0;
+
+  return text.split(".")[1].length;
+}
+
+function getGreatestCommonDivisor(a, b) {
+  a = Math.abs(a);
+  b = Math.abs(b);
+
+  while (b) {
+    var next = a % b;
+    a = b;
+    b = next;
+  }
+
+  return a;
+}
+
+function getSimplifiedRatio(widthRatio, heightRatio) {
+  var scale = Math.pow(10, Math.max(getDecimalPlaces(widthRatio), getDecimalPlaces(heightRatio)));
+  var width = Math.round(Math.abs(widthRatio) * scale);
+  var height = Math.round(Math.abs(heightRatio) * scale);
+  var divisor = getGreatestCommonDivisor(width, height);
+
+  if (!divisor) return null;
+
+  return formatNumber(width / divisor) + ":" + formatNumber(height / divisor);
+}
+
 function ratiosMatch(a, b, c, d) {
   if (b === 0 || d === 0) return false;
   return Math.abs(a / b - c / d) < EPSILON;
@@ -39,15 +79,39 @@ function setOutput(message, isHint) {
   output.className = isHint ? "hint" : "";
 }
 
+function updateTargetHighlight() {
+  var values = getValues();
+  var emptyIndexes = values
+    .map(function (value, index) {
+      return isNumber(value) ? null : index;
+    })
+    .filter(function (index) {
+      return index !== null;
+    });
+
+  inputElements.forEach(function (input) {
+    input.closest(".input-field").classList.remove("is-target");
+  });
+
+  if (emptyIndexes.length === 1) {
+    inputElements[emptyIndexes[0]].closest(".input-field").classList.add("is-target");
+  }
+}
+
 function updatePreview() {
   var values = getValues();
   var widthRatio = values[0];
   var heightRatio = values[1];
 
+  updateTargetHighlight();
+
   if (!isNumber(widthRatio) || !isNumber(heightRatio) || widthRatio <= 0 || heightRatio <= 0) {
     preview.classList.add("is-hidden");
+    simplifiedOutput.textContent = "";
     return;
   }
+
+  preview.classList.remove("is-hidden");
 
   var stageWidth = previewStage ? previewStage.clientWidth - 30 : MAX_PREVIEW_WIDTH;
   var stageHeight = previewStage ? previewStage.clientHeight - 30 : MAX_PREVIEW_HEIGHT;
@@ -60,7 +124,7 @@ function updatePreview() {
   previewBox.style.width = previewWidth + "px";
   previewBox.style.height = previewHeight + "px";
   previewLabel.textContent = formatNumber(widthRatio) + ":" + formatNumber(heightRatio);
-  preview.classList.remove("is-hidden");
+  simplifiedOutput.textContent = "Simplified: " + getSimplifiedRatio(widthRatio, heightRatio);
 }
 
 function hasZeroDenominator(values, missingIndex) {
@@ -174,22 +238,96 @@ inputElements.forEach(function (input) {
   });
 });
 
+document.querySelectorAll(".clear-input").forEach(function (button) {
+  button.addEventListener("click", function () {
+    var input = document.getElementById(button.dataset.clear);
+
+    if (!input) return;
+
+    input.value = "";
+    input.focus();
+    updatePreview();
+  });
+});
+
+document.querySelectorAll(".step-input").forEach(function (button) {
+  button.addEventListener("click", function () {
+    var input = document.getElementById(button.dataset.target);
+    var step = parseFloat(button.dataset.step);
+
+    if (!input || !isNumber(step)) return;
+
+    var currentValue = parseFloat(input.value);
+
+    input.value = formatNumber((isNumber(currentValue) ? currentValue : 0) + step);
+    input.focus();
+    updatePreview();
+  });
+});
+
+document.querySelectorAll("[data-preset-width][data-preset-height]").forEach(function (button) {
+  button.addEventListener("click", function () {
+    setPreset(button.dataset.presetWidth, button.dataset.presetHeight);
+  });
+});
+
+function setTheme(theme) {
+  var isLight = theme === "light";
+
+  document.body.classList.toggle("light-mode", isLight);
+  themeToggle.textContent = isLight ? "☾" : "☀";
+  themeToggle.setAttribute("aria-label", isLight ? "Switch to dark mode" : "Switch to light mode");
+
+  try {
+    localStorage.setItem("ratioCalculatorTheme", isLight ? "light" : "dark");
+  } catch (error) {
+    return;
+  }
+}
+
+function toggleTheme() {
+  setTheme(document.body.classList.contains("light-mode") ? "dark" : "light");
+}
+
+function closeGuide() {
+  guidePopover.classList.add("is-hidden");
+  guideToggle.setAttribute("aria-expanded", "false");
+}
+
+function toggleGuide() {
+  var isHidden = guidePopover.classList.contains("is-hidden");
+
+  guidePopover.classList.toggle("is-hidden", !isHidden);
+  guideToggle.setAttribute("aria-expanded", isHidden ? "true" : "false");
+}
+
 document.getElementById("calculate-btn").addEventListener("click", calculate);
 document.getElementById("reset-btn").addEventListener("click", reset);
-document.getElementById("preset-btn1").addEventListener("click", function () { setPreset("4", "3"); });
-document.getElementById("preset-btn2").addEventListener("click", function () { setPreset("3", "2"); });
-document.getElementById("preset-btn3").addEventListener("click", function () { setPreset("16", "9"); });
-document.getElementById("preset-btn4").addEventListener("click", function () { setPreset("1.85", "1"); });
-document.getElementById("preset-btn5").addEventListener("click", function () { setPreset("2.35", "1"); });
-document.getElementById("preset-btn6").addEventListener("click", function () { setPreset("8", "1"); });
 document.getElementById("flip-btn").addEventListener("click", flipRatio);
+themeToggle.addEventListener("click", toggleTheme);
+guideToggle.addEventListener("click", function (event) {
+  event.stopPropagation();
+  toggleGuide();
+});
+guidePopover.addEventListener("click", function (event) {
+  event.stopPropagation();
+});
 
 document.addEventListener("keydown", function (event) {
   if (event.key === "Enter") {
     calculate();
+  } else if (event.key === "Escape") {
+    closeGuide();
   }
 });
 
+document.addEventListener("click", closeGuide);
 window.addEventListener("resize", updatePreview);
+
+try {
+  setTheme(localStorage.getItem("ratioCalculatorTheme") === "light" ? "light" : "dark");
+} catch (error) {
+  setTheme("dark");
+}
 
 updatePreview();
