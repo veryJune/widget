@@ -11,6 +11,7 @@ const inputElements = [
 ];
 const output = document.getElementById("output");
 const preview = document.getElementById("ratio-preview");
+const previewStage = document.querySelector(".preview-stage");
 const previewBox = document.getElementById("preview-box");
 const previewLabel = document.getElementById("preview-label");
 
@@ -48,7 +49,11 @@ function updatePreview() {
     return;
   }
 
-  var scale = Math.min(MAX_PREVIEW_WIDTH / widthRatio, MAX_PREVIEW_HEIGHT / heightRatio);
+  var stageWidth = previewStage ? previewStage.clientWidth - 30 : MAX_PREVIEW_WIDTH;
+  var stageHeight = previewStage ? previewStage.clientHeight - 30 : MAX_PREVIEW_HEIGHT;
+  var maxWidth = Math.min(MAX_PREVIEW_WIDTH, Math.max(stageWidth, 24));
+  var maxHeight = Math.min(MAX_PREVIEW_HEIGHT, Math.max(stageHeight, 24));
+  var scale = Math.min(maxWidth / widthRatio, maxHeight / heightRatio);
   var previewWidth = Math.max(widthRatio * scale, 24);
   var previewHeight = Math.max(heightRatio * scale, 24);
 
@@ -138,6 +143,24 @@ function reset() {
 function setPreset(width, height) {
   inputElements[0].value = width;
   inputElements[1].value = height;
+  setOutput(DEFAULT_HINT, true);
+  updatePreview();
+}
+
+function flipPair(firstInput, secondInput) {
+  var firstValue = firstInput.value;
+  firstInput.value = secondInput.value;
+  secondInput.value = firstValue;
+}
+
+function flipRatio() {
+  flipPair(inputElements[0], inputElements[1]);
+
+  if (inputElements[2].value !== "" || inputElements[3].value !== "") {
+    flipPair(inputElements[2], inputElements[3]);
+  }
+
+  setOutput(DEFAULT_HINT, true);
   updatePreview();
 }
 
@@ -158,11 +181,15 @@ document.getElementById("preset-btn2").addEventListener("click", function () { s
 document.getElementById("preset-btn3").addEventListener("click", function () { setPreset("16", "9"); });
 document.getElementById("preset-btn4").addEventListener("click", function () { setPreset("1.85", "1"); });
 document.getElementById("preset-btn5").addEventListener("click", function () { setPreset("2.35", "1"); });
+document.getElementById("preset-btn6").addEventListener("click", function () { setPreset("8", "1"); });
+document.getElementById("flip-btn").addEventListener("click", flipRatio);
 
 document.addEventListener("keydown", function (event) {
   if (event.key === "Enter") {
     calculate();
   }
 });
+
+window.addEventListener("resize", updatePreview);
 
 updatePreview();

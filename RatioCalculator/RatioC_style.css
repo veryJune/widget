@@ -1,8 +1,16 @@
 body {
-  font-family: Verdana, sans-serif;
+  box-sizing: border-box;
   background-color: #1f253d;
+  font-family: Verdana, sans-serif;
   margin: 0;
-  padding: 20px;
+  min-height: 100vh;
+  padding: clamp(12px, 4vw, 32px);
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: inherit;
 }
 
 .calculator {
@@ -10,82 +18,73 @@ body {
   border: 1px solid #cccccc3a;
   border-radius: 8px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.8);
-  margin: 50px auto;
-  max-width: 430px;
-  padding: 30px;
+  margin: 0 auto;
+  max-width: 560px;
+  padding: clamp(20px, 5vw, 34px);
+  width: min(100%, 560px);
 }
 
 h1 {
-  font-size: 24px;
   color: #e4e4e4;
-  margin-bottom: 20px;
+  font-size: 26px;
+  margin: 16px 0 24px;
   text-align: center;
 }
 
 form {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: space-between;
+  display: grid;
+  gap: 24px;
 }
 
-form>div {
-  flex-basis: 48%;
+.input-grid {
+  display: grid;
+  gap: 12px 18px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 label {
+  color: #a7adc2;
   display: block;
   font-size: 12px;
-  color: #888888;
-  margin-bottom: 5px;
-  margin-top: 10px;
+  margin-bottom: 6px;
+  margin-top: 0;
 }
 
 input[type="number"] {
   background: #50597b;
-  color: #fff;
   border: solid 1px #1f253d;
   border-radius: 5px;
-  box-sizing: border-box;
+  color: #fff;
   font-size: 16px;
   padding: 10px;
   width: 100%;
 }
 
 input[type="number"]:focus {
-  outline: none;
-  /* removes the default orange border when focus */
   border: 1px solid #11a8ab;
+  outline: none;
 }
 
 button {
-  box-shadow: inset 0px 1px 0px 0px #ffffff1f;
+  align-items: center;
   background: #e64c65;
-  display: block;
-  margin-top: 30px;
-  margin-bottom: 10px;
-  border-radius: 6px;
   border: 1px solid #1f253d;
-  cursor: pointer;
+  border-radius: 6px;
+  box-shadow: inset 0px 1px 0px 0px #ffffff1f;
   color: #f3f3f3;
+  cursor: pointer;
+  display: inline-flex;
   font-size: 12px;
   font-weight: bold;
-  padding: 10px 24px;
-}
-
-button.preset {
-  background: #2d3347;
-  color: #5a6999;
+  justify-content: center;
+  margin: 0;
+  min-height: 38px;
+  padding: 10px 18px;
+  white-space: nowrap;
 }
 
 button:hover {
-  background: #0F9295;
-}
-
-button.preset:hover {
-  background: #3f5094;
-  color: #ffffff;
-  box-shadow: #11a8ab 0px 4px 14px;
-  border: 1px solid #11a9abbe;
+  background: #0f9295;
 }
 
 button:active {
@@ -93,13 +92,47 @@ button:active {
   top: 1px;
 }
 
+.action-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
 
+.action-row button {
+  flex: 1 1 140px;
+}
 
+.preset-row {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(76px, 1fr));
+}
+
+button.preset {
+  background: #2d3347;
+  color: #7f8dcb;
+  min-width: 0;
+  padding-left: 12px;
+  padding-right: 12px;
+}
+
+button.utility {
+  color: #d4dbff;
+}
+
+button.preset:hover {
+  background: #3f5094;
+  border: 1px solid #11a9abbe;
+  box-shadow: #11a8ab 0px 4px 14px;
+  color: #ffffff;
+}
 
 #output {
   color: #e4e4e4;
   font-size: 14px;
-  margin-top: 20px;
+  line-height: 1.5;
+  margin-top: 22px;
+  min-height: 21px;
   text-align: center;
 }
 
@@ -121,9 +154,8 @@ button:active {
   background: #2d3347;
   border: 1px solid #1f253d;
   border-radius: 6px;
-  box-sizing: border-box;
   display: flex;
-  height: 210px;
+  height: clamp(160px, 38vw, 220px);
   justify-content: center;
   padding: 15px;
   width: 100%;
@@ -141,32 +173,43 @@ button:active {
   font-weight: bold;
   justify-content: center;
   max-height: 180px;
-  max-width: 320px;
+  max-width: 100%;
   min-height: 24px;
   min-width: 24px;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.45);
 }
 
 @media (max-width: 480px) {
-  body {
-    padding: 12px;
-  }
-
   .calculator {
-    margin: 20px auto;
-    padding: 20px;
+    border-radius: 7px;
   }
 
-  form>div {
-    flex-basis: 100%;
+  h1 {
+    font-size: 23px;
+    margin-top: 8px;
   }
 
-  button {
-    padding-left: 16px;
-    padding-right: 16px;
+  .input-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .action-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .preset-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .preview-stage {
-    height: 180px;
+    padding: 12px;
+  }
+}
+
+@media (max-width: 340px) {
+  .action-row,
+  .preset-row {
+    grid-template-columns: 1fr;
   }
 }
