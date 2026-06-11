@@ -2,6 +2,8 @@
 <html>
 
 <head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Ratio Calculator</title>
   <meta name="author" content="Very More JUNE">
   <meta name="description" content="ratio calculations">
@@ -40,7 +42,14 @@
       <button type="button" class="preset" id="preset-btn4">1.85:1</button>
       <button type="button" class="preset" id="preset-btn5">2.35:1</button>
     </form>
-    <div id="output"><h5 style="color:#50597b; font-weight : normal;">* middle click to empty the input value</h5></div>
+    <div id="output" class="hint">Middle click an input to clear it, or use Reset to clear all values.</div>
+    <div id="ratio-preview" class="ratio-preview" aria-live="polite">
+      <div class="preview-stage">
+        <div id="preview-box" class="preview-box">
+          <span id="preview-label">16:9</span>
+        </div>
+      </div>
+    </div>
   </div>
 </body>
 

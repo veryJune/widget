@@ -1,6 +1,8 @@
 body {
   font-family: Verdana, sans-serif;
   background-color: #1f253d;
+  margin: 0;
+  padding: 20px;
 }
 
 .calculator {
@@ -9,7 +11,7 @@ body {
   border-radius: 8px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.8);
   margin: 50px auto;
-  max-width: 400px;
+  max-width: 430px;
   padding: 30px;
 }
 
@@ -76,7 +78,7 @@ button.preset {
 }
 
 button:hover {
-  background: #0F9295
+  background: #0F9295;
 }
 
 button.preset:hover {
@@ -95,7 +97,76 @@ button:active {
 
 
 #output {
+  color: #e4e4e4;
   font-size: 14px;
   margin-top: 20px;
   text-align: center;
+}
+
+#output.hint {
+  color: #8d97c4;
+  font-size: 12px;
+}
+
+.ratio-preview {
+  margin-top: 20px;
+}
+
+.ratio-preview.is-hidden {
+  display: none;
+}
+
+.preview-stage {
+  align-items: center;
+  background: #2d3347;
+  border: 1px solid #1f253d;
+  border-radius: 6px;
+  box-sizing: border-box;
+  display: flex;
+  height: 210px;
+  justify-content: center;
+  padding: 15px;
+  width: 100%;
+}
+
+.preview-box {
+  align-items: center;
+  background: linear-gradient(135deg, #11a8ab, #0f9295);
+  border: 1px solid #60d8da;
+  border-radius: 4px;
+  box-shadow: 0 10px 24px rgba(17, 168, 171, 0.25);
+  color: #ffffff;
+  display: flex;
+  font-size: 13px;
+  font-weight: bold;
+  justify-content: center;
+  max-height: 180px;
+  max-width: 320px;
+  min-height: 24px;
+  min-width: 24px;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.45);
+}
+
+@media (max-width: 480px) {
+  body {
+    padding: 12px;
+  }
+
+  .calculator {
+    margin: 20px auto;
+    padding: 20px;
+  }
+
+  form>div {
+    flex-basis: 100%;
+  }
+
+  button {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+
+  .preview-stage {
+    height: 180px;
+  }
 }
