@@ -20,20 +20,20 @@
 }
 
 body.light-mode {
-  --page-bg: #eef3fb;
+  --page-bg: #f7faff;
   --panel-bg: #ffffff;
-  --panel-border: #d9e2ef;
-  --stage-bg: #f3f7fd;
+  --panel-border: #e3eaf5;
+  --stage-bg: #f8fbff;
   --text: #172033;
   --muted: #63718a;
   --hint: #7a879d;
-  --input-bg: #fbfdff;
-  --input-border: #ccd7e6;
+  --input-bg: #ffffff;
+  --input-border: #d8e2f0;
   --primary: #f04f66;
   --primary-hover: #db3f57;
-  --button-bg: #edf2fb;
+  --button-bg: #f2f6ff;
   --button-text: #465a87;
-  --button-hover: #dce7fb;
+  --button-hover: #e5edff;
   --accent: #4f7df3;
   --accent-bright: #3468df;
   --success: #16a34a;
@@ -71,7 +71,7 @@ body {
 .top-bar {
   align-items: start;
   display: grid;
-  grid-template-columns: 68px minmax(0, 1fr) 88px;
+  grid-template-columns: 92px minmax(0, 1fr) 118px;
   margin-bottom: 18px;
 }
 
@@ -81,6 +81,22 @@ h1 {
   letter-spacing: 0;
   margin: 6px 0 0;
   text-align: center;
+}
+
+.brand-button {
+  background: transparent;
+  border: 0;
+  color: var(--text);
+  font-size: inherit;
+  font-weight: bold;
+  min-height: 0;
+  padding: 0;
+}
+
+.brand-button:hover,
+.brand-button:focus {
+  background: transparent;
+  color: var(--accent-bright);
 }
 
 .top-tools {
@@ -131,6 +147,11 @@ button:active {
 .icon-button:focus {
   background: var(--button-hover);
   color: var(--text);
+}
+
+.text-icon {
+  font-size: 10px;
+  width: 28px;
 }
 
 .tool-popover {
@@ -185,7 +206,21 @@ button:active {
   background: var(--stage-bg);
   border: 1px solid var(--panel-border);
   border-radius: 6px;
+  color: var(--text);
+  display: block;
+  font-size: 12px;
+  font-weight: normal;
+  min-height: 0;
   padding: 7px;
+  text-align: left;
+  white-space: normal;
+  width: 100%;
+}
+
+.history-item:hover,
+.history-item:focus {
+  background: var(--button-hover);
+  color: var(--text);
 }
 
 .popover-actions {
@@ -219,6 +254,12 @@ button:active {
   color: var(--muted);
   min-height: 34px;
   padding: 8px 6px;
+}
+
+.tab-button:hover,
+.tab-button:focus {
+  background: var(--button-hover);
+  color: var(--text);
 }
 
 .tab-button.is-active {
@@ -373,6 +414,13 @@ button.preset:hover,
 
 .mode-row {
   margin-bottom: 18px;
+}
+
+.rate-preset-row {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin-top: 12px;
 }
 
 .info-card,
@@ -576,15 +624,18 @@ input[type="range"] {
 }
 
 @media (max-width: 560px) {
-  .input-grid,
   .stats-grid,
   .estimate-grid,
   .compare-grid {
     grid-template-columns: 1fr;
   }
 
-  .tool-tabs {
+  .input-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .tool-tabs {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
 
@@ -594,7 +645,7 @@ input[type="range"] {
   }
 
   .top-bar {
-    grid-template-columns: 42px minmax(0, 1fr) 88px;
+    grid-template-columns: 44px minmax(0, 1fr) 118px;
     margin-bottom: 16px;
   }
 
@@ -609,6 +660,10 @@ input[type="range"] {
     padding-right: 4px;
   }
 
+  .rate-preset-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .preview-stage {
     padding: 12px;
   }
@@ -616,8 +671,10 @@ input[type="range"] {
 
 @media (max-width: 340px) {
   .input-control,
+  .input-grid,
   .preset-row,
-  .mode-row {
+  .mode-row,
+  .rate-preset-row {
     grid-template-columns: 1fr;
   }
 
