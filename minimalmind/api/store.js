@@ -31,12 +31,14 @@ export default async function handler(req, res) {
         return;
     }
 
+    const token = process.env.BLOB_READ_WRITE_TOKEN;
     try {
         if (req.method === 'GET') {
             const { blobs } = await list({ prefix: PATH });
             const found = blobs.find(b => b.pathname === PATH);
             if (!found) { res.status(200).json({ empty: true }); return; }
-            const r = await fetch(found.url, { cache: 'no-store' });
+            // 비공개 Blob 은 토큰(Bearer)으로만 읽을 수 있음
+            const r = await fetch(found.url, { headers: { Authorization: `Bearer ${token}` }, cache: 'no-store' });
             if (!r.ok) { res.status(200).json({ empty: true }); return; }
             const data = await r.json();
             res.status(200).json({ data });
@@ -47,7 +49,7 @@ export default async function handler(req, res) {
             const payload = readJsonBody(req);
             if (!payload || typeof payload !== 'object') { res.status(400).json({ error: 'invalid body' }); return; }
             await put(PATH, JSON.stringify(payload), {
-                access: 'public',           // URL 은 랜덤 store-id 하위라 추측 불가, 클라이언트엔 노출 안 됨
+                access: 'private',          // 비공개 저장소: 토큰 있어야 읽기/쓰기 가능 (더 안전)
                 addRandomSuffix: false,
                 allowOverwrite: true,
                 contentType: 'application/json',
