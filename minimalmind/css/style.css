@@ -427,6 +427,18 @@ body.font-hand .node[data-is-root="true"] { font-size: calc(26px * var(--node-fo
 }
 .proj-actions button:hover { background: var(--accent-color); }
 
+/* Cloud sync */
+.cloud-body { padding: 24px; }
+.cloud-desc { font-size: 13px; color: var(--text-sub); line-height: 1.6; margin: 0 0 4px; }
+.cloud-status-line { font-size: 14px; color: var(--text-color); display: flex; justify-content: space-between; margin: 8px 0; }
+.cloud-status-line b { color: var(--accent-color); }
+.cloud-actions { display: flex; gap: 8px; margin-top: 18px; }
+.cloud-actions .modal-btn { flex: 1; }
+#btn-cloud.connected { color: var(--accent-color); }
+#btn-cloud.syncing svg { animation: cloudPulse 1s ease-in-out infinite; }
+#btn-cloud.error { color: var(--danger); }
+@keyframes cloudPulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
+
 /* Save Modal */
 .save-modal-body { padding: 30px; text-align: center; }
 .save-input {

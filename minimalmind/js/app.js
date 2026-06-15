@@ -60,10 +60,15 @@
             this.searchIdx = 0;
             this.searchSet = new Set();
 
-            // 다중 프로젝트 스토어 (2단계에서 클라우드로 교체 가능)
+            // 다중 프로젝트 스토어
             this.store = new MM.ProjectStore();
             this.activeProjectId = null;
             this.projectsModal = document.getElementById('projects-modal');
+
+            // 클라우드 동기화 (Phase 2)
+            this.cloudModal = document.getElementById('cloud-modal');
+            this.cloud = new MM.CloudSync(this.store);
+            this.cloud.onStatus = (s) => this.updateCloudStatus(s);
 
             // 사용자 환경설정(테마/미니맵/힌트)은 문서와 분리해서 저장
             this.PREFS_KEY = 'minimalMind_prefs_v1';
@@ -105,6 +110,12 @@
                 this.centerView();
                 this.renderMinimap();
             });
+
+            // 클라우드가 켜져 있으면 로드 직후 원격과 병합
+            if (this.cloud.isEnabled()) {
+                this.updateCloudStatus('connected');
+                this.cloudPullAndMerge();
+            }
         }
 
         /* ---------- toast ---------- */
@@ -185,7 +196,7 @@
 
         /* ---------- preferences (테마/미니맵/힌트) ---------- */
         loadPrefs() {
-            const def = { dark: false, accent: '#007AFF', font: 'sans', fontScale: 1, curve: 'curved', palette: 'pastel', minimap: true, hint: 'shown' };
+            const def = { dark: false, accent: '#007AFF', font: 'sans', fontScale: 1, curve: 'curved', palette: 'pastel', minimap: true, hint: 'mini' };
             const FONTS = ['sans', 'serif', 'rounded', 'hand'];
             const SCALES = [0.9, 1, 1.15, 1.35];
             const CURVES = ['curved', 'elbow', 'straight'];
@@ -460,7 +471,7 @@
                 this.historyIdx--;
             }
             this.updateUndoRedoBtns();
-            this.saveToStorage();
+            this.saveToStorage(state); // 이미 만든 문자열 재사용 (재직렬화 생략)
         }
 
         undo() {
@@ -476,7 +487,9 @@
         }
 
         restoreState() {
-            const state = JSON.parse(this.history[this.historyIdx]);
+            let state;
+            try { state = JSON.parse(this.history[this.historyIdx]); }
+            catch (e) { this.showToast('실행 취소 기록이 손상되어 복원할 수 없습니다.', 'error'); return; }
             this.nodes = state.nodes;
             this.rootId = state.rootId;
             this.docTitle = state.docTitle || "Untitled Project";
@@ -1074,6 +1087,7 @@
                     this.helpModal.classList.remove('active');
                     this.closeSaveModal();
                     this.closeProjects();
+                    this.closeCloudModal();
                 }
                 if (e.key === 'Home') this.centerView();
                 if (e.key === 'Tab' && !this.selectedId) {
@@ -1672,19 +1686,22 @@
             anchor.click();
         }
 
-        saveToStorage() {
-            const doc = this.currentDocument();
+        // docString: saveState 가 이미 만든 JSON 문자열(있으면 재직렬화 생략)
+        saveToStorage(docString) {
             let result;
             if (!this.activeProjectId) {
                 // 첫 저장 → 새 프로젝트 생성
-                const id = this.store.createProject(doc, this.docTitle);
+                const id = this.store.createProject(this.currentDocument(), this.docTitle);
                 if (id) { this.activeProjectId = id; result = { ok: true }; }
                 else result = { ok: false, reason: 'unknown' };
+            } else if (docString) {
+                result = this.store.saveProjectRaw(this.activeProjectId, docString, this.docTitle);
             } else {
-                result = this.store.saveProject(this.activeProjectId, doc, this.docTitle);
+                result = this.store.saveProject(this.activeProjectId, this.currentDocument(), this.docTitle);
             }
             if (result.ok) {
                 this.showSaveIndicator();
+                if (this.cloud.isEnabled()) this.cloud.scheduleSync(() => this.store.exportBundle());
             } else if (result.reason === 'quota') {
                 this.showToast('저장 공간이 가득 찼습니다. 이미지를 줄이거나 파일로 내보내세요.', 'error');
             } else {
@@ -1958,6 +1975,107 @@
                 card.onclick = () => this.openProject(p.id);
                 grid.appendChild(card);
             });
+        }
+
+        /* ---------- cloud sync (Phase 2) ---------- */
+        openCloudModal() {
+            this.stopEditing();
+            this._refreshCloudModal();
+            this.cloudModal.classList.add('active');
+            if (!this.cloud.isEnabled()) {
+                const pw = document.getElementById('cloud-pw');
+                pw.value = ''; setTimeout(() => pw.focus(), 50);
+            }
+        }
+        closeCloudModal() { this.cloudModal.classList.remove('active'); }
+
+        _refreshCloudModal() {
+            const on = this.cloud.isEnabled();
+            document.getElementById('cloud-disconnected').style.display = on ? 'none' : 'block';
+            document.getElementById('cloud-connected').style.display = on ? 'block' : 'none';
+            const ls = this.cloud.lastSync();
+            document.getElementById('cloud-lastsync').textContent = ls ? this.formatDate(ls) : '아직 없음';
+        }
+
+        async cloudConnect() {
+            const pw = document.getElementById('cloud-pw').value;
+            if (!pw) { this.showToast('비밀번호를 입력하세요.', 'error'); return; }
+            this.showToast('연결 중…', 'info');
+            const r = await this.cloud.connect(pw);
+            if (!r.ok) {
+                const msg = r.reason === 'auth' ? '비밀번호가 올바르지 않습니다.'
+                    : r.reason === 'server' ? '서버(백엔드)가 아직 설정되지 않았습니다.'
+                        : '연결에 실패했습니다 (네트워크).';
+                this.showToast(msg, 'error');
+                return;
+            }
+            try {
+                if (r.data) {
+                    const activeChanged = this.store.importBundle(r.data);
+                    await this.cloud.push(this.store.exportBundle()); // 양쪽 수렴
+                    if (activeChanged) this._reloadActiveFromStore();
+                } else {
+                    await this.cloud.push(this.store.exportBundle());
+                }
+            } catch (e) { /* 상태로 표시 */ }
+            this.updateCloudStatus('synced');
+            this._refreshCloudModal();
+            this.renderProjectGallery();
+            this.showToast('동기화가 켜졌습니다.', 'success');
+        }
+
+        cloudDisconnect() {
+            this.cloud.disconnect();
+            this.updateCloudStatus('off');
+            this._refreshCloudModal();
+            this.showToast('동기화를 해제했습니다.', 'success');
+        }
+
+        async cloudSyncNow() { await this.cloudPullAndMerge(true); }
+
+        async cloudPullAndMerge(notify) {
+            if (!this.cloud.isEnabled()) return;
+            this.updateCloudStatus('syncing');
+            try {
+                const remote = await this.cloud.pull();
+                const activeChanged = remote ? this.store.importBundle(remote) : false;
+                await this.cloud.push(this.store.exportBundle());
+                if (activeChanged) this._reloadActiveFromStore();
+                this.updateCloudStatus('synced');
+                this._refreshCloudModal();
+                if (notify) this.showToast('동기화 완료.', 'success');
+            } catch (e) {
+                this.updateCloudStatus('error');
+                if (notify) this.showToast('동기화에 실패했습니다.', 'error');
+            }
+        }
+
+        // 원격 병합으로 활성 프로젝트가 바뀌었을 때 화면 갱신
+        _reloadActiveFromStore() {
+            const doc = this.store.loadProject(this.activeProjectId);
+            if (!doc) return;
+            this.nodes = doc.nodes; this.rootId = doc.rootId;
+            this.docTitle = doc.docTitle; this.isColorMode = doc.isColorMode;
+            this.titleInput.value = this.docTitle;
+            this.history = []; this.historyIdx = -1;
+            this.selectedId = null; this.editingId = null;
+            this.nodesLayer.innerHTML = '';
+            this.updateColorModeUI();
+            this.render(); this.updateLayout(); this.centerView();
+            this.showToast('최신 버전을 불러왔습니다.', 'success');
+        }
+
+        updateCloudStatus(status) {
+            const btn = document.getElementById('btn-cloud');
+            if (btn) {
+                let cls = 'icon-btn';
+                if (status === 'error') cls += ' error';
+                else if (status !== 'off') cls += ' connected';
+                if (status === 'syncing') cls += ' syncing';
+                btn.className = cls;
+            }
+            const lbl = document.getElementById('cloud-status');
+            if (lbl) lbl.textContent = status === 'syncing' ? '동기화 중…' : status === 'error' ? '오류' : status === 'off' ? '꺼짐' : '연결됨';
         }
     }
 

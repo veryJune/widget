@@ -6,7 +6,7 @@
     <title>MinimalMind</title>
     <!-- Pretendard Font -->
     <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.8/dist/web/static/pretendard.css" />
-    <!-- 노드용 추가 폰트: 명조(Noto Serif KR), 둥근(Orbit), 손글씨(Gaegu) -->
+    <!-- 노드용 추가 폰트: 명조(Noto Serif KR), Orbit, 손글씨(Gaegu) -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Gaegu:wght@400;700&family=Noto+Serif+KR:wght@400;600;800&family=Orbit&display=swap" />
@@ -65,6 +65,9 @@
             <button onclick="app.openProjects()" class="icon-btn" data-tooltip="내 프로젝트">
                 <svg viewBox="0 0 24 24"><path d="M10 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/></svg>
             </button>
+            <button onclick="app.openCloudModal()" class="icon-btn" id="btn-cloud" data-tooltip="클라우드 동기화">
+                <svg viewBox="0 0 24 24"><path d="M19.35 10.04A7.49 7.49 0 0 0 12 4C9.11 4 6.6 5.64 5.35 8.04A5.994 5.994 0 0 0 0 14a6 6 0 0 0 6 6h13a5 5 0 0 0 .35-9.96zM19 18H6a4 4 0 0 1-.36-7.98l.94-.08.44-.84A5.49 5.49 0 0 1 12 6c2.62 0 4.88 1.86 5.39 4.43l.3 1.5 1.53.11A3 3 0 0 1 19 18z"/></svg>
+            </button>
 
             <!-- 파일 그룹 (호버 드롭다운) -->
             <div class="menu-group">
@@ -122,7 +125,7 @@
             <div class="theme-grid2">
                 <button class="theme-opt" data-font="sans" onclick="app.setFont('sans')">기본</button>
                 <button class="theme-opt" data-font="serif" onclick="app.setFont('serif')" style="font-family:'Noto Serif KR',serif">명조</button>
-                <button class="theme-opt" data-font="rounded" onclick="app.setFont('rounded')" style="font-family:'Orbit'">둥근</button>
+                <button class="theme-opt" data-font="rounded" onclick="app.setFont('rounded')" style="font-family:'Orbit'">Orbit</button>
                 <button class="theme-opt" data-font="hand" onclick="app.setFont('hand')" style="font-family:'Gaegu',cursive">손글씨</button>
             </div>
         </div>
@@ -232,6 +235,32 @@
         </div>
     </div>
 
+    <!-- Cloud Sync Modal -->
+    <div id="cloud-modal" class="modal-overlay" onclick="app.closeCloudModal()">
+        <div class="help-modal" style="width: 380px;" onclick="event.stopPropagation()">
+            <div class="help-header">
+                <h3>클라우드 동기화</h3>
+                <span class="close-help" onclick="app.closeCloudModal()">✕</span>
+            </div>
+            <div class="cloud-body">
+                <div id="cloud-disconnected">
+                    <p class="cloud-desc">비밀번호를 입력하면 여러 기기에서 같은 프로젝트를 동기화합니다.<br>(Vercel에 백엔드 설정이 되어 있어야 합니다)</p>
+                    <input type="password" id="cloud-pw" class="save-input" placeholder="동기화 비밀번호" autocomplete="off"
+                           onkeydown="if(event.key==='Enter') app.cloudConnect()">
+                    <button class="modal-btn primary" style="width:100%" onclick="app.cloudConnect()">연결</button>
+                </div>
+                <div id="cloud-connected" style="display:none">
+                    <p class="cloud-status-line">상태 <b id="cloud-status">연결됨</b></p>
+                    <p class="cloud-status-line">마지막 동기화 <span id="cloud-lastsync">—</span></p>
+                    <div class="cloud-actions">
+                        <button class="modal-btn secondary" onclick="app.cloudSyncNow()">지금 동기화</button>
+                        <button class="modal-btn secondary" onclick="app.cloudDisconnect()">연결 해제</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Help Modal -->
     <div id="help-modal" class="modal-overlay" onclick="app.toggleHelp()">
         <div class="help-modal" onclick="event.stopPropagation()">
@@ -331,6 +360,7 @@
     <script src="js/data.js"></script>
     <script src="js/security.js"></script>
     <script src="js/storage.js"></script>
+    <script src="js/cloud.js"></script>
     <script src="js/app.js"></script>
 </body>
 </html>

@@ -55,8 +55,17 @@ MM.ProjectStore = class {
     }
 
     saveProject(id, doc, title) {
-        const res = this._write(this.DOC_PREFIX + id, doc);
-        if (!res.ok) return res;
+        return this.saveProjectRaw(id, JSON.stringify(doc), title);
+    }
+
+    // 이미 직렬화된 문서 문자열을 그대로 저장 (재직렬화 방지)
+    saveProjectRaw(id, docString, title) {
+        let res;
+        try { localStorage.setItem(this.DOC_PREFIX + id, docString); res = { ok: true }; }
+        catch (e) {
+            const quota = e && (e.name === 'QuotaExceededError' || e.code === 22);
+            return { ok: false, error: e, reason: quota ? 'quota' : 'unknown' };
+        }
         const list = this.listProjects();
         const now = Date.now();
         const i = list.findIndex(p => p.id === id);
@@ -64,7 +73,7 @@ MM.ProjectStore = class {
         else { list.push({ id, title, createdAt: now, updatedAt: now }); }
         list.sort((a, b) => b.updatedAt - a.updatedAt);
         this._writeIndex(list);
-        return { ok: true };
+        return res;
     }
 
     createProject(doc, title) {
@@ -98,6 +107,57 @@ MM.ProjectStore = class {
         const copy = JSON.parse(JSON.stringify(doc));
         copy.docTitle = title;
         return this.createProject(copy, title);
+    }
+
+    /* ---------- 클라우드 동기화용 번들 ---------- */
+    // 모든 프로젝트(인덱스 + 문서)를 하나의 번들로 내보내기
+    exportBundle() {
+        const projects = this.listProjects();
+        const docs = {};
+        projects.forEach(p => {
+            const raw = this._read(this.DOC_PREFIX + p.id);
+            if (raw) docs[p.id] = raw;
+        });
+        return { v: 1, projects, docs, active: this.getActiveId(), at: Date.now() };
+    }
+
+    // 원격 번들을 로컬과 병합 (프로젝트별 updatedAt 최신 우선; 삭제는 전파하지 않음)
+    // @returns {boolean} 활성 프로젝트 문서가 갱신되었는지
+    importBundle(bundle) {
+        if (!bundle || !Array.isArray(bundle.projects)) return false;
+        const activeId = this.getActiveId();
+        const localIndex = this.listProjects();
+        const localMap = {};
+        localIndex.forEach(p => { localMap[p.id] = p; });
+        const mergedIndex = localIndex.slice();
+        let changed = false, activeChanged = false;
+
+        bundle.projects.forEach(rp => {
+            if (!rp || typeof rp.id !== 'string') return;
+            const lp = localMap[rp.id];
+            if (lp && (rp.updatedAt || 0) <= (lp.updatedAt || 0)) return; // 로컬이 최신
+            const rdoc = bundle.docs && bundle.docs[rp.id];
+            const clean = rdoc ? MM.Security.sanitizeDocument(rdoc) : null;
+            if (!clean) return;
+            const w = this._write(this.DOC_PREFIX + rp.id, clean);
+            if (!w.ok) return;
+            const entry = {
+                id: rp.id,
+                title: rp.title || clean.docTitle || 'Untitled',
+                createdAt: rp.createdAt || Date.now(),
+                updatedAt: rp.updatedAt || Date.now(),
+            };
+            const i = mergedIndex.findIndex(p => p.id === rp.id);
+            if (i >= 0) mergedIndex[i] = entry; else mergedIndex.push(entry);
+            changed = true;
+            if (rp.id === activeId) activeChanged = true;
+        });
+
+        if (changed) {
+            mergedIndex.sort((a, b) => b.updatedAt - a.updatedAt);
+            this._writeIndex(mergedIndex);
+        }
+        return activeChanged;
     }
 
     /** 기존 단일 문서를 첫 프로젝트로 이전 (인덱스가 비어있을 때만) */
