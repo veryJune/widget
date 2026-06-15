@@ -2046,7 +2046,7 @@
                 if (notify) this.showToast('동기화 완료.', 'success');
             } catch (e) {
                 this.updateCloudStatus('error');
-                if (notify) this.showToast('동기화에 실패했습니다.', 'error');
+                if (notify) this.showToast('동기화 실패: ' + (e.message || '알 수 없는 오류'), 'error');
             }
         }
 

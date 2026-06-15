@@ -69,10 +69,16 @@ MM.CloudSync = class {
         if (this.onStatus) this.onStatus('off');
     }
 
+    async _errMsg(res, fallback) {
+        let m; try { m = (await res.json()).error; } catch (e) { /* non-json */ }
+        return m || fallback;
+    }
+
     async pull() {
         if (!this.isEnabled()) return null;
         const res = await this._fetch('GET');
-        if (res.status === 401) { this.disconnect(); throw new Error('auth'); }
+        if (res.status === 401) { this.disconnect(); throw new Error('비밀번호가 거부되었습니다.'); }
+        if (!res.ok) throw new Error(await this._errMsg(res, '불러오기 실패 (' + res.status + ')'));
         const json = await res.json();
         return json && json.data ? json.data : null;
     }
@@ -80,8 +86,8 @@ MM.CloudSync = class {
     async push(bundle) {
         if (!this.isEnabled()) return;
         const res = await this._fetch('PUT', bundle);
-        if (res.status === 401) { this.disconnect(); throw new Error('auth'); }
-        if (!res.ok) throw new Error('push ' + res.status);
+        if (res.status === 401) { this.disconnect(); throw new Error('비밀번호가 거부되었습니다.'); }
+        if (!res.ok) throw new Error(await this._errMsg(res, '업로드 실패 (' + res.status + ')'));
         this.state.lastSync = Date.now();
         this._save();
     }
