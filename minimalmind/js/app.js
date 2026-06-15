@@ -2004,7 +2004,7 @@
             const r = await this.cloud.connect(pw);
             if (!r.ok) {
                 const msg = r.reason === 'auth' ? '비밀번호가 올바르지 않습니다.'
-                    : r.reason === 'server' ? '서버(백엔드)가 아직 설정되지 않았습니다.'
+                    : r.reason === 'server' ? (r.message || '서버(백엔드)가 아직 설정되지 않았습니다.')
                         : '연결에 실패했습니다 (네트워크).';
                 this.showToast(msg, 'error');
                 return;

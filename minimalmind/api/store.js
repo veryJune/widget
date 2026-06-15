@@ -21,10 +21,15 @@ function readJsonBody(req) {
 
 export default async function handler(req, res) {
     const expected = process.env.APP_PASSWORD;
-    if (!expected) { res.status(500).json({ error: 'APP_PASSWORD not configured' }); return; }
+    if (!expected) { res.status(500).json({ error: 'APP_PASSWORD 환경변수가 설정되지 않았습니다.' }); return; }
 
     const key = req.headers['x-mm-key'];
     if (!key || key !== expected) { res.status(401).json({ error: 'unauthorized' }); return; }
+
+    if (!process.env.BLOB_READ_WRITE_TOKEN) {
+        res.status(500).json({ error: 'BLOB_READ_WRITE_TOKEN 이 없습니다. Vercel에서 Blob 저장소를 프로젝트에 연결(Connect)하세요.' });
+        return;
+    }
 
     try {
         if (req.method === 'GET') {

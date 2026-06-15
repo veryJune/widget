@@ -54,7 +54,7 @@ MM.CloudSync = class {
         let json = null;
         try { json = await res.json(); } catch (e) { return { ok: false, reason: 'server' }; }
         if (!res.ok || (json && json.error && !('empty' in json) && !('data' in json))) {
-            return { ok: false, reason: 'server' };
+            return { ok: false, reason: 'server', message: json && json.error };
         }
         this.state.enabled = true;
         this.state.password = password;
