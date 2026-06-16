@@ -1355,6 +1355,55 @@ select:disabled {
   color: var(--accent-3);
 }
 
+.cloud-status-chip {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  min-height: 26px;
+  margin-top: 9px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 0 10px;
+  background: var(--surface-solid);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 850;
+  box-shadow: var(--small-shadow);
+}
+
+.cloud-status-chip::before {
+  width: 7px;
+  height: 7px;
+  margin-right: 7px;
+  border-radius: 50%;
+  background: currentColor;
+  content: "";
+}
+
+.status-saving {
+  color: var(--accent);
+  animation: statusPulse 900ms ease-in-out infinite;
+}
+
+.status-saved {
+  color: var(--accent-3);
+}
+
+.status-error {
+  color: var(--red);
+}
+
+.status-local,
+.status-auth {
+  color: var(--orange);
+}
+
+@keyframes statusPulse {
+  50% {
+    opacity: 0.58;
+  }
+}
+
 .auth-gate {
   position: fixed;
   inset: 0;
@@ -1402,27 +1451,41 @@ select:disabled {
 
 .toast {
   position: fixed;
-  right: 18px;
-  bottom: 18px;
-  z-index: 40;
-  max-width: min(360px, calc(100vw - 36px));
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  padding: 12px 14px;
-  background: #17211d;
+  right: 22px;
+  bottom: 22px;
+  z-index: 90;
+  max-width: min(420px, calc(100vw - 36px));
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 14px;
+  padding: 14px 16px;
+  background: #0d1612;
   color: #fff;
-  box-shadow: var(--shadow);
+  font-weight: 850;
+  box-shadow:
+    0 18px 46px rgba(0, 0, 0, 0.46),
+    0 0 0 1px rgba(255, 255, 255, 0.08) inset;
   opacity: 0;
-  transform: translateY(10px);
+  transform: translateY(12px) scale(0.98);
   transition:
     opacity 180ms ease,
-    transform 180ms ease;
+    transform 180ms ease,
+    background 180ms ease;
   pointer-events: none;
 }
 
 .toast.visible {
   opacity: 1;
-  transform: translateY(0);
+  transform: translateY(0) scale(1);
+}
+
+.toast.success {
+  background: #0d2b1f;
+  border-color: rgba(43, 211, 121, 0.44);
+}
+
+.toast.error {
+  background: #311014;
+  border-color: rgba(255, 123, 136, 0.5);
 }
 
 @media (max-width: 1080px) {

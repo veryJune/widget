@@ -1,6 +1,9 @@
 const STORAGE_KEY = "prompt-dock-v1";
 const THEME_KEY = "prompt-dock-theme";
 const CLOUD_SAVE_DELAY = 700;
+const DEFAULT_SETTINGS = {
+  hoverPreview: true,
+};
 const PLATFORM_ORDER = ["Any", "GPTs", "Gems", "Perplexity", "ChatGPT", "Gemini", "Claude", "Other"];
 const DEFAULT_CATEGORIES = ["요약", "글쓰기", "리서치", "업무", "코딩", "마케팅", "이미지", "학습"];
 
@@ -207,7 +210,9 @@ const elements = {
   cloudReloadBtn: $("#cloudReloadBtn"),
   cloudSaveBtn: $("#cloudSaveBtn"),
   logoutBtn: $("#logoutBtn"),
+  hoverPreviewToggle: $("#hoverPreviewToggle"),
   syncStatusText: $("#syncStatusText"),
+  cloudStatusChip: $("#cloudStatusChip"),
   authGate: $("#authGate"),
   authForm: $("#authForm"),
   passwordInput: $("#passwordInput"),
@@ -298,6 +303,11 @@ function bindEvents() {
   elements.cloudReloadBtn.addEventListener("click", () => loadCloudState({ manual: true }));
   elements.cloudSaveBtn.addEventListener("click", () => saveCloudState({ manual: true }));
   elements.logoutBtn.addEventListener("click", logoutCloud);
+  elements.hoverPreviewToggle.addEventListener("change", () => {
+    state.settings.hoverPreview = elements.hoverPreviewToggle.checked;
+    saveState();
+    render();
+  });
   elements.authForm.addEventListener("submit", loginCloud);
   bindBackdropClose(elements.itemDialog);
   bindBackdropClose(elements.categoryDialog);
@@ -331,10 +341,15 @@ function normalizeState(input) {
   const inputCategories = Array.isArray(input?.categories) ? input.categories : splitList(input?.categories);
   const categories = [...new Set([...(inputCategories.length ? inputCategories : DEFAULT_CATEGORIES), ...discoveredCategories])].filter(Boolean);
   const summaryCategories = [...new Set(splitList(input?.summaryCategories))].filter((category) => categories.includes(category));
+  const settings = {
+    ...DEFAULT_SETTINGS,
+    ...(input?.settings && typeof input.settings === "object" ? input.settings : {}),
+  };
   return {
     categories,
     items: items.map(normalizeItem),
     summaryCategories,
+    settings,
     updatedAt: input?.updatedAt || new Date().toISOString(),
   };
 }
@@ -368,12 +383,13 @@ function saveState(options = {}) {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
     if (!options.skipSync) scheduleCloudSave();
   } catch {
-    showToast("저장 공간이 부족합니다. 먼저 내보내기로 백업해주세요.");
+    showToast("저장 공간이 부족합니다. 먼저 파일로 저장해주세요.", "error");
   }
 }
 
 function initCloudSession() {
   updateCloudStatus("로그인 확인 중...");
+  setSaveStatus("확인 중", "auth");
   loadCloudState({ silent: true });
 }
 
@@ -408,6 +424,7 @@ async function logoutCloud() {
   cloudStatus = "signed-out";
   showAuthGate();
   updateCloudStatus("로그아웃되었습니다.");
+  setSaveStatus("로그인 필요", "auth");
 }
 
 async function loadCloudState(options = {}) {
@@ -417,6 +434,7 @@ async function loadCloudState(options = {}) {
       cloudReady = false;
       showAuthGate();
       updateCloudStatus("로그인이 필요합니다.");
+      setSaveStatus("로그인 필요", "auth");
       return;
     }
     if (!response.ok) throw new Error("LOAD_FAILED");
@@ -424,12 +442,29 @@ async function loadCloudState(options = {}) {
     cloudReady = true;
     hideAuthGate();
     if (payload.data) {
+      const remoteState = normalizeState(payload.data);
+      const remoteUpdatedAt = payload.data.updatedAt || payload.updatedAt || remoteState.updatedAt;
+      const localIsNewer = compareDate(state.updatedAt, remoteUpdatedAt) > 1000;
+      if (localIsNewer && options.manual) {
+        const confirmed = window.confirm("이 PC의 데이터가 DB보다 최신입니다. 그래도 DB 데이터를 불러올까요?");
+        if (!confirmed) {
+          updateCloudStatus("이 PC 데이터가 DB보다 최신입니다.");
+          setSaveStatus("로컬 최신", "local");
+          return;
+        }
+      }
+      if (localIsNewer && !options.manual) {
+        updateCloudStatus("이 PC 데이터가 DB보다 최신입니다. 필요하면 DB에 지금 저장하세요.");
+        setSaveStatus("로컬 최신", "local");
+        return;
+      }
       applyingRemoteState = true;
-      state = normalizeState(payload.data);
+      state = remoteState;
       saveState({ skipSync: true });
       applyingRemoteState = false;
       render();
       updateCloudStatus(`DB에서 불러옴 ${formatCloudTime(payload.updatedAt || state.updatedAt)}`);
+      setSaveStatus("DB 최신", "saved");
       if (options.manual) showToast("DB 데이터를 불러왔습니다.");
     } else {
       updateCloudStatus("DB가 비어 있어 현재 데이터를 저장합니다.");
@@ -439,11 +474,13 @@ async function loadCloudState(options = {}) {
     cloudReady = false;
     if (!options.silent) showToast("클라우드 데이터를 불러오지 못했습니다.");
     updateCloudStatus("Vercel 배포와 DB 연결을 확인해주세요.");
+    setSaveStatus("연결 실패", "error");
   }
 }
 
 function scheduleCloudSave() {
   if (applyingRemoteState || !cloudReady) return;
+  setSaveStatus("저장 중", "saving");
   window.clearTimeout(cloudSaveTimer);
   cloudSaveTimer = window.setTimeout(() => saveCloudState({ silent: true }), CLOUD_SAVE_DELAY);
 }
@@ -451,6 +488,7 @@ function scheduleCloudSave() {
 async function saveCloudState(options = {}) {
   if (!cloudReady && !options.manual) return;
   setCloudBusy(true);
+  setSaveStatus("저장 중", "saving");
   try {
     const response = await fetch("/api/data", {
       method: "PUT",
@@ -462,16 +500,19 @@ async function saveCloudState(options = {}) {
       cloudReady = false;
       showAuthGate();
       updateCloudStatus("로그인이 필요합니다.");
+      setSaveStatus("로그인 필요", "auth");
       return;
     }
     if (!response.ok) throw new Error("SAVE_FAILED");
     const payload = await response.json();
     cloudReady = true;
     updateCloudStatus(`DB에 저장됨 ${formatCloudTime(payload.updatedAt)}`);
-    if (options.manual) showToast("DB에 저장했습니다.");
+    setSaveStatus("DB 저장됨", "saved");
+    if (options.manual) showToast("DB에 저장했습니다.", "success");
   } catch {
-    if (!options.silent) showToast("DB 저장에 실패했습니다.");
+    if (!options.silent) showToast("DB 저장에 실패했습니다.", "error");
     updateCloudStatus("DB 저장 실패");
+    setSaveStatus("저장 실패", "error");
   } finally {
     setCloudBusy(false);
   }
@@ -483,6 +524,7 @@ function getCloudPayload() {
     version: 2,
     categories: state.categories,
     summaryCategories: state.summaryCategories || [],
+    settings: state.settings || DEFAULT_SETTINGS,
     items: state.items,
     updatedAt: state.updatedAt || new Date().toISOString(),
   };
@@ -499,6 +541,12 @@ function updateCloudStatus(message = "") {
     return;
   }
   elements.syncStatusText.textContent = cloudStatus || (cloudReady ? "DB 연결됨" : "로그인이 필요합니다.");
+}
+
+function setSaveStatus(text, mode = "saved") {
+  if (!elements.cloudStatusChip) return;
+  elements.cloudStatusChip.textContent = text;
+  elements.cloudStatusChip.className = `cloud-status-chip status-${mode}`;
 }
 
 function setCloudBusy(isBusy) {
@@ -528,7 +576,17 @@ function formatCloudTime(value) {
 function render() {
   renderFilters();
   renderItems();
+  renderUtilityControls();
+  renderSettingsControls();
   if (elements.categoryDialog.open) renderCategoryEditor();
+}
+
+function renderUtilityControls() {
+  elements.resetSampleBtn.classList.toggle("hidden", state.items.length > 0);
+}
+
+function renderSettingsControls() {
+  elements.hoverPreviewToggle.checked = state.settings?.hoverPreview !== false;
 }
 
 function renderFilters() {
@@ -772,11 +830,13 @@ function attachItemEvents() {
 
   document.querySelectorAll("[data-id].prompt-card, [data-id].list-row").forEach((card) => {
     card.addEventListener("mouseenter", (event) => {
+      if (!isHoverPreviewEnabled()) return;
       const item = findItem(card.dataset.id);
       if (item) showHoverPreview(item, card, event);
     });
     card.addEventListener("mouseleave", scheduleHoverHide);
     card.addEventListener("focus", () => {
+      if (!isHoverPreviewEnabled()) return;
       const item = findItem(card.dataset.id);
       if (item) showHoverPreview(item, card);
     });
@@ -882,6 +942,10 @@ function openItemDialog(item = null) {
   renderTagSuggestions();
   showDialog(elements.itemDialog);
   elements.titleInput.focus();
+}
+
+function isHoverPreviewEnabled() {
+  return state.settings?.hoverPreview !== false && window.matchMedia("(hover: hover)").matches;
 }
 
 function renderFormCategories() {
@@ -1432,6 +1496,7 @@ function exportJson() {
     "application/json",
   );
   elements.exportDialog.close();
+  showToast("JSON 파일을 저장했습니다.", "success");
 }
 
 function exportCsv() {
@@ -1443,20 +1508,26 @@ function exportCsv() {
   const csvContent = `\uFEFF${[headers.join(","), ...rows].join("\r\n")}`;
   downloadFile(`prompt-dock-${dateStamp()}.csv`, csvContent, "text/csv;charset=utf-8");
   elements.exportDialog.close();
+  showToast("CSV 파일을 저장했습니다.", "success");
 }
 
 async function importFile(event) {
   const file = event.target.files?.[0];
   if (!file) return;
+  const confirmed = window.confirm("선택한 파일 내용으로 현재 데이터를 복원할까요?");
+  if (!confirmed) {
+    elements.importInput.value = "";
+    return;
+  }
   try {
     const text = await file.text();
     const imported = file.name.toLowerCase().endsWith(".csv") ? importCsvText(text) : JSON.parse(text);
     state = normalizeState(imported);
     saveState();
     render();
-    showToast("가져오기가 완료되었습니다.");
+    showToast("파일에서 복원했습니다.", "success");
   } catch (error) {
-    showToast("가져오기에 실패했습니다. 파일 형식을 확인해주세요.");
+    showToast("복원에 실패했습니다. 파일 형식을 확인해주세요.", "error");
   } finally {
     elements.importInput.value = "";
   }
@@ -1672,11 +1743,11 @@ function dateStamp() {
   return new Date().toISOString().slice(0, 10);
 }
 
-function showToast(message) {
+function showToast(message, type = "") {
   elements.toast.textContent = message;
-  elements.toast.classList.add("visible");
+  elements.toast.className = `toast visible ${type}`.trim();
   window.clearTimeout(showToast.timer);
   showToast.timer = window.setTimeout(() => {
-    elements.toast.classList.remove("visible");
+    elements.toast.className = "toast";
   }, 1800);
 }
