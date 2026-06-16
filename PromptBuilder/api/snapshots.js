@@ -73,6 +73,31 @@ module.exports = async function handler(req, res) {
     }
 
     const body = await readJsonBody(req);
+    if (body.action === "create") {
+      if (!body.data || typeof body.data !== "object") {
+        res.status(400).json({ error: "Missing data object" });
+        return;
+      }
+      await sql`
+        insert into promptbuilder_snapshots (user_id, data)
+        values (${userId}, ${JSON.stringify(body.data)}::jsonb)
+      `;
+      await sql`
+        delete from promptbuilder_snapshots
+        where id in (
+          select id
+          from (
+            select id, row_number() over (partition by user_id order by created_at desc) as snapshot_rank
+            from promptbuilder_snapshots
+            where user_id = ${userId}
+          ) ranked
+          where snapshot_rank > 5
+        )
+      `;
+      res.status(200).json({ ok: true });
+      return;
+    }
+
     const snapshotId = Number(body.id);
     if (!Number.isSafeInteger(snapshotId) || snapshotId <= 0) {
       res.status(400).json({ error: "Missing snapshot id" });

@@ -31,7 +31,7 @@
             <span class="icon" aria-hidden="true">▦</span>
           </button>
           <button class="icon-button" id="syncBtn" type="button" title="설정" aria-label="설정">
-            <span class="icon" aria-hidden="true">⇄</span>
+            <span class="icon" aria-hidden="true">⚙</span>
           </button>
           <button class="icon-button" id="themeToggleBtn" type="button" title="테마 변경" aria-label="테마 변경">
             <span class="icon" id="themeIcon" aria-hidden="true">☾</span>
@@ -217,8 +217,9 @@
           <button class="icon-button ghost" id="closeCategoryBtn" type="button" aria-label="닫기">×</button>
         </div>
         <div class="category-editor">
-          <div class="inline-add">
+          <div class="inline-add category-add">
             <input id="categoryNameInput" placeholder="새 카테고리 이름" />
+            <input id="categoryColorInput" type="color" value="#3e73ff" title="카테고리 색상" aria-label="카테고리 색상" />
             <button id="addCategoryBtn" class="secondary-action" type="button">추가</button>
           </div>
           <div id="categoryList" class="category-list"></div>

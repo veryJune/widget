@@ -208,6 +208,7 @@ const elements = {
   categoryDialog: $("#categoryDialog"),
   closeCategoryBtn: $("#closeCategoryBtn"),
   categoryNameInput: $("#categoryNameInput"),
+  categoryColorInput: $("#categoryColorInput"),
   addCategoryBtn: $("#addCategoryBtn"),
   categoryList: $("#categoryList"),
   summaryCategorySelect: $("#summaryCategorySelect"),
@@ -407,6 +408,7 @@ function normalizeState(input) {
   const inputCategories = Array.isArray(input?.categories) ? input.categories : splitList(input?.categories);
   const categories = [...new Set([...(inputCategories.length ? inputCategories : DEFAULT_CATEGORIES), ...discoveredCategories])].filter(Boolean);
   const summaryCategories = [...new Set(splitList(input?.summaryCategories))].filter((category) => categories.includes(category));
+  const categoryColors = input?.categoryColors && typeof input.categoryColors === "object" ? input.categoryColors : {};
   const itemIds = new Set(normalizedItems.map((item) => item.id));
   const favoriteOrder = splitList(input?.favoriteOrder).filter((id) => itemIds.has(id));
   const settings = {
@@ -415,6 +417,7 @@ function normalizeState(input) {
   };
   return {
     categories,
+    categoryColors,
     items: normalizedItems,
     summaryCategories,
     favoriteOrder,
@@ -717,6 +720,7 @@ async function restoreSnapshot(id) {
   });
   if (!confirmed) return;
   try {
+    await createPreRestoreSnapshot();
     const response = await fetch("/api/snapshots", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -742,6 +746,7 @@ async function restoreBlobBackup(url) {
   });
   if (!confirmed) return;
   try {
+    await createPreRestoreSnapshot();
     const response = await fetch("/api/blob-backups", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -756,6 +761,15 @@ async function restoreBlobBackup(url) {
   } catch {
     showToast("Blob 백업 복원에 실패했습니다.", "error");
   }
+}
+
+async function createPreRestoreSnapshot() {
+  await fetch("/api/snapshots", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify({ action: "create", data: getCloudPayload() }),
+  }).catch(() => {});
 }
 
 async function createBlobBackupNow() {
@@ -820,6 +834,7 @@ function getCloudPayload() {
     app: "prompt-dock",
     version: 2,
     categories: state.categories,
+    categoryColors: state.categoryColors || {},
     summaryCategories: state.summaryCategories || [],
     favoriteOrder: state.favoriteOrder || [],
     variableHistory: state.variableHistory || {},
@@ -956,7 +971,8 @@ function renderFilters() {
     const active = category === "전체" ? filters.categories.length === 0 : filters.categories.includes(category);
     const label = category === "전체" ? "모두" : category;
     const orderAttrs = category === "전체" ? "" : ` draggable="true" data-category-order="${escapeAttribute(category)}"`;
-    return `<button class="chip category-chip ${active ? "active" : ""}" data-category="${escapeAttribute(category)}" type="button"${orderAttrs}>${escapeHtml(label)}</button>`;
+    const style = category === "전체" ? "" : categoryStyleAttribute(category);
+    return `<button class="chip category-chip ${active ? "active" : ""}" data-category="${escapeAttribute(category)}" type="button"${orderAttrs}${style}>${escapeHtml(label)}</button>`;
   }).join("");
   elements.categoryFilters.querySelectorAll("[data-category]").forEach((button) => {
     button.addEventListener("click", (event) => {
@@ -1046,7 +1062,7 @@ function renderSummaryChips() {
   const categoryChips = categorySource.map(({ category, count }) => {
     const active = filters.categories.includes(category);
     return `
-      <button class="summary-chip ${active ? "active" : ""}" data-summary-category="${escapeAttribute(category)}" type="button">
+      <button class="summary-chip ${active ? "active" : ""}" data-summary-category="${escapeAttribute(category)}" type="button"${categoryStyleAttribute(category)}>
         <span class="summary-dot"></span>
         <span>자주 쓰는 ${escapeHtml(category)}</span>
         <strong>${count}</strong>
@@ -1138,7 +1154,7 @@ function renderCard(item) {
         <p>${highlightMatches(shorten(summary, 74))}</p>
       </div>
       <div class="meta-line">
-        ${item.categories.slice(0, 3).map((category) => `<span class="category-pill">${escapeHtml(category)}</span>`).join("")}
+        ${item.categories.slice(0, 3).map(renderCategoryPill).join("")}
         <span class="stat-pill">사용 ${Number(item.useCount || 0)}회</span>
       </div>
       <div class="card-actions">
@@ -1207,6 +1223,10 @@ function renderPopularDock(items) {
   `;
 }
 
+function renderCategoryPill(category) {
+  return `<span class="category-pill" ${categoryStyleAttribute(category)}>${escapeHtml(category)}</span>`;
+}
+
 function renderListRow(item) {
   const id = escapeAttribute(item.id);
   const platformBadgeClass = platformClass[item.platform] || platformClass.Other;
@@ -1217,7 +1237,7 @@ function renderListRow(item) {
         <small>${highlightMatches(item.summary || item.useCase || "요약 없음")} · 사용 ${Number(item.useCount || 0)}회</small>
       </div>
       <span class="platform-badge ${platformBadgeClass}">${escapeHtml(item.platform)}</span>
-      <div class="meta-line">${item.categories.slice(0, 2).map((category) => `<span class="category-pill">${escapeHtml(category)}</span>`).join("")}</div>
+      <div class="meta-line">${item.categories.slice(0, 2).map(renderCategoryPill).join("")}</div>
       <div class="row-actions">
         <button class="star-button ${item.favorite ? "active" : ""}" data-action="favorite" data-id="${id}" type="button" aria-label="${item.favorite ? "즐겨찾기 해제" : "즐겨찾기"}">${item.favorite ? "★" : "☆"}</button>
         ${item.prompt ? `<button class="tool-button" data-action="copy" data-id="${id}" type="button" aria-label="프롬프트 복사">⧉</button>` : ""}
@@ -1286,7 +1306,7 @@ function showHoverPreview(item, anchor, pointerEvent = null) {
       </div>
       <h3>${escapeHtml(item.title)}</h3>
       <p>${escapeHtml(item.summary || item.useCase || "상세 설명 없음")}</p>
-      <div class="meta-line">${item.categories.map((category) => `<span class="category-pill">${escapeHtml(category)}</span>`).join("")}</div>
+      <div class="meta-line">${item.categories.map(renderCategoryPill).join("")}</div>
       ${variables.length ? `<div class="preview-section"><strong>변수</strong><p>${variables.map((name) => `{${escapeHtml(name)}}`).join(" ")}</p></div>` : ""}
       ${item.prompt ? `<div class="preview-section"><strong>프롬프트</strong><p>${escapeHtml(shorten(item.prompt, 170))}</p></div>` : ""}
       ${item.url ? `<div class="preview-section"><strong>링크</strong><p>${escapeHtml(shorten(item.url, 80))}</p></div>` : ""}
@@ -1376,7 +1396,7 @@ function isHoverPreviewEnabled() {
 function renderFormCategories() {
   elements.formCategories.innerHTML = state.categories.map((category) => {
     const active = formDraft.categories.includes(category);
-    return `<button class="chip ${active ? "active" : ""}" data-form-category="${escapeAttribute(category)}" type="button">${escapeHtml(category)}</button>`;
+    return `<button class="chip category-chip ${active ? "active" : ""}" data-form-category="${escapeAttribute(category)}" type="button"${categoryStyleAttribute(category)}>${escapeHtml(category)}</button>`;
   }).join("");
   elements.formCategories.querySelectorAll("[data-form-category]").forEach((button) => {
     button.addEventListener("click", () => {
@@ -1605,7 +1625,7 @@ function openDetail(item) {
           <span>사용 ${Number(item.useCount || 0)}회</span>
           <span>최근 사용 ${item.lastUsedAt ? formatCloudTime(item.lastUsedAt) : "-"}</span>
         </div>
-        <div class="meta-line">${item.categories.map((category) => `<span class="category-pill">${escapeHtml(category)}</span>`).join("")}</div>
+        <div class="meta-line">${item.categories.map(renderCategoryPill).join("")}</div>
         <div class="meta-line">${item.tags.map((tag) => `<span class="tag-pill">#${escapeHtml(tag)}</span>`).join("")}</div>
       </div>
 
@@ -1810,6 +1830,7 @@ function renderCategoryEditor() {
     <div class="category-edit-row" draggable="true" data-category-row="${escapeAttribute(category)}">
       <span class="drag-handle" aria-hidden="true">⋮⋮</span>
       <input value="${escapeAttribute(category)}" data-category-edit="${escapeAttribute(category)}" />
+      <input class="category-color-input" type="color" value="${escapeAttribute(getCategoryColor(category))}" data-category-color="${escapeAttribute(category)}" aria-label="${escapeAttribute(category)} 색상" />
       <button class="danger-button" data-category-delete="${escapeAttribute(category)}" type="button">삭제</button>
     </div>
   `).join("");
@@ -1841,6 +1862,9 @@ function renderCategoryEditor() {
   elements.categoryList.querySelectorAll("[data-category-edit]").forEach((input) => {
     input.addEventListener("change", () => renameCategory(input.dataset.categoryEdit, input.value.trim()));
   });
+  elements.categoryList.querySelectorAll("[data-category-color]").forEach((input) => {
+    input.addEventListener("change", () => setCategoryColor(input.dataset.categoryColor, input.value));
+  });
   elements.categoryList.querySelectorAll("[data-category-delete]").forEach((button) => {
     button.addEventListener("click", () => deleteCategory(button.dataset.categoryDelete));
   });
@@ -1852,6 +1876,8 @@ function addCategoryFromInput() {
   const category = elements.categoryNameInput.value.trim();
   if (!category) return;
   if (!state.categories.includes(category)) state.categories.push(category);
+  state.categoryColors = state.categoryColors || {};
+  state.categoryColors[category] = elements.categoryColorInput.value || getCategoryColor(category);
   if (!state.summaryCategories.includes(category)) state.summaryCategories.push(category);
   if (!formDraft.categories.includes(category)) formDraft.categories.push(category);
   elements.categoryNameInput.value = "";
@@ -1870,11 +1896,25 @@ function renameCategory(oldName, newName) {
   }
   state.categories = state.categories.map((category) => category === oldName ? newName : category);
   state.summaryCategories = state.summaryCategories.map((category) => category === oldName ? newName : category);
+  state.categoryColors = state.categoryColors || {};
+  if (state.categoryColors[oldName]) {
+    state.categoryColors[newName] = state.categoryColors[oldName];
+    delete state.categoryColors[oldName];
+  }
   state.items.forEach((item) => {
     item.categories = item.categories.map((category) => category === oldName ? newName : category);
   });
   filters.categories = filters.categories.map((category) => category === oldName ? newName : category);
   formDraft.categories = formDraft.categories.map((category) => category === oldName ? newName : category);
+  saveState();
+  render();
+  renderFormCategories();
+}
+
+function setCategoryColor(category, color) {
+  if (!category || !isHexColor(color)) return;
+  state.categoryColors = state.categoryColors || {};
+  state.categoryColors[category] = color;
   saveState();
   render();
   renderFormCategories();
@@ -1889,6 +1929,7 @@ async function deleteCategory(category) {
   });
   if (!confirmed) return;
   state.categories = state.categories.filter((item) => item !== category);
+  if (state.categoryColors) delete state.categoryColors[category];
   state.summaryCategories = state.summaryCategories.filter((entry) => entry !== category);
   state.items.forEach((item) => {
     item.categories = item.categories.filter((entry) => entry !== category);
@@ -2138,6 +2179,7 @@ async function importFile(event) {
     return;
   }
   try {
+    await createPreRestoreSnapshot();
     const text = await file.text();
     const imported = file.name.toLowerCase().endsWith(".csv") ? importCsvText(text) : JSON.parse(text);
     state = normalizeState(imported);
@@ -2368,6 +2410,23 @@ function searchBlob(item) {
 
 function normalizeText(value) {
   return String(value || "").toLowerCase().replace(/\s+/g, "");
+}
+
+function getCategoryColor(category) {
+  const saved = state.categoryColors?.[category];
+  if (isHexColor(saved)) return saved;
+  const palette = ["#3e73ff", "#18c884", "#f26a8d", "#8a72df", "#ff8b5d", "#1aa49b", "#c87832", "#6f8cff"];
+  const index = Math.abs(String(category || "").split("").reduce((sum, char) => sum + char.charCodeAt(0), 0)) % palette.length;
+  return palette[index];
+}
+
+function categoryStyleAttribute(category) {
+  const color = getCategoryColor(category);
+  return ` style="--category-color: ${escapeAttribute(color)}"`;
+}
+
+function isHexColor(value) {
+  return /^#[0-9a-f]{6}$/i.test(String(value || ""));
 }
 
 function normalizePromptText(value) {

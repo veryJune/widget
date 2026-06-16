@@ -479,7 +479,7 @@ select:focus {
 
 .summary-chip:hover,
 .summary-chip.active {
-  border-color: color-mix(in srgb, var(--accent-3) 42%, var(--line));
+  border-color: color-mix(in srgb, var(--category-color, var(--accent-3)) 42%, var(--line));
   color: var(--ink);
   transform: translateY(-1px);
   box-shadow: var(--small-shadow);
@@ -500,7 +500,7 @@ select:focus {
 .summary-dot {
   width: 9px;
   height: 9px;
-  background: linear-gradient(135deg, var(--accent-3), var(--accent));
+  background: linear-gradient(135deg, var(--category-color, var(--accent-3)), var(--accent));
 }
 
 .view-toggle {
@@ -592,6 +592,15 @@ label,
 
 .category-chip[draggable="true"] {
   cursor: grab;
+}
+
+.category-chip {
+  border-color: color-mix(in srgb, var(--category-color, currentColor) 24%, var(--line));
+}
+
+.category-chip.active {
+  background: color-mix(in srgb, var(--category-color, var(--accent)) 15%, var(--surface-solid));
+  color: color-mix(in srgb, var(--category-color, var(--accent)) 76%, var(--ink));
 }
 
 .category-chip[draggable="true"]:active,
@@ -947,9 +956,9 @@ label,
 }
 
 .category-pill {
-  border: 1px solid color-mix(in srgb, var(--accent-3) 20%, transparent);
-  background: color-mix(in srgb, var(--accent-soft) 80%, transparent);
-  color: color-mix(in srgb, var(--accent) 78%, var(--ink));
+  border: 1px solid color-mix(in srgb, var(--category-color, var(--accent-3)) 34%, transparent);
+  background: color-mix(in srgb, var(--category-color, var(--accent-3)) 13%, var(--surface));
+  color: color-mix(in srgb, var(--category-color, var(--accent)) 72%, var(--ink));
 }
 
 .stat-pill {
@@ -1458,6 +1467,10 @@ label,
   gap: 8px;
 }
 
+.category-add {
+  grid-template-columns: 1fr auto auto;
+}
+
 .tag-merge-grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
@@ -1494,12 +1507,23 @@ label,
 
 .category-edit-row {
   display: grid;
-  grid-template-columns: auto 1fr auto;
+  grid-template-columns: auto 1fr auto auto;
   align-items: center;
   gap: 8px;
   border: 1px solid transparent;
   border-radius: 10px;
   padding: 5px;
+}
+
+.summary-edit-row {
+  grid-template-columns: auto 1fr auto;
+}
+
+.category-color-input {
+  width: 40px;
+  min-width: 40px;
+  height: 36px;
+  padding: 3px;
 }
 
 .drag-handle {
