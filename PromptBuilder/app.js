@@ -3,6 +3,7 @@ const THEME_KEY = "prompt-dock-theme";
 const CLOUD_SAVE_DELAY = 700;
 const DEFAULT_SETTINGS = {
   hoverPreview: true,
+  blobWeeklyBackup: false,
 };
 const PLATFORM_ORDER = ["Any", "GPTs", "Gems", "Perplexity", "ChatGPT", "Gemini", "Claude", "Other"];
 const DEFAULT_CATEGORIES = ["요약", "글쓰기", "리서치", "업무", "코딩", "마케팅", "이미지", "학습"];
@@ -146,6 +147,8 @@ let cloudStatus = "checking";
 let applyingRemoteState = false;
 let pendingRemoteState = null;
 let pendingRemoteUpdatedAt = "";
+let statusCheckTimer = null;
+let confirmResolver = null;
 
 const $ = (selector) => document.querySelector(selector);
 
@@ -212,8 +215,10 @@ const elements = {
   cloudReloadBtn: $("#cloudReloadBtn"),
   cloudSaveBtn: $("#cloudSaveBtn"),
   diagnosticsBtn: $("#diagnosticsBtn"),
+  closeDiagnosticsBtn: $("#closeDiagnosticsBtn"),
   logoutBtn: $("#logoutBtn"),
   hoverPreviewToggle: $("#hoverPreviewToggle"),
+  blobBackupToggle: $("#blobBackupToggle"),
   syncStatusText: $("#syncStatusText"),
   diagnosticsPanel: $("#diagnosticsPanel"),
   snapshotPanel: $("#snapshotPanel"),
@@ -226,6 +231,13 @@ const elements = {
   remoteCompareMeta: $("#remoteCompareMeta"),
   useRemoteBtn: $("#useRemoteBtn"),
   keepLocalBtn: $("#keepLocalBtn"),
+  confirmDialog: $("#confirmDialog"),
+  confirmEyebrow: $("#confirmEyebrow"),
+  confirmTitle: $("#confirmTitle"),
+  confirmMessage: $("#confirmMessage"),
+  confirmCloseBtn: $("#confirmCloseBtn"),
+  confirmCancelBtn: $("#confirmCancelBtn"),
+  confirmOkBtn: $("#confirmOkBtn"),
   authGate: $("#authGate"),
   authForm: $("#authForm"),
   passwordInput: $("#passwordInput"),
@@ -316,22 +328,33 @@ function bindEvents() {
   elements.cloudReloadBtn.addEventListener("click", () => loadCloudState({ manual: true }));
   elements.cloudSaveBtn.addEventListener("click", () => saveCloudState({ manual: true }));
   elements.diagnosticsBtn.addEventListener("click", runDiagnostics);
+  elements.closeDiagnosticsBtn.addEventListener("click", closeDiagnostics);
   elements.logoutBtn.addEventListener("click", logoutCloud);
   elements.hoverPreviewToggle.addEventListener("change", () => {
     state.settings.hoverPreview = elements.hoverPreviewToggle.checked;
     saveState();
     render();
   });
+  elements.blobBackupToggle.addEventListener("change", () => {
+    state.settings.blobWeeklyBackup = elements.blobBackupToggle.checked;
+    saveState();
+    renderSettingsControls();
+  });
   elements.authForm.addEventListener("submit", loginCloud);
   elements.closeConflictBtn.addEventListener("click", () => elements.conflictDialog.close());
   elements.useRemoteBtn.addEventListener("click", useRemoteState);
   elements.keepLocalBtn.addEventListener("click", keepLocalState);
+  elements.confirmCloseBtn.addEventListener("click", () => resolveConfirm(false));
+  elements.confirmCancelBtn.addEventListener("click", () => resolveConfirm(false));
+  elements.confirmOkBtn.addEventListener("click", () => resolveConfirm(true));
+  elements.confirmDialog.addEventListener("close", () => resolveConfirm(false));
   bindBackdropClose(elements.itemDialog);
   bindBackdropClose(elements.categoryDialog);
   bindBackdropClose(elements.exportDialog);
   bindBackdropClose(elements.detailDialog);
   bindBackdropClose(elements.syncDialog);
   bindBackdropClose(elements.conflictDialog);
+  bindBackdropClose(elements.confirmDialog);
 
   elements.resetSampleBtn.addEventListener("click", () => {
     const confirmed = window.confirm("현재 데이터를 샘플 데이터로 교체할까요? 먼저 내보내기로 백업해두는 것을 권장합니다.");
@@ -355,18 +378,22 @@ function loadState() {
 
 function normalizeState(input) {
   const items = Array.isArray(input?.items) ? input.items : Array.isArray(input) ? input : sampleItems;
+  const normalizedItems = items.map(normalizeItem);
   const discoveredCategories = [...new Set(items.flatMap((item) => splitList(item.categories)))];
   const inputCategories = Array.isArray(input?.categories) ? input.categories : splitList(input?.categories);
   const categories = [...new Set([...(inputCategories.length ? inputCategories : DEFAULT_CATEGORIES), ...discoveredCategories])].filter(Boolean);
   const summaryCategories = [...new Set(splitList(input?.summaryCategories))].filter((category) => categories.includes(category));
+  const itemIds = new Set(normalizedItems.map((item) => item.id));
+  const favoriteOrder = splitList(input?.favoriteOrder).filter((id) => itemIds.has(id));
   const settings = {
     ...DEFAULT_SETTINGS,
     ...(input?.settings && typeof input.settings === "object" ? input.settings : {}),
   };
   return {
     categories,
-    items: items.map(normalizeItem),
+    items: normalizedItems,
     summaryCategories,
+    favoriteOrder,
     settings,
     updatedAt: input?.updatedAt || new Date().toISOString(),
   };
@@ -492,7 +519,7 @@ function applyRemoteState(remoteState, updatedAt = "") {
   applyingRemoteState = false;
   render();
   updateCloudStatus(`DB에서 불러옴 ${formatCloudTime(updatedAt || state.updatedAt)}`);
-  setSaveStatus("DB 최신", "saved");
+  setSaveStatus(`DB 최신 ${formatCloudTime(updatedAt || state.updatedAt)}`, "saved");
 }
 
 function openConflictDialog(remoteState, remoteUpdatedAt) {
@@ -534,6 +561,7 @@ function scheduleCloudSave() {
 }
 
 async function runDiagnostics() {
+  elements.closeDiagnosticsBtn.classList.remove("hidden");
   elements.diagnosticsPanel.classList.remove("hidden");
   elements.diagnosticsPanel.innerHTML = `<p class="help-text">상태 확인 중...</p>`;
   try {
@@ -555,6 +583,14 @@ async function runDiagnostics() {
   }
 }
 
+function closeDiagnostics() {
+  elements.closeDiagnosticsBtn.classList.add("hidden");
+  elements.diagnosticsPanel.classList.add("hidden");
+  elements.snapshotPanel.classList.add("hidden");
+  elements.diagnosticsPanel.innerHTML = "";
+  elements.snapshotPanel.innerHTML = "";
+}
+
 function renderDiagnostics(diagnostics) {
   const checks = diagnostics.checks || {};
   elements.diagnosticsPanel.innerHTML = `
@@ -564,6 +600,9 @@ function renderDiagnostics(diagnostics) {
       <span>카테고리</span><strong>${checks.categoryCount || 0}개</strong>
       <span>스냅샷</span><strong>${checks.snapshotCount || 0}개</strong>
       <span>최근 저장</span><strong>${formatCloudTime(checks.dataUpdatedAt) || "-"}</strong>
+      <span>저장 기기</span><strong>${escapeHtml(checks.lastDevice || "-")}</strong>
+      <span>Blob 백업</span><strong>${checks.blobConfigured ? "연결됨" : "미설정"}</strong>
+      <span>마지막 Blob</span><strong>${formatCloudTime(checks.blobLastBackupAt) || "-"}</strong>
     </div>
   `;
 }
@@ -630,7 +669,7 @@ async function saveCloudState(options = {}) {
     const payload = await response.json();
     cloudReady = true;
     updateCloudStatus(`DB에 저장됨 ${formatCloudTime(payload.updatedAt)}`);
-    setSaveStatus("DB 저장됨", "saved");
+    setSaveStatus(`DB 저장됨 ${formatCloudTime(payload.updatedAt)}`, "saved");
     if (options.manual) showToast("DB에 저장했습니다.", "success");
   } catch {
     if (!options.silent) showToast("DB 저장에 실패했습니다.", "error");
@@ -647,7 +686,9 @@ function getCloudPayload() {
     version: 2,
     categories: state.categories,
     summaryCategories: state.summaryCategories || [],
+    favoriteOrder: state.favoriteOrder || [],
     settings: state.settings || DEFAULT_SETTINGS,
+    deviceInfo: getClientInfo(),
     items: state.items,
     updatedAt: state.updatedAt || new Date().toISOString(),
   };
@@ -668,9 +709,16 @@ function updateCloudStatus(message = "") {
 
 function setSaveStatus(text, mode = "saved") {
   if (!elements.cloudStatusChip) return;
-  elements.cloudStatusChip.textContent = text;
+  elements.cloudStatusChip.innerHTML = `<span class="status-text">${escapeHtml(text)}</span>`;
   elements.cloudStatusChip.title = text;
   elements.cloudStatusChip.className = `cloud-status-chip status-${mode}`;
+  if (mode === "saved") {
+    window.clearTimeout(statusCheckTimer);
+    elements.cloudStatusChip.classList.add("just-saved");
+    statusCheckTimer = window.setTimeout(() => {
+      elements.cloudStatusChip.classList.remove("just-saved");
+    }, 950);
+  }
 }
 
 function setCloudBusy(isBusy) {
@@ -691,10 +739,38 @@ function hideAuthGate() {
 function formatCloudTime(value) {
   if (!value) return "";
   try {
-    return new Date(value).toLocaleString("ko-KR", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" });
+    return new Date(value).toLocaleString("ko-KR", {
+      year: "2-digit",
+      month: "numeric",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
   } catch {
     return "";
   }
+}
+
+function getClientInfo() {
+  const ua = navigator.userAgent || "";
+  const browser =
+    ua.includes("Edg/")
+      ? "Edge"
+      : ua.includes("Chrome/")
+        ? "Chrome"
+        : ua.includes("Firefox/")
+          ? "Firefox"
+          : ua.includes("Safari/")
+            ? "Safari"
+            : "Browser";
+  const platform = navigator.platform || "현재 PC";
+  return {
+    label: `${platform} · ${browser}`,
+    browser,
+    platform,
+    userAgent: ua.slice(0, 180),
+    savedAt: new Date().toISOString(),
+  };
 }
 
 function render() {
@@ -711,6 +787,7 @@ function renderUtilityControls() {
 
 function renderSettingsControls() {
   elements.hoverPreviewToggle.checked = state.settings?.hoverPreview !== false;
+  elements.blobBackupToggle.checked = state.settings?.blobWeeklyBackup === true;
 }
 
 function renderFilters() {
@@ -773,10 +850,7 @@ function renderItems() {
   const visible = getVisibleItems();
   elements.resultCount.textContent = `${visible.length}개 항목`;
 
-  const favorites = [...state.items]
-    .filter((item) => item.favorite)
-    .sort(sortItems)
-    .slice(0, 6);
+  const favorites = getFavoriteItems().slice(0, 8);
   elements.favoriteSection.innerHTML = favorites.length
     ? `<div class="favorite-dock">
         <div class="dock-title"><h3>고정 즐겨찾기</h3><small>${favorites.length}개</small></div>
@@ -806,6 +880,17 @@ function getVisibleItems() {
       return normalizeText(searchBlob(item)).includes(query);
     })
     .sort(sortItems);
+}
+
+function getFavoriteItems() {
+  const order = new Map((state.favoriteOrder || []).map((id, index) => [id, index]));
+  return state.items
+    .filter((item) => item.favorite)
+    .sort((a, b) => {
+      const aOrder = order.has(a.id) ? order.get(a.id) : Number.MAX_SAFE_INTEGER;
+      const bOrder = order.has(b.id) ? order.get(b.id) : Number.MAX_SAFE_INTEGER;
+      return aOrder - bOrder || compareDate(b.lastUsedAt || b.updatedAt, a.lastUsedAt || a.updatedAt);
+    });
 }
 
 function renderSummaryChips() {
@@ -924,7 +1009,7 @@ function renderFavoriteTile(item) {
   const platformBadgeClass = platformClass[item.platform] || platformClass.Other;
   const summary = item.summary || item.useCase || item.prompt || item.url || "요약 없음";
   return `
-    <article class="favorite-tile" data-id="${id}" tabindex="0">
+    <article class="favorite-tile" data-id="${id}" tabindex="0" draggable="true" aria-label="즐겨찾기 ${escapeAttribute(item.title)}">
       <span class="platform-badge ${platformBadgeClass}">${escapeHtml(item.platform)}</span>
       <strong>${highlightMatches(item.title)}</strong>
       <small>${highlightMatches(shorten(summary, 46))}</small>
@@ -994,6 +1079,7 @@ function attachItemEvents() {
       if (item) openDetail(item);
     });
   });
+  bindFavoriteDrag();
 }
 
 function showHoverPreview(item, anchor, pointerEvent = null) {
@@ -1226,14 +1312,20 @@ function saveItemFromForm() {
   showToast("저장했습니다.");
 }
 
-function deleteCurrentItem() {
+async function deleteCurrentItem() {
   const id = elements.itemId.value;
   if (!id) return;
   const item = findItem(id);
   if (!item) return;
-  const confirmed = window.confirm(`"${item.title}" 항목을 삭제할까요?`);
+  const confirmed = await askConfirm({
+    eyebrow: "Delete Prompt",
+    title: "프롬프트를 삭제할까요?",
+    message: `"${item.title}" 항목은 삭제 후 스냅샷이나 파일 복원으로만 되돌릴 수 있습니다.`,
+    okText: "삭제",
+  });
   if (!confirmed) return;
   state.items = state.items.filter((entry) => entry.id !== id);
+  state.favoriteOrder = (state.favoriteOrder || []).filter((entryId) => entryId !== id);
   saveState();
   elements.itemDialog.close();
   render();
@@ -1342,6 +1434,24 @@ function showDialog(dialog) {
   if (!dialog.open) dialog.showModal();
 }
 
+function askConfirm({ eyebrow = "확인", title = "계속할까요?", message = "", okText = "확인" } = {}) {
+  elements.confirmEyebrow.textContent = eyebrow;
+  elements.confirmTitle.textContent = title;
+  elements.confirmMessage.textContent = message;
+  elements.confirmOkBtn.textContent = okText;
+  showDialog(elements.confirmDialog);
+  return new Promise((resolve) => {
+    confirmResolver = resolve;
+  });
+}
+
+function resolveConfirm(value) {
+  const resolver = confirmResolver;
+  confirmResolver = null;
+  if (elements.confirmDialog.open) elements.confirmDialog.close();
+  if (resolver) resolver(value);
+}
+
 function applyTheme(theme) {
   document.documentElement.dataset.theme = theme;
   localStorage.setItem(THEME_KEY, theme);
@@ -1416,6 +1526,12 @@ function toggleFavorite(id) {
   if (!item) return;
   item.favorite = !item.favorite;
   item.updatedAt = new Date().toISOString();
+  const order = state.favoriteOrder || [];
+  if (item.favorite) {
+    state.favoriteOrder = [item.id, ...order.filter((entryId) => entryId !== item.id)];
+  } else {
+    state.favoriteOrder = order.filter((entryId) => entryId !== item.id);
+  }
   saveState();
   renderItems();
 }
@@ -1623,6 +1739,46 @@ function bindCategoryFilterDrag() {
       }, 0);
     });
   });
+}
+
+function bindFavoriteDrag() {
+  let draggingId = "";
+  document.querySelectorAll(".favorite-tile").forEach((tile) => {
+    tile.addEventListener("dragstart", (event) => {
+      draggingId = tile.dataset.id;
+      tile.classList.add("dragging");
+      event.dataTransfer.effectAllowed = "move";
+      event.dataTransfer.setData("text/plain", draggingId);
+    });
+    tile.addEventListener("dragend", () => {
+      draggingId = "";
+      tile.classList.remove("dragging");
+      document.querySelectorAll(".favorite-tile.drop-target").forEach((item) => item.classList.remove("drop-target"));
+    });
+    tile.addEventListener("dragover", (event) => {
+      event.preventDefault();
+      if (tile.dataset.id !== draggingId) tile.classList.add("drop-target");
+    });
+    tile.addEventListener("dragleave", () => tile.classList.remove("drop-target"));
+    tile.addEventListener("drop", (event) => {
+      event.preventDefault();
+      tile.classList.remove("drop-target");
+      const fromId = event.dataTransfer.getData("text/plain") || draggingId;
+      const toId = tile.dataset.id;
+      if (fromId && toId && fromId !== toId) reorderFavorites(fromId, toId);
+    });
+  });
+}
+
+function reorderFavorites(fromId, toId) {
+  const ids = getFavoriteItems().map((item) => item.id);
+  const fromIndex = ids.indexOf(fromId);
+  const toIndex = ids.indexOf(toId);
+  if (fromIndex === -1 || toIndex === -1) return;
+  ids.splice(toIndex, 0, ids.splice(fromIndex, 1)[0]);
+  state.favoriteOrder = ids;
+  saveState();
+  renderItems();
 }
 
 function reorderCategory(fromCategory, toCategory) {

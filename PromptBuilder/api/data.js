@@ -6,6 +6,7 @@ const {
 } = require("./_lib/session");
 
 let sqlClient = null;
+const ONE_WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 
 function getSql() {
   if (!process.env.DATABASE_URL) {
@@ -35,6 +36,45 @@ async function ensureSchema(sql) {
     create index if not exists promptbuilder_snapshots_user_created_idx
     on promptbuilder_snapshots (user_id, created_at desc)
   `;
+  await sql`
+    create table if not exists promptbuilder_backup_meta (
+      user_id text primary key,
+      last_blob_backup_at timestamptz,
+      last_blob_url text
+    )
+  `;
+}
+
+async function maybeRunBlobBackup(sql, userId, data) {
+  if (data?.settings?.blobWeeklyBackup !== true) return { enabled: false };
+  if (!process.env.BLOB_READ_WRITE_TOKEN) return { enabled: true, skipped: true, reason: "BLOB_READ_WRITE_TOKEN missing" };
+
+  const metaRows = await sql`
+    select last_blob_backup_at
+    from promptbuilder_backup_meta
+    where user_id = ${userId}
+    limit 1
+  `;
+  const lastBackupAt = metaRows[0]?.last_blob_backup_at ? new Date(metaRows[0].last_blob_backup_at) : null;
+  if (lastBackupAt && Date.now() - lastBackupAt.getTime() < ONE_WEEK_MS) {
+    return { enabled: true, skipped: true, lastBlobBackupAt: lastBackupAt };
+  }
+
+  const { put } = await import("@vercel/blob");
+  const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+  const pathname = `promptbuilder/backups/${userId}/promptbuilder-${stamp}.json`;
+  const blob = await put(pathname, JSON.stringify(data, null, 2), {
+    access: "private",
+    contentType: "application/json; charset=utf-8",
+  });
+
+  await sql`
+    insert into promptbuilder_backup_meta (user_id, last_blob_backup_at, last_blob_url)
+    values (${userId}, now(), ${blob.url})
+    on conflict (user_id)
+    do update set last_blob_backup_at = excluded.last_blob_backup_at, last_blob_url = excluded.last_blob_url
+  `;
+  return { enabled: true, saved: true, url: blob.url };
 }
 
 module.exports = async function handler(req, res) {
@@ -98,7 +138,17 @@ module.exports = async function handler(req, res) {
         where snapshot_rank > 5
       )
     `;
-    res.status(200).json({ ok: true, updatedAt: rows[0].updated_at });
+    let blobBackup = { enabled: body.data?.settings?.blobWeeklyBackup === true, skipped: true };
+    try {
+      blobBackup = await maybeRunBlobBackup(sql, userId, body.data);
+    } catch (error) {
+      blobBackup = {
+        enabled: true,
+        skipped: true,
+        error: process.env.NODE_ENV === "production" ? "Blob backup failed" : error.message,
+      };
+    }
+    res.status(200).json({ ok: true, updatedAt: rows[0].updated_at, blobBackup });
   } catch (error) {
     res.status(500).json({
       error: "Database request failed",

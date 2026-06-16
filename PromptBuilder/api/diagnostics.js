@@ -23,6 +23,10 @@ module.exports = async function handler(req, res) {
     itemCount: 0,
     categoryCount: 0,
     snapshotCount: 0,
+    lastDevice: "",
+    lastDeviceBrowser: "",
+    blobConfigured: Boolean(process.env.BLOB_READ_WRITE_TOKEN),
+    blobLastBackupAt: null,
   };
 
   if (!process.env.DATABASE_URL) {
@@ -49,6 +53,13 @@ module.exports = async function handler(req, res) {
         created_at timestamptz not null default now()
       )
     `;
+    await sql`
+      create table if not exists promptbuilder_backup_meta (
+        user_id text primary key,
+        last_blob_backup_at timestamptz,
+        last_blob_url text
+      )
+    `;
 
     const rows = await sql`
       select data, updated_at
@@ -60,6 +71,8 @@ module.exports = async function handler(req, res) {
       checks.dataUpdatedAt = rows[0].updated_at;
       checks.itemCount = Array.isArray(rows[0].data?.items) ? rows[0].data.items.length : 0;
       checks.categoryCount = Array.isArray(rows[0].data?.categories) ? rows[0].data.categories.length : 0;
+      checks.lastDevice = rows[0].data?.deviceInfo?.label || "";
+      checks.lastDeviceBrowser = rows[0].data?.deviceInfo?.browser || "";
     }
 
     const snapshotRows = await sql`
@@ -68,6 +81,14 @@ module.exports = async function handler(req, res) {
       where user_id = ${checks.userId}
     `.catch(() => [{ count: 0 }]);
     checks.snapshotCount = snapshotRows[0]?.count || 0;
+
+    const backupRows = await sql`
+      select last_blob_backup_at
+      from promptbuilder_backup_meta
+      where user_id = ${checks.userId}
+      limit 1
+    `.catch(() => []);
+    checks.blobLastBackupAt = backupRows[0]?.last_blob_backup_at || null;
 
     res.status(200).json({ ok: checks.dbConnected, checks });
   } catch (error) {

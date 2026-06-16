@@ -151,6 +151,34 @@ p {
   z-index: 12;
 }
 
+.brand-block {
+  display: grid;
+  grid-template-columns: 48px minmax(0, auto);
+  align-items: center;
+  gap: 12px;
+}
+
+.brand-logo,
+.auth-logo {
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
+  object-fit: cover;
+  box-shadow: var(--small-shadow);
+}
+
+.logo-dark {
+  display: none;
+}
+
+:root[data-theme="dark"] .logo-light {
+  display: none;
+}
+
+:root[data-theme="dark"] .logo-dark {
+  display: block;
+}
+
 .app-header h1 {
   background: linear-gradient(100deg, var(--ink), var(--accent));
   background-clip: text;
@@ -704,6 +732,15 @@ label,
   border-color: color-mix(in srgb, var(--accent-3) 32%, var(--line-strong));
   box-shadow: var(--small-shadow);
   transform: translateY(-2px);
+}
+
+.favorite-tile.dragging {
+  opacity: 0.52;
+}
+
+.favorite-tile.drop-target {
+  border-color: var(--accent-3);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-3) 16%, transparent);
 }
 
 .favorite-tile strong {
@@ -1435,15 +1472,18 @@ select:disabled {
 }
 
 .cloud-status-chip {
+  position: relative;
+  grid-column: 2;
   display: inline-flex;
   align-items: center;
-  width: 30px;
-  max-width: 30px;
+  justify-self: start;
+  width: 28px;
+  max-width: 28px;
   min-height: 26px;
-  margin-top: 9px;
+  margin-top: 7px;
   border: 1px solid var(--line);
   border-radius: 999px;
-  padding: 0 10px;
+  padding: 0;
   background: var(--surface-solid);
   color: var(--muted);
   font-size: 12px;
@@ -1462,19 +1502,58 @@ select:disabled {
   flex: 0 0 auto;
   width: 7px;
   height: 7px;
-  margin-right: 7px;
+  margin: 0 9px;
   border-radius: 50%;
   background: currentColor;
   content: "";
 }
 
-.app-header > div:hover .cloud-status-chip,
+.cloud-status-chip .status-text {
+  width: 0;
+  max-width: 0;
+  opacity: 0;
+  overflow: hidden;
+  transition:
+    max-width 180ms ease,
+    opacity 140ms ease;
+}
+
+.brand-block:hover .cloud-status-chip,
 .cloud-status-chip.status-saving,
 .cloud-status-chip.status-error,
 .cloud-status-chip.status-local,
 .cloud-status-chip:focus-visible {
   width: fit-content;
-  max-width: 220px;
+  max-width: min(280px, calc(100vw - 48px));
+  padding-right: 10px;
+}
+
+.brand-block:hover .cloud-status-chip .status-text,
+.cloud-status-chip.status-saving .status-text,
+.cloud-status-chip.status-error .status-text,
+.cloud-status-chip.status-local .status-text,
+.cloud-status-chip:focus-visible .status-text {
+  width: auto;
+  max-width: 250px;
+  opacity: 1;
+}
+
+.cloud-status-chip.just-saved::after {
+  position: absolute;
+  right: -7px;
+  top: -7px;
+  display: grid;
+  width: 18px;
+  height: 18px;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--accent-3);
+  color: white;
+  content: "✓";
+  font-size: 12px;
+  font-weight: 950;
+  box-shadow: 0 8px 16px color-mix(in srgb, var(--accent-3) 32%, transparent);
+  animation: savedPop 900ms ease both;
 }
 
 .status-saving {
@@ -1501,6 +1580,23 @@ select:disabled {
   }
 }
 
+@keyframes savedPop {
+  0% {
+    opacity: 0;
+    transform: scale(0.55);
+  }
+
+  35% {
+    opacity: 1;
+    transform: scale(1.12);
+  }
+
+  100% {
+    opacity: 0;
+    transform: scale(0.9) translateY(-5px);
+  }
+}
+
 .auth-gate {
   position: fixed;
   inset: 0;
@@ -1524,6 +1620,12 @@ select:disabled {
   padding: 24px;
   background: color-mix(in srgb, var(--surface-solid) 90%, transparent);
   box-shadow: var(--shadow);
+}
+
+.auth-logo {
+  width: 62px;
+  height: 62px;
+  border-radius: 18px;
 }
 
 .auth-card h2 {
@@ -1568,6 +1670,12 @@ select:disabled {
   font-size: 12px;
 }
 
+.status-grid strong {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  text-align: right;
+}
+
 .snapshot-list {
   display: grid;
   gap: 8px;
@@ -1609,6 +1717,10 @@ select:disabled {
 .compare-panel p {
   margin: 0;
   font-size: 12px;
+}
+
+.confirm-dialog .sync-actions {
+  justify-content: flex-end;
 }
 
 .toast {

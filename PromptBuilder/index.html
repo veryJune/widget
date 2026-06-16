@@ -4,15 +4,21 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Prompt Dock</title>
+    <link rel="icon" type="image/png" href="logos/pb_light.png" />
+    <link rel="apple-touch-icon" href="logos/pb_light.png" />
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
     <div class="app-shell">
       <header class="app-header">
-        <div>
-          <p class="eyebrow">Personal AI Prompt Launcher</p>
-          <h1>Prompt Dock</h1>
-          <div class="cloud-status-chip status-auth" id="cloudStatusChip">로그인 필요</div>
+        <div class="brand-block">
+          <img class="brand-logo logo-light" src="logos/pb_light.png" alt="" />
+          <img class="brand-logo logo-dark" src="logos/pb_dark.png" alt="" />
+          <div>
+            <p class="eyebrow">Personal AI Prompt Launcher</p>
+            <h1>Prompt Dock</h1>
+          </div>
+          <div class="cloud-status-chip status-auth" id="cloudStatusChip"><span class="status-text">로그인 필요</span></div>
         </div>
         <div class="header-actions">
           <button class="icon-button" id="importBtn" type="button" title="파일에서 복원" aria-label="파일에서 복원">
@@ -243,17 +249,39 @@
           <p class="help-text">Vercel API가 Neon Postgres DB에 데이터를 저장합니다. 다른 PC에서는 같은 주소로 접속해 비밀번호를 입력하면 같은 프롬프트를 볼 수 있습니다.</p>
           <label class="checkbox-row">
             <input id="hoverPreviewToggle" type="checkbox" />
-            <span>미리보기</span>
+            <span>카드 미리보기</span>
+          </label>
+          <label class="checkbox-row">
+            <input id="blobBackupToggle" type="checkbox" />
+            <span>주 1회 Blob 백업</span>
           </label>
           <div class="sync-actions">
             <button class="secondary-action" id="cloudReloadBtn" type="button">DB에서 다시 불러오기</button>
             <button class="primary-action" id="cloudSaveBtn" type="button">DB에 지금 저장</button>
             <button class="secondary-action" id="diagnosticsBtn" type="button">상태 진단</button>
+            <button class="text-button hidden" id="closeDiagnosticsBtn" type="button">진단 닫기</button>
             <button class="text-button" id="logoutBtn" type="button">로그아웃</button>
           </div>
           <p class="help-text" id="syncStatusText">로그인 확인 중...</p>
           <div class="diagnostics-panel hidden" id="diagnosticsPanel"></div>
           <div class="snapshot-panel hidden" id="snapshotPanel"></div>
+        </div>
+      </div>
+    </dialog>
+
+    <dialog id="confirmDialog" class="dialog">
+      <div class="dialog-inner small-dialog confirm-dialog">
+        <div class="dialog-head">
+          <div>
+            <p class="eyebrow" id="confirmEyebrow">확인</p>
+            <h2 id="confirmTitle">계속할까요?</h2>
+          </div>
+          <button class="icon-button ghost" id="confirmCloseBtn" type="button" aria-label="닫기">×</button>
+        </div>
+        <p class="help-text" id="confirmMessage"></p>
+        <div class="sync-actions">
+          <button class="secondary-action" id="confirmCancelBtn" type="button">취소</button>
+          <button class="danger-button" id="confirmOkBtn" type="button">삭제</button>
         </div>
       </div>
     </dialog>
@@ -305,6 +333,8 @@
 
     <div id="authGate" class="auth-gate hidden">
       <form id="authForm" class="auth-card">
+        <img class="auth-logo logo-light" src="logos/pb_light.png" alt="" />
+        <img class="auth-logo logo-dark" src="logos/pb_dark.png" alt="" />
         <p class="eyebrow">Private PromptBuilder</p>
         <h2>비밀번호 입력</h2>
         <p>Vercel DB에 저장된 프롬프트를 불러오려면 비밀번호가 필요합니다.</p>
