@@ -676,6 +676,40 @@ label,
   box-shadow: var(--small-shadow);
 }
 
+.popular-dock {
+  border: 1px solid color-mix(in srgb, var(--line) 78%, transparent);
+  border-radius: 20px;
+  padding: 13px;
+  background: color-mix(in srgb, var(--surface-solid) 58%, transparent);
+  box-shadow: var(--small-shadow);
+}
+
+.popular-list {
+  display: grid;
+  gap: 8px;
+}
+
+.popular-item {
+  display: grid;
+  gap: 3px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 10px 12px;
+  background: var(--surface);
+  color: var(--ink);
+  cursor: pointer;
+  text-align: left;
+}
+
+.popular-item span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.popular-item:hover {
+  border-color: color-mix(in srgb, var(--accent-3) 30%, var(--line));
+}
+
 .favorite-dock.collapsed {
   padding-bottom: 10px;
 }
@@ -899,7 +933,8 @@ label,
 }
 
 .tag-pill,
-.category-pill {
+.category-pill,
+.stat-pill {
   display: inline-flex;
   min-height: 23px;
   align-items: center;
@@ -915,6 +950,12 @@ label,
   border: 1px solid color-mix(in srgb, var(--accent-3) 20%, transparent);
   background: color-mix(in srgb, var(--accent-soft) 80%, transparent);
   color: color-mix(in srgb, var(--accent) 78%, var(--ink));
+}
+
+.stat-pill {
+  border: 1px solid color-mix(in srgb, var(--line) 86%, transparent);
+  background: color-mix(in srgb, var(--surface-solid) 54%, transparent);
+  color: var(--muted);
 }
 
 .card-actions {
@@ -1373,6 +1414,22 @@ label,
   overflow-wrap: anywhere;
 }
 
+.usage-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.usage-stats span {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 4px 8px;
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 760;
+}
+
 .variable-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
@@ -1398,6 +1455,12 @@ label,
 .inline-add {
   display: grid;
   grid-template-columns: 1fr auto;
+  gap: 8px;
+}
+
+.tag-merge-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
   gap: 8px;
 }
 
@@ -1455,6 +1518,25 @@ label,
   flex-wrap: wrap;
   justify-content: flex-end;
   gap: 8px;
+}
+
+.settings-tabs {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 5px;
+  background: var(--surface-2);
+}
+
+.settings-tabs .seg {
+  min-height: 34px;
+}
+
+.settings-panel {
+  display: grid;
+  gap: 12px;
 }
 
 .checkbox-row {
@@ -1844,6 +1926,7 @@ select:disabled {
   }
 
   .form-grid,
+  .tag-merge-grid,
     .list-row {
     grid-template-columns: 1fr;
   }

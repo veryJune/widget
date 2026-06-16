@@ -7,6 +7,7 @@ const {
 
 let sqlClient = null;
 const ONE_WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+const BLOB_BACKUP_LIMIT = 12;
 
 function getSql() {
   if (!process.env.DATABASE_URL) {
@@ -60,7 +61,7 @@ async function maybeRunBlobBackup(sql, userId, data) {
     return { enabled: true, skipped: true, lastBlobBackupAt: lastBackupAt };
   }
 
-  const { put } = await import("@vercel/blob");
+  const { put, list, del } = await import("@vercel/blob");
   const stamp = new Date().toISOString().replace(/[:.]/g, "-");
   const pathname = `promptbuilder/backups/${userId}/promptbuilder-${stamp}.json`;
   const blob = await put(pathname, JSON.stringify(data, null, 2), {
@@ -74,7 +75,23 @@ async function maybeRunBlobBackup(sql, userId, data) {
     on conflict (user_id)
     do update set last_blob_backup_at = excluded.last_blob_backup_at, last_blob_url = excluded.last_blob_url
   `;
+  await pruneBlobBackups({ userId, list, del });
   return { enabled: true, saved: true, url: blob.url };
+}
+
+async function pruneBlobBackups({ userId, list, del }) {
+  const result = await list({
+    prefix: `promptbuilder/backups/${userId}/`,
+    limit: 100,
+  });
+  const sorted = (result.blobs || [])
+    .map((blob) => ({
+      url: blob.url,
+      uploadedAt: blob.uploadedAt || blob.createdAt || null,
+    }))
+    .sort((a, b) => new Date(b.uploadedAt || 0) - new Date(a.uploadedAt || 0));
+  const oldBackups = sorted.slice(BLOB_BACKUP_LIMIT);
+  if (oldBackups.length) await del(oldBackups.map((backup) => backup.url));
 }
 
 module.exports = async function handler(req, res) {

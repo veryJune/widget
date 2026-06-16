@@ -164,6 +164,7 @@ const elements = {
   viewButtons: document.querySelectorAll(".seg"),
   itemsView: $("#itemsView"),
   favoriteSection: $("#favoriteSection"),
+  popularSection: $("#popularSection"),
   resultCount: $("#resultCount"),
   hoverPreview: $("#hoverPreview"),
   toast: $("#toast"),
@@ -212,11 +213,16 @@ const elements = {
   summaryCategorySelect: $("#summaryCategorySelect"),
   addSummaryCategoryBtn: $("#addSummaryCategoryBtn"),
   summaryCategoryList: $("#summaryCategoryList"),
+  tagManageSelect: $("#tagManageSelect"),
+  tagRenameInput: $("#tagRenameInput"),
+  renameTagBtn: $("#renameTagBtn"),
   syncDialog: $("#syncDialog"),
   closeSyncBtn: $("#closeSyncBtn"),
   cloudReloadBtn: $("#cloudReloadBtn"),
   cloudSaveBtn: $("#cloudSaveBtn"),
+  blobBackupNowBtn: $("#blobBackupNowBtn"),
   diagnosticsBtn: $("#diagnosticsBtn"),
+  diagnosticsPanelBtn: $("#diagnosticsPanelBtn"),
   closeDiagnosticsBtn: $("#closeDiagnosticsBtn"),
   logoutBtn: $("#logoutBtn"),
   hoverPreviewToggle: $("#hoverPreviewToggle"),
@@ -239,6 +245,7 @@ const elements = {
   confirmMessage: $("#confirmMessage"),
   confirmCloseBtn: $("#confirmCloseBtn"),
   confirmCancelBtn: $("#confirmCancelBtn"),
+  confirmExtraBtn: $("#confirmExtraBtn"),
   confirmOkBtn: $("#confirmOkBtn"),
   authGate: $("#authGate"),
   authForm: $("#authForm"),
@@ -295,6 +302,7 @@ function bindEvents() {
   elements.closeCategoryBtn.addEventListener("click", () => elements.categoryDialog.close());
   elements.addCategoryBtn.addEventListener("click", addCategoryFromInput);
   elements.addSummaryCategoryBtn.addEventListener("click", addSummaryCategoryFromSelect);
+  elements.renameTagBtn.addEventListener("click", renameOrMergeTag);
   elements.categoryNameInput.addEventListener("keydown", (event) => {
     if (event.key === "Enter") {
       event.preventDefault();
@@ -332,7 +340,9 @@ function bindEvents() {
   elements.closeSyncBtn.addEventListener("click", () => elements.syncDialog.close());
   elements.cloudReloadBtn.addEventListener("click", () => loadCloudState({ manual: true }));
   elements.cloudSaveBtn.addEventListener("click", () => saveCloudState({ manual: true }));
+  elements.blobBackupNowBtn.addEventListener("click", createBlobBackupNow);
   elements.diagnosticsBtn.addEventListener("click", runDiagnostics);
+  elements.diagnosticsPanelBtn.addEventListener("click", runDiagnostics);
   elements.closeDiagnosticsBtn.addEventListener("click", closeDiagnostics);
   elements.logoutBtn.addEventListener("click", logoutCloud);
   elements.hoverPreviewToggle.addEventListener("change", () => {
@@ -351,8 +361,12 @@ function bindEvents() {
   elements.keepLocalBtn.addEventListener("click", keepLocalState);
   elements.confirmCloseBtn.addEventListener("click", () => resolveConfirm(false));
   elements.confirmCancelBtn.addEventListener("click", () => resolveConfirm(false));
+  elements.confirmExtraBtn.addEventListener("click", () => resolveConfirm("extra"));
   elements.confirmOkBtn.addEventListener("click", () => resolveConfirm(true));
   elements.confirmDialog.addEventListener("close", () => resolveConfirm(false));
+  document.querySelectorAll("[data-settings-tab]").forEach((button) => {
+    button.addEventListener("click", () => switchSettingsTab(button.dataset.settingsTab));
+  });
   bindBackdropClose(elements.itemDialog);
   bindBackdropClose(elements.categoryDialog);
   bindBackdropClose(elements.exportDialog);
@@ -361,8 +375,13 @@ function bindEvents() {
   bindBackdropClose(elements.conflictDialog);
   bindBackdropClose(elements.confirmDialog);
 
-  elements.resetSampleBtn.addEventListener("click", () => {
-    const confirmed = window.confirm("현재 데이터를 샘플 데이터로 교체할까요? 먼저 내보내기로 백업해두는 것을 권장합니다.");
+  elements.resetSampleBtn.addEventListener("click", async () => {
+    const confirmed = await askConfirm({
+      eyebrow: "Sample Restore",
+      title: "샘플 데이터를 다시 불러올까요?",
+      message: "현재 데이터가 샘플 데이터로 교체됩니다. 먼저 파일로 저장해두는 것을 권장합니다.",
+      okText: "샘플 복원",
+    });
     if (!confirmed) return;
     state = normalizeState({ categories: DEFAULT_CATEGORIES, items: sampleItems.map(cloneItem) });
     saveState();
@@ -425,6 +444,7 @@ function normalizeItem(item = {}) {
     createdAt: item.createdAt || now,
     updatedAt: item.updatedAt || now,
     lastUsedAt: item.lastUsedAt || "",
+    useCount: Number(item.useCount || 0),
   };
 }
 
@@ -447,6 +467,16 @@ function initCloudSession() {
 function openSyncDialog() {
   updateCloudStatus();
   showDialog(elements.syncDialog);
+}
+
+function switchSettingsTab(tab) {
+  document.querySelectorAll("[data-settings-tab]").forEach((button) => {
+    button.classList.toggle("active", button.dataset.settingsTab === tab);
+  });
+  document.querySelectorAll("[data-settings-panel]").forEach((panel) => {
+    panel.classList.toggle("hidden", panel.dataset.settingsPanel !== tab);
+  });
+  if (tab === "backup") runDiagnostics();
 }
 
 async function loginCloud(event) {
@@ -679,7 +709,12 @@ function renderBlobBackupList(blobBackups = {}) {
 }
 
 async function restoreSnapshot(id) {
-  const confirmed = window.confirm("선택한 스냅샷으로 DB와 현재 화면을 복원할까요?");
+  const confirmed = await askConfirm({
+    eyebrow: "Snapshot Restore",
+    title: "DB 스냅샷에서 복원할까요?",
+    message: "선택한 스냅샷의 내용으로 DB와 현재 화면을 복원합니다.",
+    okText: "복원",
+  });
   if (!confirmed) return;
   try {
     const response = await fetch("/api/snapshots", {
@@ -699,7 +734,12 @@ async function restoreSnapshot(id) {
 }
 
 async function restoreBlobBackup(url) {
-  const confirmed = window.confirm("선택한 Blob 백업 파일로 DB와 현재 화면을 복원할까요?");
+  const confirmed = await askConfirm({
+    eyebrow: "Blob Restore",
+    title: "Blob 백업에서 복원할까요?",
+    message: "선택한 JSON 백업 파일의 내용으로 DB와 현재 화면을 복원합니다.",
+    okText: "복원",
+  });
   if (!confirmed) return;
   try {
     const response = await fetch("/api/blob-backups", {
@@ -715,6 +755,30 @@ async function restoreBlobBackup(url) {
     runDiagnostics();
   } catch {
     showToast("Blob 백업 복원에 실패했습니다.", "error");
+  }
+}
+
+async function createBlobBackupNow() {
+  setCloudBusy(true);
+  try {
+    const response = await fetch("/api/blob-backups", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ action: "create", data: getCloudPayload() }),
+    });
+    if (response.status === 401) {
+      showAuthGate();
+      return;
+    }
+    const payload = await response.json();
+    if (!response.ok || payload.configured === false) throw new Error("BLOB_NOT_READY");
+    showToast("Blob 백업을 만들었습니다.", "success");
+    runDiagnostics();
+  } catch {
+    showToast("Blob 백업 생성에 실패했습니다. Vercel Blob 토큰을 확인해주세요.", "error");
+  } finally {
+    setCloudBusy(false);
   }
 }
 
@@ -794,7 +858,7 @@ function setSaveStatus(text, mode = "saved") {
 }
 
 function setCloudBusy(isBusy) {
-  [elements.cloudReloadBtn, elements.cloudSaveBtn, elements.logoutBtn].forEach((button) => {
+  [elements.cloudReloadBtn, elements.cloudSaveBtn, elements.blobBackupNowBtn, elements.logoutBtn].forEach((button) => {
     button.disabled = isBusy;
   });
 }
@@ -850,7 +914,10 @@ function render() {
   renderItems();
   renderUtilityControls();
   renderSettingsControls();
-  if (elements.categoryDialog.open) renderCategoryEditor();
+  if (elements.categoryDialog.open) {
+    renderCategoryEditor();
+    renderTagManager();
+  }
 }
 
 function renderUtilityControls() {
@@ -926,6 +993,8 @@ function renderItems() {
   elements.favoriteSection.innerHTML = favorites.length
     ? renderFavoriteDock(favorites)
     : "";
+  const popularItems = getPopularItems().slice(0, 6);
+  elements.popularSection.innerHTML = popularItems.length ? renderPopularDock(popularItems) : "";
 
   elements.itemsView.className = `items-grid ${filters.view === "list" ? "list-view" : ""}`;
   if (!visible.length) {
@@ -961,6 +1030,12 @@ function getFavoriteItems() {
       const bOrder = order.has(b.id) ? order.get(b.id) : Number.MAX_SAFE_INTEGER;
       return aOrder - bOrder || compareDate(b.lastUsedAt || b.updatedAt, a.lastUsedAt || a.updatedAt);
     });
+}
+
+function getPopularItems() {
+  return [...state.items]
+    .filter((item) => Number(item.useCount || 0) > 0)
+    .sort((a, b) => Number(b.useCount || 0) - Number(a.useCount || 0) || compareDate(b.lastUsedAt, a.lastUsedAt));
 }
 
 function renderSummaryChips() {
@@ -1062,7 +1137,10 @@ function renderCard(item) {
         <h3>${highlightMatches(item.title)}</h3>
         <p>${highlightMatches(shorten(summary, 74))}</p>
       </div>
-      <div class="meta-line">${item.categories.slice(0, 3).map((category) => `<span class="category-pill">${escapeHtml(category)}</span>`).join("")}</div>
+      <div class="meta-line">
+        ${item.categories.slice(0, 3).map((category) => `<span class="category-pill">${escapeHtml(category)}</span>`).join("")}
+        <span class="stat-pill">사용 ${Number(item.useCount || 0)}회</span>
+      </div>
       <div class="card-actions">
         ${item.prompt ? `<button class="tool-button" data-action="copy" data-id="${id}" type="button" aria-label="프롬프트 복사">⧉</button>` : ""}
         ${item.url ? `<button class="tool-button" data-action="open" data-id="${id}" type="button" aria-label="링크 열기">↗</button>` : ""}
@@ -1108,6 +1186,27 @@ function renderFavoriteDock(favorites) {
   `;
 }
 
+function renderPopularDock(items) {
+  return `
+    <div class="popular-dock">
+      <div class="dock-title">
+        <div>
+          <h3>자주 쓰는 프롬프트</h3>
+          <small>사용 횟수 기준 자동 정렬</small>
+        </div>
+      </div>
+      <div class="popular-list">
+        ${items.map((item) => `
+          <button class="popular-item" data-popular-open="${escapeAttribute(item.id)}" type="button">
+            <strong>${escapeHtml(item.title)}</strong>
+            <span>사용 ${Number(item.useCount || 0)}회 · ${item.lastUsedAt ? formatCloudTime(item.lastUsedAt) : "최근 기록 없음"}</span>
+          </button>
+        `).join("")}
+      </div>
+    </div>
+  `;
+}
+
 function renderListRow(item) {
   const id = escapeAttribute(item.id);
   const platformBadgeClass = platformClass[item.platform] || platformClass.Other;
@@ -1115,7 +1214,7 @@ function renderListRow(item) {
     <article class="list-row" data-id="${id}" tabindex="0">
       <div class="row-title">
         <strong>${highlightMatches(item.title)}</strong>
-        <small>${highlightMatches(item.summary || item.useCase || "요약 없음")}</small>
+        <small>${highlightMatches(item.summary || item.useCase || "요약 없음")} · 사용 ${Number(item.useCount || 0)}회</small>
       </div>
       <span class="platform-badge ${platformBadgeClass}">${escapeHtml(item.platform)}</span>
       <div class="meta-line">${item.categories.slice(0, 2).map((category) => `<span class="category-pill">${escapeHtml(category)}</span>`).join("")}</div>
@@ -1162,6 +1261,12 @@ function attachItemEvents() {
     card.addEventListener("blur", scheduleHoverHide);
     card.addEventListener("click", () => {
       const item = findItem(card.dataset.id);
+      if (item) openDetail(item);
+    });
+  });
+  document.querySelectorAll("[data-popular-open]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const item = findItem(button.dataset.popularOpen);
       if (item) openDetail(item);
     });
   });
@@ -1336,6 +1441,16 @@ function buildTagCandidates() {
   return [...new Set([...contextualTags, ...existingTags, ...categoryTags, ...aliasTags])].filter(Boolean);
 }
 
+function getAllTags() {
+  return [...new Set(state.items.flatMap((item) => item.tags || []))]
+    .filter(Boolean)
+    .sort((a, b) => getTagUsage(b) - getTagUsage(a) || a.localeCompare(b, "ko"));
+}
+
+function getTagUsage(tag) {
+  return state.items.filter((item) => item.tags.includes(tag)).length;
+}
+
 function getTagContext() {
   const raw = [
     elements.titleInput.value,
@@ -1416,6 +1531,7 @@ async function saveItemFromForm() {
     createdAt: existing?.createdAt || now,
     updatedAt: now,
     lastUsedAt: existing?.lastUsedAt || "",
+    useCount: existing?.useCount || 0,
   });
 
   if (!item.prompt && !item.url) {
@@ -1485,6 +1601,10 @@ function openDetail(item) {
           <button class="star-button ${item.favorite ? "active" : ""}" data-detail-favorite="${id}" type="button">${item.favorite ? "★" : "☆"}</button>
         </div>
         <p>${escapeHtml(item.summary || item.useCase || "요약 없음")}</p>
+        <div class="usage-stats">
+          <span>사용 ${Number(item.useCount || 0)}회</span>
+          <span>최근 사용 ${item.lastUsedAt ? formatCloudTime(item.lastUsedAt) : "-"}</span>
+        </div>
         <div class="meta-line">${item.categories.map((category) => `<span class="category-pill">${escapeHtml(category)}</span>`).join("")}</div>
         <div class="meta-line">${item.tags.map((tag) => `<span class="tag-pill">#${escapeHtml(tag)}</span>`).join("")}</div>
       </div>
@@ -1574,12 +1694,14 @@ function showDialog(dialog) {
   if (!dialog.open) dialog.showModal();
 }
 
-function askConfirm({ eyebrow = "확인", title = "계속할까요?", message = "", okText = "확인", cancelText = "취소" } = {}) {
+function askConfirm({ eyebrow = "확인", title = "계속할까요?", message = "", okText = "확인", cancelText = "취소", extraText = "" } = {}) {
   elements.confirmEyebrow.textContent = eyebrow;
   elements.confirmTitle.textContent = title;
   elements.confirmMessage.textContent = message;
   elements.confirmOkBtn.textContent = okText;
   elements.confirmCancelBtn.textContent = cancelText;
+  elements.confirmExtraBtn.textContent = extraText;
+  elements.confirmExtraBtn.classList.toggle("hidden", !extraText);
   showDialog(elements.confirmDialog);
   return new Promise((resolve) => {
     confirmResolver = resolve;
@@ -1589,6 +1711,7 @@ function askConfirm({ eyebrow = "확인", title = "계속할까요?", message = 
 function resolveConfirm(value) {
   const resolver = confirmResolver;
   confirmResolver = null;
+  elements.confirmExtraBtn.classList.add("hidden");
   if (elements.confirmDialog.open) elements.confirmDialog.close();
   if (resolver) resolver(value);
 }
@@ -1655,6 +1778,7 @@ function markUsed(id) {
   const item = findItem(id);
   if (!item) return;
   item.lastUsedAt = new Date().toISOString();
+  item.useCount = Number(item.useCount || 0) + 1;
   saveState();
   renderItems();
 }
@@ -1676,6 +1800,7 @@ function toggleFavorite(id) {
 
 function openCategoryDialog() {
   renderCategoryEditor();
+  renderTagManager();
   showDialog(elements.categoryDialog);
   elements.categoryNameInput.focus();
 }
@@ -1755,8 +1880,13 @@ function renameCategory(oldName, newName) {
   renderFormCategories();
 }
 
-function deleteCategory(category) {
-  const confirmed = window.confirm(`"${category}" 카테고리를 삭제할까요? 항목에서는 이 카테고리만 제거됩니다.`);
+async function deleteCategory(category) {
+  const confirmed = await askConfirm({
+    eyebrow: "Delete Category",
+    title: "카테고리를 삭제할까요?",
+    message: `"${category}" 카테고리가 목록과 항목에서 제거됩니다.`,
+    okText: "삭제",
+  });
   if (!confirmed) return;
   state.categories = state.categories.filter((item) => item !== category);
   state.summaryCategories = state.summaryCategories.filter((entry) => entry !== category);
@@ -1844,6 +1974,39 @@ function reorderSummaryCategory(fromCategory, toCategory) {
   saveState();
   render();
   renderSummaryCategoryEditor();
+}
+
+function renderTagManager() {
+  const tags = getAllTags();
+  elements.tagManageSelect.innerHTML = tags.length
+    ? tags.map((tag) => `<option value="${escapeAttribute(tag)}">${escapeHtml(tag)} (${getTagUsage(tag)})</option>`).join("")
+    : `<option value="">태그 없음</option>`;
+  elements.renameTagBtn.disabled = !tags.length;
+}
+
+function renameOrMergeTag() {
+  const fromTag = elements.tagManageSelect.value;
+  const toTag = elements.tagRenameInput.value.trim().replace(/^#/, "");
+  if (!fromTag || !toTag) {
+    showToast("바꿀 태그와 새 태그 이름을 입력해주세요.", "error");
+    return;
+  }
+  if (fromTag === toTag) {
+    showToast("같은 태그 이름입니다.");
+    return;
+  }
+  let changed = 0;
+  state.items.forEach((item) => {
+    if (!item.tags.includes(fromTag)) return;
+    item.tags = [...new Set(item.tags.map((tag) => (tag === fromTag ? toTag : tag)))];
+    item.updatedAt = new Date().toISOString();
+    changed += 1;
+  });
+  saveState();
+  elements.tagRenameInput.value = "";
+  renderTagManager();
+  render();
+  showToast(`${changed}개 항목의 태그를 정리했습니다.`, "success");
 }
 
 function bindCategoryFilterDrag() {
@@ -1950,7 +2113,7 @@ function exportJson() {
 }
 
 function exportCsv() {
-  const headers = ["title", "type", "platform", "categories", "tags", "summary", "useCase", "prompt", "url", "notes", "favorite"];
+  const headers = ["title", "type", "platform", "categories", "tags", "summary", "useCase", "prompt", "url", "notes", "favorite", "useCount", "lastUsedAt"];
   const rows = state.items.map((item) => headers.map((key) => {
     const value = Array.isArray(item[key]) ? item[key].join("|") : item[key];
     return csvEscape(value ?? "");
@@ -1964,7 +2127,12 @@ function exportCsv() {
 async function importFile(event) {
   const file = event.target.files?.[0];
   if (!file) return;
-  const confirmed = window.confirm("선택한 파일 내용으로 현재 데이터를 복원할까요?");
+  const confirmed = await askConfirm({
+    eyebrow: "File Restore",
+    title: "파일에서 복원할까요?",
+    message: "선택한 파일 내용으로 현재 데이터를 교체합니다.",
+    okText: "복원",
+  });
   if (!confirmed) {
     elements.importInput.value = "";
     return;
@@ -1994,6 +2162,8 @@ function importCsvText(text) {
       categories: splitList(record.categories),
       tags: splitList(record.tags),
       favorite: record.favorite === "true",
+      useCount: Number(record.useCount || 0),
+      lastUsedAt: record.lastUsedAt || "",
     };
   });
   return { categories: DEFAULT_CATEGORIES, items };
@@ -2064,18 +2234,48 @@ function findDuplicatePrompt(item) {
 }
 
 async function askDuplicateConfirm(item, duplicate) {
-  const confirmed = await askConfirm({
+  const choice = await askConfirm({
     eyebrow: "Duplicate Check",
     title: "비슷한 항목이 있습니다",
-    message: `"${duplicate.title}" 항목과 내용이 비슷합니다. 그래도 새로 저장할까요?`,
+    message: `"${duplicate.title}" 항목과 내용이 비슷합니다. 새 항목으로 저장하거나 기존 항목에 정보를 병합할 수 있습니다.`,
     okText: "그래도 저장",
     cancelText: "기존 항목 보기",
+    extraText: "기존 항목에 병합",
   });
-  if (!confirmed) {
+  if (choice === "extra") {
+    mergeDuplicateItem(duplicate.id, item);
+    elements.itemDialog.close();
+    openDetail(findItem(duplicate.id));
+    return false;
+  }
+  if (!choice) {
     elements.itemDialog.close();
     openDetail(duplicate);
   }
-  return confirmed;
+  return choice === true;
+}
+
+function mergeDuplicateItem(targetId, source) {
+  const target = findItem(targetId);
+  if (!target) return;
+  target.title = target.title || source.title;
+  target.summary = target.summary || source.summary;
+  target.useCase = target.useCase || source.useCase;
+  target.prompt = target.prompt || source.prompt;
+  target.url = target.url || source.url;
+  target.notes = [target.notes, source.notes].filter(Boolean).join("\n\n");
+  target.categories = [...new Set([...target.categories, ...source.categories])];
+  target.tags = [...new Set([...target.tags, ...source.tags])];
+  target.favorite = target.favorite || source.favorite;
+  target.useCount = Number(target.useCount || 0) + Number(source.useCount || 0);
+  target.updatedAt = new Date().toISOString();
+  if (source.id && source.id !== targetId) {
+    state.items = state.items.filter((item) => item.id !== source.id);
+    state.favoriteOrder = (state.favoriteOrder || []).filter((id) => id !== source.id);
+  }
+  saveState();
+  render();
+  showToast("기존 항목에 병합했습니다.", "success");
 }
 
 function getFilledPromptText(item) {
