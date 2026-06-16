@@ -638,6 +638,16 @@ label,
   margin-bottom: 18px;
 }
 
+.favorite-dock {
+  border: 1px solid color-mix(in srgb, var(--line-strong) 58%, transparent);
+  border-radius: 22px;
+  padding: 14px;
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--surface-solid) 72%, transparent), color-mix(in srgb, var(--surface-2) 84%, transparent)),
+    var(--surface);
+  box-shadow: var(--small-shadow);
+}
+
 .dock-title {
   display: flex;
   align-items: center;
@@ -659,6 +669,75 @@ label,
   display: grid;
   grid-template-columns: 1fr;
   gap: 8px;
+}
+
+.favorite-rail {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(220px, 280px);
+  gap: 10px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+  scroll-snap-type: x proximity;
+}
+
+.favorite-tile {
+  position: relative;
+  display: grid;
+  min-height: 132px;
+  gap: 7px;
+  border: 1px solid color-mix(in srgb, var(--line) 78%, transparent);
+  border-radius: 16px;
+  padding: 12px;
+  background: color-mix(in srgb, var(--surface-solid) 72%, transparent);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.22);
+  cursor: pointer;
+  scroll-snap-align: start;
+  transition:
+    border-color 160ms ease,
+    transform 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.favorite-tile:hover,
+.favorite-tile:focus {
+  border-color: color-mix(in srgb, var(--accent-3) 32%, var(--line-strong));
+  box-shadow: var(--small-shadow);
+  transform: translateY(-2px);
+}
+
+.favorite-tile strong {
+  color: var(--ink);
+  font-size: 14px;
+  line-height: 1.35;
+}
+
+.favorite-tile small {
+  color: var(--muted);
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.favorite-tile-actions {
+  display: flex;
+  gap: 5px;
+  margin-top: auto;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(4px);
+  transition:
+    opacity 150ms ease,
+    transform 150ms ease;
+}
+
+.favorite-tile:hover .favorite-tile-actions,
+.favorite-tile:focus .favorite-tile-actions,
+.favorite-tile:focus-within .favorite-tile-actions {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
 }
 
 .prompt-card {
@@ -1358,7 +1437,8 @@ select:disabled {
 .cloud-status-chip {
   display: inline-flex;
   align-items: center;
-  width: fit-content;
+  width: 30px;
+  max-width: 30px;
   min-height: 26px;
   margin-top: 9px;
   border: 1px solid var(--line);
@@ -1369,15 +1449,32 @@ select:disabled {
   font-size: 12px;
   font-weight: 850;
   box-shadow: var(--small-shadow);
+  overflow: hidden;
+  white-space: nowrap;
+  transition:
+    max-width 180ms ease,
+    width 180ms ease,
+    color 160ms ease,
+    background 160ms ease;
 }
 
 .cloud-status-chip::before {
+  flex: 0 0 auto;
   width: 7px;
   height: 7px;
   margin-right: 7px;
   border-radius: 50%;
   background: currentColor;
   content: "";
+}
+
+.app-header > div:hover .cloud-status-chip,
+.cloud-status-chip.status-saving,
+.cloud-status-chip.status-error,
+.cloud-status-chip.status-local,
+.cloud-status-chip:focus-visible {
+  width: fit-content;
+  max-width: 220px;
 }
 
 .status-saving {
@@ -1449,11 +1546,76 @@ select:disabled {
   display: none;
 }
 
+.diagnostics-panel,
+.snapshot-panel {
+  border-top: 1px solid var(--line);
+  padding-top: 12px;
+}
+
+.status-grid {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 12px;
+  background: var(--surface-2);
+}
+
+.status-grid span,
+.snapshot-item span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.snapshot-list {
+  display: grid;
+  gap: 8px;
+}
+
+.snapshot-item {
+  display: grid;
+  gap: 3px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 10px 12px;
+  background: var(--surface);
+  color: var(--ink);
+  cursor: pointer;
+  text-align: left;
+}
+
+.compare-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.compare-panel {
+  display: grid;
+  gap: 7px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 13px;
+  background: var(--surface-2);
+}
+
+.compare-panel span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.compare-panel p {
+  margin: 0;
+  font-size: 12px;
+}
+
 .toast {
   position: fixed;
   right: 22px;
   bottom: 22px;
-  z-index: 90;
+  z-index: 1000;
   max-width: min(420px, calc(100vw - 36px));
   border: 1px solid rgba(255, 255, 255, 0.22);
   border-radius: 14px;
@@ -1553,6 +1715,10 @@ select:disabled {
 
   .form-grid,
     .list-row {
+    grid-template-columns: 1fr;
+  }
+
+  .compare-grid {
     grid-template-columns: 1fr;
   }
 

@@ -144,6 +144,8 @@ let cloudSaveTimer = null;
 let cloudReady = false;
 let cloudStatus = "checking";
 let applyingRemoteState = false;
+let pendingRemoteState = null;
+let pendingRemoteUpdatedAt = "";
 
 const $ = (selector) => document.querySelector(selector);
 
@@ -209,10 +211,21 @@ const elements = {
   closeSyncBtn: $("#closeSyncBtn"),
   cloudReloadBtn: $("#cloudReloadBtn"),
   cloudSaveBtn: $("#cloudSaveBtn"),
+  diagnosticsBtn: $("#diagnosticsBtn"),
   logoutBtn: $("#logoutBtn"),
   hoverPreviewToggle: $("#hoverPreviewToggle"),
   syncStatusText: $("#syncStatusText"),
+  diagnosticsPanel: $("#diagnosticsPanel"),
+  snapshotPanel: $("#snapshotPanel"),
   cloudStatusChip: $("#cloudStatusChip"),
+  conflictDialog: $("#conflictDialog"),
+  closeConflictBtn: $("#closeConflictBtn"),
+  localCompareTitle: $("#localCompareTitle"),
+  localCompareMeta: $("#localCompareMeta"),
+  remoteCompareTitle: $("#remoteCompareTitle"),
+  remoteCompareMeta: $("#remoteCompareMeta"),
+  useRemoteBtn: $("#useRemoteBtn"),
+  keepLocalBtn: $("#keepLocalBtn"),
   authGate: $("#authGate"),
   authForm: $("#authForm"),
   passwordInput: $("#passwordInput"),
@@ -302,6 +315,7 @@ function bindEvents() {
   elements.closeSyncBtn.addEventListener("click", () => elements.syncDialog.close());
   elements.cloudReloadBtn.addEventListener("click", () => loadCloudState({ manual: true }));
   elements.cloudSaveBtn.addEventListener("click", () => saveCloudState({ manual: true }));
+  elements.diagnosticsBtn.addEventListener("click", runDiagnostics);
   elements.logoutBtn.addEventListener("click", logoutCloud);
   elements.hoverPreviewToggle.addEventListener("change", () => {
     state.settings.hoverPreview = elements.hoverPreviewToggle.checked;
@@ -309,11 +323,15 @@ function bindEvents() {
     render();
   });
   elements.authForm.addEventListener("submit", loginCloud);
+  elements.closeConflictBtn.addEventListener("click", () => elements.conflictDialog.close());
+  elements.useRemoteBtn.addEventListener("click", useRemoteState);
+  elements.keepLocalBtn.addEventListener("click", keepLocalState);
   bindBackdropClose(elements.itemDialog);
   bindBackdropClose(elements.categoryDialog);
   bindBackdropClose(elements.exportDialog);
   bindBackdropClose(elements.detailDialog);
   bindBackdropClose(elements.syncDialog);
+  bindBackdropClose(elements.conflictDialog);
 
   elements.resetSampleBtn.addEventListener("click", () => {
     const confirmed = window.confirm("현재 데이터를 샘플 데이터로 교체할까요? 먼저 내보내기로 백업해두는 것을 권장합니다.");
@@ -445,26 +463,15 @@ async function loadCloudState(options = {}) {
       const remoteState = normalizeState(payload.data);
       const remoteUpdatedAt = payload.data.updatedAt || payload.updatedAt || remoteState.updatedAt;
       const localIsNewer = compareDate(state.updatedAt, remoteUpdatedAt) > 1000;
-      if (localIsNewer && options.manual) {
-        const confirmed = window.confirm("이 PC의 데이터가 DB보다 최신입니다. 그래도 DB 데이터를 불러올까요?");
-        if (!confirmed) {
-          updateCloudStatus("이 PC 데이터가 DB보다 최신입니다.");
-          setSaveStatus("로컬 최신", "local");
-          return;
-        }
-      }
-      if (localIsNewer && !options.manual) {
+      if (localIsNewer) {
+        pendingRemoteState = remoteState;
+        pendingRemoteUpdatedAt = remoteUpdatedAt;
         updateCloudStatus("이 PC 데이터가 DB보다 최신입니다. 필요하면 DB에 지금 저장하세요.");
         setSaveStatus("로컬 최신", "local");
+        if (options.manual) openConflictDialog(remoteState, remoteUpdatedAt);
         return;
       }
-      applyingRemoteState = true;
-      state = remoteState;
-      saveState({ skipSync: true });
-      applyingRemoteState = false;
-      render();
-      updateCloudStatus(`DB에서 불러옴 ${formatCloudTime(payload.updatedAt || state.updatedAt)}`);
-      setSaveStatus("DB 최신", "saved");
+      applyRemoteState(remoteState, payload.updatedAt || state.updatedAt);
       if (options.manual) showToast("DB 데이터를 불러왔습니다.");
     } else {
       updateCloudStatus("DB가 비어 있어 현재 데이터를 저장합니다.");
@@ -478,11 +485,127 @@ async function loadCloudState(options = {}) {
   }
 }
 
+function applyRemoteState(remoteState, updatedAt = "") {
+  applyingRemoteState = true;
+  state = normalizeState(remoteState);
+  saveState({ skipSync: true });
+  applyingRemoteState = false;
+  render();
+  updateCloudStatus(`DB에서 불러옴 ${formatCloudTime(updatedAt || state.updatedAt)}`);
+  setSaveStatus("DB 최신", "saved");
+}
+
+function openConflictDialog(remoteState, remoteUpdatedAt) {
+  const localSummary = summarizeState(state);
+  const remoteSummary = summarizeState(remoteState);
+  elements.localCompareTitle.textContent = `${localSummary.itemCount}개 항목`;
+  elements.localCompareMeta.textContent = `${localSummary.categoryCount}개 카테고리 · ${formatCloudTime(state.updatedAt)}`;
+  elements.remoteCompareTitle.textContent = `${remoteSummary.itemCount}개 항목`;
+  elements.remoteCompareMeta.textContent = `${remoteSummary.categoryCount}개 카테고리 · ${formatCloudTime(remoteUpdatedAt || remoteState.updatedAt)}`;
+  showDialog(elements.conflictDialog);
+}
+
+function summarizeState(data = {}) {
+  return {
+    itemCount: Array.isArray(data.items) ? data.items.length : 0,
+    categoryCount: Array.isArray(data.categories) ? data.categories.length : 0,
+  };
+}
+
+function useRemoteState() {
+  if (!pendingRemoteState) return;
+  applyRemoteState(pendingRemoteState, pendingRemoteUpdatedAt);
+  pendingRemoteState = null;
+  pendingRemoteUpdatedAt = "";
+  elements.conflictDialog.close();
+  showToast("DB 데이터를 적용했습니다.", "success");
+}
+
+function keepLocalState() {
+  elements.conflictDialog.close();
+  saveCloudState({ manual: true });
+}
+
 function scheduleCloudSave() {
   if (applyingRemoteState || !cloudReady) return;
   setSaveStatus("저장 중", "saving");
   window.clearTimeout(cloudSaveTimer);
   cloudSaveTimer = window.setTimeout(() => saveCloudState({ silent: true }), CLOUD_SAVE_DELAY);
+}
+
+async function runDiagnostics() {
+  elements.diagnosticsPanel.classList.remove("hidden");
+  elements.diagnosticsPanel.innerHTML = `<p class="help-text">상태 확인 중...</p>`;
+  try {
+    const [diagnosticsResponse, snapshotsResponse] = await Promise.all([
+      fetch("/api/diagnostics", { credentials: "include" }),
+      fetch("/api/snapshots", { credentials: "include" }),
+    ]);
+    if (diagnosticsResponse.status === 401 || snapshotsResponse.status === 401) {
+      showAuthGate();
+      elements.diagnosticsPanel.innerHTML = `<p class="help-text">로그인이 필요합니다.</p>`;
+      return;
+    }
+    const diagnostics = await diagnosticsResponse.json();
+    const snapshots = await snapshotsResponse.json();
+    renderDiagnostics(diagnostics);
+    renderSnapshots(snapshots.snapshots || []);
+  } catch {
+    elements.diagnosticsPanel.innerHTML = `<p class="help-text">상태 진단에 실패했습니다.</p>`;
+  }
+}
+
+function renderDiagnostics(diagnostics) {
+  const checks = diagnostics.checks || {};
+  elements.diagnosticsPanel.innerHTML = `
+    <div class="status-grid">
+      <span>DB 연결</span><strong>${checks.dbConnected ? "정상" : "확인 필요"}</strong>
+      <span>항목</span><strong>${checks.itemCount || 0}개</strong>
+      <span>카테고리</span><strong>${checks.categoryCount || 0}개</strong>
+      <span>스냅샷</span><strong>${checks.snapshotCount || 0}개</strong>
+      <span>최근 저장</span><strong>${formatCloudTime(checks.dataUpdatedAt) || "-"}</strong>
+    </div>
+  `;
+}
+
+function renderSnapshots(snapshots) {
+  elements.snapshotPanel.classList.remove("hidden");
+  elements.snapshotPanel.innerHTML = snapshots.length
+    ? `
+      <div class="snapshot-list">
+        ${snapshots.map((snapshot) => `
+          <button class="snapshot-item" data-snapshot-id="${escapeAttribute(snapshot.id)}" type="button">
+            <strong>${formatCloudTime(snapshot.createdAt) || "스냅샷"}</strong>
+            <span>${snapshot.itemCount || 0}개 항목 · ${snapshot.categoryCount || 0}개 카테고리</span>
+          </button>
+        `).join("")}
+      </div>
+    `
+    : `<p class="help-text">아직 스냅샷이 없습니다. DB 저장 후 자동으로 최근 5개가 보관됩니다.</p>`;
+
+  elements.snapshotPanel.querySelectorAll("[data-snapshot-id]").forEach((button) => {
+    button.addEventListener("click", () => restoreSnapshot(button.dataset.snapshotId));
+  });
+}
+
+async function restoreSnapshot(id) {
+  const confirmed = window.confirm("선택한 스냅샷으로 DB와 현재 화면을 복원할까요?");
+  if (!confirmed) return;
+  try {
+    const response = await fetch("/api/snapshots", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ id }),
+    });
+    if (!response.ok) throw new Error("RESTORE_FAILED");
+    const payload = await response.json();
+    applyRemoteState(payload.data, payload.updatedAt);
+    showToast("스냅샷을 복원했습니다.", "success");
+    runDiagnostics();
+  } catch {
+    showToast("스냅샷 복원에 실패했습니다.", "error");
+  }
 }
 
 async function saveCloudState(options = {}) {
@@ -546,6 +669,7 @@ function updateCloudStatus(message = "") {
 function setSaveStatus(text, mode = "saved") {
   if (!elements.cloudStatusChip) return;
   elements.cloudStatusChip.textContent = text;
+  elements.cloudStatusChip.title = text;
   elements.cloudStatusChip.className = `cloud-status-chip status-${mode}`;
 }
 
@@ -649,9 +773,15 @@ function renderItems() {
   const visible = getVisibleItems();
   elements.resultCount.textContent = `${visible.length}개 항목`;
 
-  const favorites = visible.filter((item) => item.favorite).slice(0, 4);
+  const favorites = [...state.items]
+    .filter((item) => item.favorite)
+    .sort(sortItems)
+    .slice(0, 6);
   elements.favoriteSection.innerHTML = favorites.length
-    ? `<div class="dock-title"><h3>즐겨찾기</h3><small>${favorites.length}개</small></div><div class="items-grid">${favorites.map(renderCard).join("")}</div>`
+    ? `<div class="favorite-dock">
+        <div class="dock-title"><h3>고정 즐겨찾기</h3><small>${favorites.length}개</small></div>
+        <div class="favorite-rail">${favorites.map(renderFavoriteTile).join("")}</div>
+      </div>`
     : "";
 
   elements.itemsView.className = `items-grid ${filters.view === "list" ? "list-view" : ""}`;
@@ -789,6 +919,24 @@ function renderCard(item) {
   `;
 }
 
+function renderFavoriteTile(item) {
+  const id = escapeAttribute(item.id);
+  const platformBadgeClass = platformClass[item.platform] || platformClass.Other;
+  const summary = item.summary || item.useCase || item.prompt || item.url || "요약 없음";
+  return `
+    <article class="favorite-tile" data-id="${id}" tabindex="0">
+      <span class="platform-badge ${platformBadgeClass}">${escapeHtml(item.platform)}</span>
+      <strong>${highlightMatches(item.title)}</strong>
+      <small>${highlightMatches(shorten(summary, 46))}</small>
+      <div class="favorite-tile-actions">
+        ${item.prompt ? `<button class="tool-button" data-action="copy" data-id="${id}" type="button" aria-label="프롬프트 복사">⧉</button>` : ""}
+        ${item.url ? `<button class="tool-button" data-action="open" data-id="${id}" type="button" aria-label="링크 열기">↗</button>` : ""}
+        <button class="tool-button" data-action="detail" data-id="${id}" type="button" aria-label="상세 보기">i</button>
+      </div>
+    </article>
+  `;
+}
+
 function renderListRow(item) {
   const id = escapeAttribute(item.id);
   const platformBadgeClass = platformClass[item.platform] || platformClass.Other;
@@ -828,7 +976,7 @@ function attachItemEvents() {
     });
   });
 
-  document.querySelectorAll("[data-id].prompt-card, [data-id].list-row").forEach((card) => {
+  document.querySelectorAll("[data-id].prompt-card, [data-id].list-row, [data-id].favorite-tile").forEach((card) => {
     card.addEventListener("mouseenter", (event) => {
       if (!isHoverPreviewEnabled()) return;
       const item = findItem(card.dataset.id);
@@ -1744,6 +1892,8 @@ function dateStamp() {
 }
 
 function showToast(message, type = "") {
+  const toastHost = document.querySelector("dialog[open] .dialog-inner") || document.body;
+  if (elements.toast.parentElement !== toastHost) toastHost.appendChild(elements.toast);
   elements.toast.textContent = message;
   elements.toast.className = `toast visible ${type}`.trim();
   window.clearTimeout(showToast.timer);

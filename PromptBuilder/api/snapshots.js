@@ -1,9 +1,5 @@
 const { neon } = require("@neondatabase/serverless");
-const {
-  getUserId,
-  isAuthenticated,
-  readJsonBody,
-} = require("./_lib/session");
+const { getUserId, isAuthenticated, readJsonBody } = require("./_lib/session");
 
 let sqlClient = null;
 
@@ -31,10 +27,14 @@ async function ensureSchema(sql) {
       created_at timestamptz not null default now()
     )
   `;
-  await sql`
-    create index if not exists promptbuilder_snapshots_user_created_idx
-    on promptbuilder_snapshots (user_id, created_at desc)
-  `;
+}
+
+function summarizeData(data = {}) {
+  return {
+    itemCount: Array.isArray(data.items) ? data.items.length : 0,
+    categoryCount: Array.isArray(data.categories) ? data.categories.length : 0,
+    updatedAt: data.updatedAt || null,
+  };
 }
 
 module.exports = async function handler(req, res) {
@@ -43,8 +43,8 @@ module.exports = async function handler(req, res) {
     return;
   }
 
-  if (!["GET", "PUT"].includes(req.method)) {
-    res.setHeader("Allow", "GET, PUT");
+  if (!["GET", "POST"].includes(req.method)) {
+    res.setHeader("Allow", "GET, POST");
     res.status(405).json({ error: "Method not allowed" });
     return;
   }
@@ -56,52 +56,52 @@ module.exports = async function handler(req, res) {
 
     if (req.method === "GET") {
       const rows = await sql`
-        select data, updated_at
-        from promptbuilder_data
+        select id, data, created_at
+        from promptbuilder_snapshots
         where user_id = ${userId}
-        limit 1
+        order by created_at desc
+        limit 5
       `;
-      const row = rows[0];
       res.status(200).json({
-        data: row?.data || null,
-        updatedAt: row?.updated_at || null,
+        snapshots: rows.map((row) => ({
+          id: String(row.id),
+          createdAt: row.created_at,
+          ...summarizeData(row.data),
+        })),
       });
       return;
     }
 
     const body = await readJsonBody(req);
-    if (!body.data || typeof body.data !== "object") {
-      res.status(400).json({ error: "Missing data object" });
+    const snapshotId = Number(body.id);
+    if (!Number.isSafeInteger(snapshotId) || snapshotId <= 0) {
+      res.status(400).json({ error: "Missing snapshot id" });
       return;
     }
 
     const rows = await sql`
+      select data
+      from promptbuilder_snapshots
+      where user_id = ${userId} and id = ${snapshotId}
+      limit 1
+    `;
+    const snapshot = rows[0];
+    if (!snapshot) {
+      res.status(404).json({ error: "Snapshot not found" });
+      return;
+    }
+
+    const updated = await sql`
       insert into promptbuilder_data (user_id, data, updated_at)
-      values (${userId}, ${JSON.stringify(body.data)}::jsonb, now())
+      values (${userId}, ${JSON.stringify(snapshot.data)}::jsonb, now())
       on conflict (user_id)
       do update set data = excluded.data, updated_at = now()
-      returning updated_at
+      returning data, updated_at
     `;
-    await sql`
-      insert into promptbuilder_snapshots (user_id, data)
-      values (${userId}, ${JSON.stringify(body.data)}::jsonb)
-    `;
-    await sql`
-      delete from promptbuilder_snapshots
-      where id in (
-        select id
-        from (
-          select id, row_number() over (partition by user_id order by created_at desc) as snapshot_rank
-          from promptbuilder_snapshots
-          where user_id = ${userId}
-        ) ranked
-        where snapshot_rank > 5
-      )
-    `;
-    res.status(200).json({ ok: true, updatedAt: rows[0].updated_at });
+    res.status(200).json({ ok: true, data: updated[0].data, updatedAt: updated[0].updated_at });
   } catch (error) {
     res.status(500).json({
-      error: "Database request failed",
+      error: "Snapshot request failed",
       detail: process.env.NODE_ENV === "production" ? undefined : error.message,
     });
   }
