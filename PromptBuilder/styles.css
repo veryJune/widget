@@ -1355,6 +1355,47 @@ select:disabled {
   color: var(--accent-3);
 }
 
+.auth-gate {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  background:
+    linear-gradient(145deg, color-mix(in srgb, var(--glow-a) 80%, transparent), transparent 42%),
+    linear-gradient(235deg, color-mix(in srgb, var(--glow-b) 78%, transparent), transparent 48%),
+    color-mix(in srgb, var(--bg) 86%, rgba(0, 0, 0, 0.24));
+  backdrop-filter: blur(18px);
+}
+
+.auth-card {
+  display: grid;
+  width: min(420px, 100%);
+  gap: 13px;
+  border: 1px solid var(--line-strong);
+  border-radius: 28px;
+  padding: 24px;
+  background: color-mix(in srgb, var(--surface-solid) 90%, transparent);
+  box-shadow: var(--shadow);
+}
+
+.auth-card h2 {
+  margin-bottom: 0;
+}
+
+.auth-card p {
+  margin-bottom: 0;
+}
+
+.auth-card .primary-action {
+  width: 100%;
+}
+
+.hidden {
+  display: none !important;
+}
+
 .hidden-input {
   display: none;
 }

@@ -1,31 +1,42 @@
-# Prompt Dock
+# PromptBuilder
 
-Prompt Dock is a lightweight personal prompt launcher for text prompts, GPTs, Gems, Perplexity links, and other AI tools.
+Personal prompt manager for Vercel + Neon Postgres.
 
-## What It Does
+## Storage Model
 
-- Add, edit, delete, and favorite prompt items in the web UI
-- Search by title, summary, category, tag, prompt body, or platform
-- Switch between card, list, and compact views
-- Filter by platform and editable categories
-- Use tag suggestions based on existing tags and simple Korean/English aliases
-- Copy prompts with one click
-- Open GPTs, Gems, Perplexity, or reference links
-- Fill `{variables}` in prompts before copying
-- Export and import JSON or CSV backups
+- The browser keeps a local cache for speed and emergency fallback.
+- Vercel Serverless Functions protect the data with a private password.
+- Neon Postgres stores the shared PromptBuilder data in `promptbuilder_data`.
+- JSON/CSV export and JSON/CSV import remain available as manual backup and restore.
 
-## How To Use
+## Required Vercel Environment Variables
 
-Open `index.html` in a browser.
+Set these in Vercel Project Settings > Environment Variables.
 
-The app stores data in your browser with local storage. Use export/import for backups or moving data between browsers.
+```text
+DATABASE_URL=your_neon_postgres_connection_string
+APP_PASSWORD=your_private_promptbuilder_password
+SESSION_SECRET=a_long_random_secret
+PROMPTBUILDER_USER_ID=default
+```
 
-## GitHub Pages
+`SESSION_SECRET` can be any long random text. `PROMPTBUILDER_USER_ID` can stay `default` for one-person use.
 
-This project is a static web app, so it can be hosted on GitHub Pages.
+## Deploy Steps
 
-1. Create a GitHub repository.
-2. Upload `index.html`, `styles.css`, `app.js`, and this `README.md`.
-3. Enable GitHub Pages from the repository settings.
+1. Create or open a Vercel account.
+2. Import this GitHub repository into Vercel.
+3. When Vercel asks for the project root, choose `PromptBuilder`.
+4. Add a Neon Postgres database from Vercel Marketplace or Neon.
+5. Copy the Neon connection string into `DATABASE_URL`.
+6. Add `APP_PASSWORD`, `SESSION_SECRET`, and `PROMPTBUILDER_USER_ID`.
+7. Deploy.
+8. Open the deployed URL and enter the password.
 
-For the MVP, data is saved in the user's browser rather than pushed back to GitHub. This keeps setup simple and avoids exposing GitHub tokens in the browser.
+On first login, if the database is empty, the app saves the current local PromptBuilder data into Neon.
+
+## Future Multi-user Path
+
+The current app uses a single `PROMPTBUILDER_USER_ID`.
+
+Later, it can be expanded into real user accounts by replacing the single password with users, sessions, and per-user `user_id` values in the database.
