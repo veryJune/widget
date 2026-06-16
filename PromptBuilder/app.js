@@ -308,6 +308,9 @@ function bindEvents() {
   elements.hoverPreview.addEventListener("mouseleave", scheduleHoverHide);
 
   elements.tagInput.addEventListener("input", renderTagSuggestions);
+  [elements.titleInput, elements.summaryInput, elements.promptInput, elements.useCaseInput].forEach((input) => {
+    input.addEventListener("input", renderTagSuggestions);
+  });
   elements.tagInput.addEventListener("keydown", (event) => {
     if (event.key === "Enter" || event.key === ",") {
       event.preventDefault();
@@ -568,19 +571,21 @@ async function runDiagnostics() {
   elements.diagnosticsPanel.classList.remove("hidden");
   elements.diagnosticsPanel.innerHTML = `<p class="help-text">상태 확인 중...</p>`;
   try {
-    const [diagnosticsResponse, snapshotsResponse] = await Promise.all([
+    const [diagnosticsResponse, snapshotsResponse, blobResponse] = await Promise.all([
       fetch("/api/diagnostics", { credentials: "include" }),
       fetch("/api/snapshots", { credentials: "include" }),
+      fetch("/api/blob-backups", { credentials: "include" }),
     ]);
-    if (diagnosticsResponse.status === 401 || snapshotsResponse.status === 401) {
+    if (diagnosticsResponse.status === 401 || snapshotsResponse.status === 401 || blobResponse.status === 401) {
       showAuthGate();
       elements.diagnosticsPanel.innerHTML = `<p class="help-text">로그인이 필요합니다.</p>`;
       return;
     }
     const diagnostics = await diagnosticsResponse.json();
     const snapshots = await snapshotsResponse.json();
+    const blobBackups = await blobResponse.json();
     renderDiagnostics(diagnostics);
-    renderSnapshots(snapshots.snapshots || []);
+    renderBackups(snapshots.snapshots || [], blobBackups);
   } catch {
     elements.diagnosticsPanel.innerHTML = `<p class="help-text">상태 진단에 실패했습니다.</p>`;
   }
@@ -610,9 +615,37 @@ function renderDiagnostics(diagnostics) {
   `;
 }
 
-function renderSnapshots(snapshots) {
+function renderBackups(snapshots, blobBackups = {}) {
   elements.snapshotPanel.classList.remove("hidden");
-  elements.snapshotPanel.innerHTML = snapshots.length
+  elements.snapshotPanel.innerHTML = `
+    <div class="backup-groups">
+      <section>
+        <div class="field-head">
+          <span>최근 DB 스냅샷</span>
+          <small>최근 5개</small>
+        </div>
+        ${renderSnapshotList(snapshots)}
+      </section>
+      <section>
+        <div class="field-head">
+          <span>Blob 장기 백업</span>
+          <small>${blobBackups.configured ? "최근 파일" : "미설정"}</small>
+        </div>
+        ${renderBlobBackupList(blobBackups)}
+      </section>
+    </div>
+  `;
+
+  elements.snapshotPanel.querySelectorAll("[data-snapshot-id]").forEach((button) => {
+    button.addEventListener("click", () => restoreSnapshot(button.dataset.snapshotId));
+  });
+  elements.snapshotPanel.querySelectorAll("[data-blob-url]").forEach((button) => {
+    button.addEventListener("click", () => restoreBlobBackup(button.dataset.blobUrl));
+  });
+}
+
+function renderSnapshotList(snapshots) {
+  return snapshots.length
     ? `
       <div class="snapshot-list">
         ${snapshots.map((snapshot) => `
@@ -624,10 +657,25 @@ function renderSnapshots(snapshots) {
       </div>
     `
     : `<p class="help-text">아직 스냅샷이 없습니다. DB 저장 후 자동으로 최근 5개가 보관됩니다.</p>`;
+}
 
-  elements.snapshotPanel.querySelectorAll("[data-snapshot-id]").forEach((button) => {
-    button.addEventListener("click", () => restoreSnapshot(button.dataset.snapshotId));
-  });
+function renderBlobBackupList(blobBackups = {}) {
+  if (!blobBackups.configured) {
+    return `<p class="help-text">Vercel Blob 토큰이 설정되면 주 1회 백업 목록이 여기에 표시됩니다.</p>`;
+  }
+  const backups = blobBackups.backups || [];
+  return backups.length
+    ? `
+      <div class="snapshot-list">
+        ${backups.map((backup) => `
+          <button class="snapshot-item" data-blob-url="${escapeAttribute(backup.url)}" type="button">
+            <strong>${formatCloudTime(backup.uploadedAt) || "Blob 백업"}</strong>
+            <span>${escapeHtml(formatBytes(backup.size))} · ${escapeHtml(shorten(backup.pathname || "", 58))}</span>
+          </button>
+        `).join("")}
+      </div>
+    `
+    : `<p class="help-text">아직 Blob 백업 파일이 없습니다. 주 1회 Blob 백업을 켠 뒤 DB 저장이 필요합니다.</p>`;
 }
 
 async function restoreSnapshot(id) {
@@ -647,6 +695,26 @@ async function restoreSnapshot(id) {
     runDiagnostics();
   } catch {
     showToast("스냅샷 복원에 실패했습니다.", "error");
+  }
+}
+
+async function restoreBlobBackup(url) {
+  const confirmed = window.confirm("선택한 Blob 백업 파일로 DB와 현재 화면을 복원할까요?");
+  if (!confirmed) return;
+  try {
+    const response = await fetch("/api/blob-backups", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ url }),
+    });
+    if (!response.ok) throw new Error("BLOB_RESTORE_FAILED");
+    const payload = await response.json();
+    applyRemoteState(payload.data, payload.updatedAt);
+    showToast("Blob 백업에서 복원했습니다.", "success");
+    runDiagnostics();
+  } catch {
+    showToast("Blob 백업 복원에 실패했습니다.", "error");
   }
 }
 
@@ -1219,6 +1287,7 @@ function toggleFormCategory(category) {
     formDraft.categories.push(category);
   }
   renderFormCategories();
+  renderTagSuggestions();
 }
 
 function renderSelectedTags() {
@@ -1246,31 +1315,69 @@ function renderTagSuggestions() {
 }
 
 function getTagSuggestions(query) {
-  const existingTags = [...new Set(state.items.flatMap((item) => item.tags))].filter(Boolean);
   const lowerQuery = normalizeText(query);
-  const aliasMatches = Object.entries(tagAliases)
-    .filter(([tag, aliases]) => {
-      const blob = normalizeText([tag, ...aliases].join(" "));
-      return lowerQuery && blob.includes(lowerQuery);
+  const context = getTagContext();
+  const candidates = buildTagCandidates();
+  return candidates
+    .filter((tag) => {
+      if (formDraft.tags.includes(tag)) return false;
+      if (!lowerQuery) return true;
+      const blob = normalizeText([tag, ...(tagAliases[tag] || [])].join(" "));
+      return blob.includes(lowerQuery) || romanizeKorean(tag).includes(lowerQuery);
     })
-    .flatMap(([tag, aliases]) => [tag, ...aliases]);
-
-  const ranked = [...new Set([...existingTags, ...aliasMatches])].filter((tag) => {
-    if (formDraft.tags.includes(tag)) return false;
-    if (!lowerQuery) return true;
-    const blob = normalizeText([tag, ...(tagAliases[tag] || [])].join(" "));
-    return blob.includes(lowerQuery) || romanizeKorean(tag).includes(lowerQuery);
-  });
-
-  return ranked.sort((a, b) => tagScore(b, query) - tagScore(a, query) || a.localeCompare(b, "ko"));
+    .sort((a, b) => tagScore(b, query, context) - tagScore(a, query, context) || a.localeCompare(b, "ko"));
 }
 
-function tagScore(tag, query) {
+function buildTagCandidates() {
+  const existingTags = [...new Set(state.items.flatMap((item) => item.tags))].filter(Boolean);
+  const categoryTags = state.categories.flatMap((category) => [category, ...(tagAliases[category] || [])]);
+  const contextualTags = inferContextTags(getTagContext().raw);
+  const aliasTags = Object.entries(tagAliases).flatMap(([tag, aliases]) => [tag, ...aliases]);
+  return [...new Set([...contextualTags, ...existingTags, ...categoryTags, ...aliasTags])].filter(Boolean);
+}
+
+function getTagContext() {
+  const raw = [
+    elements.titleInput.value,
+    elements.summaryInput.value,
+    elements.promptInput.value,
+    elements.useCaseInput.value,
+    ...formDraft.categories,
+  ].join(" ");
+  return {
+    raw,
+    normalized: normalizeText(raw),
+  };
+}
+
+function inferContextTags(text) {
+  const rules = [
+    { tags: ["요약", "회의록", "액션아이템"], words: ["회의", "회의록", "미팅", "요약", "정리"] },
+    { tags: ["블로그", "SEO", "초안"], words: ["블로그", "콘텐츠", "seo", "검색", "원고"] },
+    { tags: ["시장조사", "경쟁사", "리서치"], words: ["시장", "경쟁", "조사", "리서치", "분석"] },
+    { tags: ["메일", "답장", "업무"], words: ["메일", "이메일", "답장", "회신"] },
+    { tags: ["코드", "디버깅", "개발"], words: ["코드", "개발", "버그", "디버그", "api"] },
+    { tags: ["이미지", "프롬프트", "비주얼"], words: ["이미지", "사진", "비주얼", "디자인"] },
+    { tags: ["번역", "영어", "한국어"], words: ["번역", "영어", "한국어", "translation"] },
+    { tags: ["기획", "아이디어", "전략"], words: ["기획", "아이디어", "전략", "제안"] },
+  ];
+  const normalized = normalizeText(text);
+  return rules
+    .filter((rule) => rule.words.some((word) => normalized.includes(normalizeText(word))))
+    .flatMap((rule) => rule.tags);
+}
+
+function tagScore(tag, query, context = getTagContext()) {
   const usage = state.items.filter((item) => item.tags.includes(tag)).length;
   const normalized = normalizeText(tag);
   const lowerQuery = normalizeText(query);
   const starts = lowerQuery && normalized.startsWith(lowerQuery) ? 20 : 0;
-  return usage * 5 + starts;
+  const exact = lowerQuery && normalized === lowerQuery ? 30 : 0;
+  const aliasBlob = normalizeText([tag, ...(tagAliases[tag] || [])].join(" "));
+  const aliasMatch = lowerQuery && aliasBlob.includes(lowerQuery) ? 14 : 0;
+  const contextMatch = context.normalized.includes(normalized) || (tagAliases[tag] || []).some((alias) => context.normalized.includes(normalizeText(alias))) ? 18 : 0;
+  const categoryMatch = formDraft.categories.includes(tag) ? 16 : 0;
+  return usage * 5 + starts + exact + aliasMatch + contextMatch + categoryMatch;
 }
 
 function addTag(value) {
@@ -2131,6 +2238,13 @@ function shorten(text, length) {
   const value = String(text || "");
   if (value.length <= length) return value;
   return `${value.slice(0, length - 1)}...`;
+}
+
+function formatBytes(bytes = 0) {
+  const value = Number(bytes) || 0;
+  if (value < 1024) return `${value} B`;
+  if (value < 1024 * 1024) return `${(value / 1024).toFixed(1)} KB`;
+  return `${(value / 1024 / 1024).toFixed(1)} MB`;
 }
 
 function highlightMatches(text) {

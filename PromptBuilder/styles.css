@@ -153,16 +153,16 @@ p {
 
 .brand-block {
   display: grid;
-  grid-template-columns: 48px minmax(0, auto);
+  grid-template-columns: 58px minmax(0, auto);
   align-items: center;
   gap: 12px;
 }
 
 .brand-logo,
 .auth-logo {
-  width: 48px;
-  height: 48px;
-  border-radius: 14px;
+  width: 58px;
+  height: 58px;
+  border-radius: 17px;
   object-fit: cover;
   box-shadow: var(--small-shadow);
 }
@@ -1636,9 +1636,9 @@ select:disabled {
 }
 
 .auth-logo {
-  width: 62px;
-  height: 62px;
-  border-radius: 18px;
+  width: 72px;
+  height: 72px;
+  border-radius: 21px;
 }
 
 .auth-card h2 {
@@ -1692,6 +1692,11 @@ select:disabled {
 .snapshot-list {
   display: grid;
   gap: 8px;
+}
+
+.backup-groups {
+  display: grid;
+  gap: 14px;
 }
 
 .snapshot-item {
