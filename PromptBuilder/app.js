@@ -4,6 +4,7 @@ const CLOUD_SAVE_DELAY = 700;
 const DEFAULT_SETTINGS = {
   hoverPreview: true,
   blobWeeklyBackup: false,
+  favoritesCollapsed: false,
 };
 const PLATFORM_ORDER = ["Any", "GPTs", "Gems", "Perplexity", "ChatGPT", "Gemini", "Claude", "Other"];
 const DEFAULT_CATEGORIES = ["요약", "글쓰기", "리서치", "업무", "코딩", "마케팅", "이미지", "학습"];
@@ -149,6 +150,7 @@ let pendingRemoteState = null;
 let pendingRemoteUpdatedAt = "";
 let statusCheckTimer = null;
 let confirmResolver = null;
+let duplicateCheckBypassId = "";
 
 const $ = (selector) => document.querySelector(selector);
 
@@ -394,6 +396,7 @@ function normalizeState(input) {
     items: normalizedItems,
     summaryCategories,
     favoriteOrder,
+    variableHistory: input?.variableHistory && typeof input.variableHistory === "object" ? input.variableHistory : {},
     settings,
     updatedAt: input?.updatedAt || new Date().toISOString(),
   };
@@ -687,6 +690,7 @@ function getCloudPayload() {
     categories: state.categories,
     summaryCategories: state.summaryCategories || [],
     favoriteOrder: state.favoriteOrder || [],
+    variableHistory: state.variableHistory || {},
     settings: state.settings || DEFAULT_SETTINGS,
     deviceInfo: getClientInfo(),
     items: state.items,
@@ -852,10 +856,7 @@ function renderItems() {
 
   const favorites = getFavoriteItems().slice(0, 8);
   elements.favoriteSection.innerHTML = favorites.length
-    ? `<div class="favorite-dock">
-        <div class="dock-title"><h3>고정 즐겨찾기</h3><small>${favorites.length}개</small></div>
-        <div class="favorite-rail">${favorites.map(renderFavoriteTile).join("")}</div>
-      </div>`
+    ? renderFavoriteDock(favorites)
     : "";
 
   elements.itemsView.className = `items-grid ${filters.view === "list" ? "list-view" : ""}`;
@@ -867,6 +868,7 @@ function renderItems() {
     elements.itemsView.innerHTML = visible.map(renderCard).join("");
   }
   attachItemEvents();
+  bindFavoriteDockControls();
 }
 
 function getVisibleItems() {
@@ -1019,6 +1021,22 @@ function renderFavoriteTile(item) {
         <button class="tool-button" data-action="detail" data-id="${id}" type="button" aria-label="상세 보기">i</button>
       </div>
     </article>
+  `;
+}
+
+function renderFavoriteDock(favorites) {
+  const collapsed = state.settings?.favoritesCollapsed === true;
+  return `
+    <div class="favorite-dock ${collapsed ? "collapsed" : ""}">
+      <div class="dock-title">
+        <div>
+          <h3>고정 즐겨찾기</h3>
+          <small>${favorites.length}개 · 드래그로 순서 변경</small>
+        </div>
+        <button class="subtle-button" id="favoriteToggleBtn" type="button">${collapsed ? "펼치기" : "접기"}</button>
+      </div>
+      <div class="favorite-rail">${favorites.map(renderFavoriteTile).join("")}</div>
+    </div>
   `;
 }
 
@@ -1264,7 +1282,7 @@ function addTag(value) {
   renderTagSuggestions();
 }
 
-function saveItemFromForm() {
+async function saveItemFromForm() {
   const title = elements.titleInput.value.trim();
   if (!title) {
     elements.titleInput.focus();
@@ -1297,6 +1315,16 @@ function saveItemFromForm() {
     showToast("프롬프트나 링크 중 하나는 입력해주세요.");
     return;
   }
+
+  if (duplicateCheckBypassId !== id) {
+    const duplicate = findDuplicatePrompt(item);
+    if (duplicate) {
+      const shouldContinue = await askDuplicateConfirm(item, duplicate);
+      if (!shouldContinue) return;
+      duplicateCheckBypassId = id;
+    }
+  }
+  duplicateCheckBypassId = "";
 
   const index = state.items.findIndex((entry) => entry.id === id);
   if (index >= 0) state.items[index] = item;
@@ -1356,7 +1384,7 @@ function openDetail(item) {
 
       ${item.useCase ? `<div class="detail-panel"><h3>사용 목적</h3><p>${escapeHtml(item.useCase)}</p></div>` : ""}
       ${variables.length ? renderVariablePanel(item, variables) : ""}
-      ${item.prompt ? `<div class="detail-panel copy-panel"><div class="panel-title-row"><h3>완성될 프롬프트</h3><button class="field-copy-button" data-field-copy="prompt" type="button">복사</button></div><div class="prompt-preview">${escapeHtml(item.prompt)}</div></div>` : ""}
+      ${item.prompt ? `<div class="detail-panel copy-panel"><div class="panel-title-row"><h3>완성될 프롬프트</h3><button class="field-copy-button" data-field-copy="prompt" type="button">복사</button></div><div class="prompt-preview" id="filledPromptPreview">${escapeHtml(item.prompt)}</div></div>` : ""}
       ${item.url ? `<div class="detail-panel copy-panel"><div class="panel-title-row"><h3>링크</h3><button class="field-copy-button" data-field-copy="url" type="button">복사</button></div><p class="url-preview">${escapeHtml(item.url)}</p></div>` : ""}
       ${item.notes ? `<div class="detail-panel"><h3>메모</h3><p>${escapeHtml(item.notes)}</p></div>` : ""}
       ${similar.length ? `<div class="detail-panel"><h3>비슷한 항목</h3><div class="similar-list">${similar.map(renderSimilarItem).join("")}</div></div>` : ""}
@@ -1381,7 +1409,8 @@ function renderVariablePanel(item, variables) {
         ${variables.map((variable) => `
           <label>
             ${escapeHtml(variable)}
-            <input data-variable="${escapeAttribute(variable)}" placeholder="${escapeAttribute(variable)} 입력" />
+            <input data-variable="${escapeAttribute(variable)}" list="var-${escapeAttribute(slugify(variable))}" placeholder="${escapeAttribute(getVariablePlaceholder(variable))}" />
+            ${renderVariableSuggestions(variable)}
           </label>
         `).join("")}
       </div>
@@ -1422,6 +1451,10 @@ function bindDetailEvents(item) {
       if (next) openDetail(next);
     });
   });
+  elements.detailBody.querySelectorAll("[data-variable]").forEach((input) => {
+    input.addEventListener("input", () => updateFilledPromptPreview(item));
+  });
+  updateFilledPromptPreview(item);
 }
 
 function bindBackdropClose(dialog) {
@@ -1434,11 +1467,12 @@ function showDialog(dialog) {
   if (!dialog.open) dialog.showModal();
 }
 
-function askConfirm({ eyebrow = "확인", title = "계속할까요?", message = "", okText = "확인" } = {}) {
+function askConfirm({ eyebrow = "확인", title = "계속할까요?", message = "", okText = "확인", cancelText = "취소" } = {}) {
   elements.confirmEyebrow.textContent = eyebrow;
   elements.confirmTitle.textContent = title;
   elements.confirmMessage.textContent = message;
   elements.confirmOkBtn.textContent = okText;
+  elements.confirmCancelBtn.textContent = cancelText;
   showDialog(elements.confirmDialog);
   return new Promise((resolve) => {
     confirmResolver = resolve;
@@ -1471,11 +1505,8 @@ async function copyPrompt(item) {
 }
 
 async function copyFilledPrompt(item) {
-  let text = item.prompt;
-  elements.detailBody.querySelectorAll("[data-variable]").forEach((input) => {
-    const key = input.dataset.variable;
-    text = text.replaceAll(`{${key}}`, input.value || `{${key}}`);
-  });
+  const text = getFilledPromptText(item);
+  rememberVariableValues();
   await writeClipboard(text);
   markUsed(item.id);
   showToast("채운 프롬프트를 복사했습니다.");
@@ -1770,6 +1801,14 @@ function bindFavoriteDrag() {
   });
 }
 
+function bindFavoriteDockControls() {
+  document.querySelector("#favoriteToggleBtn")?.addEventListener("click", () => {
+    state.settings.favoritesCollapsed = state.settings?.favoritesCollapsed !== true;
+    saveState();
+    renderItems();
+  });
+}
+
 function reorderFavorites(fromId, toId) {
   const ids = getFavoriteItems().map((item) => item.id);
   const fromIndex = ids.indexOf(fromId);
@@ -1900,6 +1939,92 @@ function getSimilarItems(item) {
     .map((entry) => entry.item);
 }
 
+function findDuplicatePrompt(item) {
+  const itemPrompt = normalizePromptText(item.prompt);
+  const itemTitle = normalizeText(item.title);
+  const itemUrl = normalizeUrl(item.url);
+  return state.items
+    .filter((entry) => entry.id !== item.id)
+    .map((entry) => {
+      const promptScore = itemPrompt && normalizePromptText(entry.prompt) === itemPrompt ? 100 : 0;
+      const urlScore = itemUrl && normalizeUrl(entry.url) === itemUrl ? 96 : 0;
+      const titleScore = itemTitle && normalizeText(entry.title) === itemTitle ? 82 : 0;
+      const nearPromptScore = getPromptSimilarity(item.prompt, entry.prompt) >= 0.92 ? 90 : 0;
+      return { item: entry, score: Math.max(promptScore, urlScore, titleScore, nearPromptScore) };
+    })
+    .filter((entry) => entry.score >= 82)
+    .sort((a, b) => b.score - a.score)[0]?.item;
+}
+
+async function askDuplicateConfirm(item, duplicate) {
+  const confirmed = await askConfirm({
+    eyebrow: "Duplicate Check",
+    title: "비슷한 항목이 있습니다",
+    message: `"${duplicate.title}" 항목과 내용이 비슷합니다. 그래도 새로 저장할까요?`,
+    okText: "그래도 저장",
+    cancelText: "기존 항목 보기",
+  });
+  if (!confirmed) {
+    elements.itemDialog.close();
+    openDetail(duplicate);
+  }
+  return confirmed;
+}
+
+function getFilledPromptText(item) {
+  let text = item.prompt || "";
+  elements.detailBody.querySelectorAll("[data-variable]").forEach((input) => {
+    const key = input.dataset.variable;
+    text = text.replaceAll(`{${key}}`, input.value || `{${key}}`);
+  });
+  return text;
+}
+
+function updateFilledPromptPreview(item) {
+  const preview = elements.detailBody.querySelector("#filledPromptPreview");
+  if (!preview) return;
+  preview.textContent = getFilledPromptText(item);
+}
+
+function rememberVariableValues() {
+  const values = state.variableHistory || {};
+  elements.detailBody.querySelectorAll("[data-variable]").forEach((input) => {
+    const value = input.value.trim();
+    if (!value) return;
+    const key = input.dataset.variable;
+    values[key] = [value, ...(values[key] || []).filter((entry) => entry !== value)].slice(0, 6);
+  });
+  state.variableHistory = values;
+  saveState();
+}
+
+function renderVariableSuggestions(variable) {
+  const suggestions = getVariableSuggestions(variable);
+  if (!suggestions.length) return "";
+  return `
+    <datalist id="var-${escapeAttribute(slugify(variable))}">
+      ${suggestions.map((value) => `<option value="${escapeAttribute(value)}"></option>`).join("")}
+    </datalist>
+  `;
+}
+
+function getVariableSuggestions(variable) {
+  const history = state.variableHistory?.[variable] || [];
+  const fallback = {
+    주제: ["신규 서비스 소개", "고객 후기 분석", "콘텐츠 캘린더"],
+    톤: ["친근하게", "전문적으로", "간결하게"],
+    대상독자: ["초보자", "실무자", "잠재 고객"],
+    언어: ["한국어", "영어"],
+    형식: ["표", "불릿", "체크리스트"],
+  }[variable] || [];
+  return [...new Set([...history, ...fallback])].slice(0, 8);
+}
+
+function getVariablePlaceholder(variable) {
+  const suggestions = getVariableSuggestions(variable);
+  return suggestions[0] ? `예: ${suggestions[0]}` : `${variable} 입력`;
+}
+
 function extractVariables(prompt) {
   const matches = [...String(prompt || "").matchAll(/\{([^{}\n]+)\}/g)].map((match) => match[1].trim()).filter(Boolean);
   return [...new Set(matches)];
@@ -1936,6 +2061,26 @@ function searchBlob(item) {
 
 function normalizeText(value) {
   return String(value || "").toLowerCase().replace(/\s+/g, "");
+}
+
+function normalizePromptText(value) {
+  return normalizeText(value).replace(/[.,;:!?'"`~()[\]<>]/g, "");
+}
+
+function normalizeUrl(value) {
+  return String(value || "").trim().replace(/\/+$/, "").toLowerCase();
+}
+
+function getPromptSimilarity(a, b) {
+  const left = new Set(normalizePromptText(a).match(/.{1,12}/g) || []);
+  const right = new Set(normalizePromptText(b).match(/.{1,12}/g) || []);
+  if (!left.size || !right.size) return 0;
+  const shared = [...left].filter((part) => right.has(part)).length;
+  return shared / Math.max(left.size, right.size);
+}
+
+function slugify(value) {
+  return normalizeText(value).replace(/[^a-z0-9가-힣_-]/g, "") || "value";
 }
 
 function romanizeKorean(value) {

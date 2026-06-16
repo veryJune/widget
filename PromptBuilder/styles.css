@@ -676,6 +676,14 @@ label,
   box-shadow: var(--small-shadow);
 }
 
+.favorite-dock.collapsed {
+  padding-bottom: 10px;
+}
+
+.favorite-dock.collapsed .favorite-rail {
+  display: none;
+}
+
 .dock-title {
   display: flex;
   align-items: center;
@@ -685,6 +693,11 @@ label,
 
 .dock-title h3 {
   margin: 0;
+}
+
+.dock-title small {
+  color: var(--muted);
+  font-size: 12px;
 }
 
 .items-grid {
