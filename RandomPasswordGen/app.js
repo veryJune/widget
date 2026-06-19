@@ -490,9 +490,9 @@ function updateStrength(length, setCount) {
 function renderVariations(variations) {
   latestVariations = variations;
   variantList.innerHTML = "";
-  variantExpanded = false;
 
   if (variations.length <= 1) {
+    variantExpanded = false;
     variantPanel.classList.add("hidden");
     return;
   }
