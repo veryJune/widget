@@ -5,6 +5,8 @@ const DEFAULT_SETTINGS = {
   hoverPreview: true,
   blobWeeklyBackup: false,
   favoritesCollapsed: false,
+  popularCollapsed: false,
+  archiveCollapsed: false,
 };
 const PLATFORM_ORDER = ["Any", "Perplexity", "ChatGPT", "Gemini", "Claude", "Other"];
 const PLATFORM_BY_TYPE = {
@@ -16,6 +18,12 @@ const LEGACY_PLATFORM_MAP = {
   GPTs: "ChatGPT",
   Gems: "Gemini",
 };
+const SEARCH_SCOPES = [
+  { key: "title", label: "제목" },
+  { key: "tags", label: "태그" },
+  { key: "body", label: "내용" },
+  { key: "prompt", label: "프롬프트" },
+];
 const DEFAULT_CATEGORIES = ["요약", "글쓰기", "리서치", "업무", "코딩", "마케팅", "이미지", "학습"];
 
 const platformClass = {
@@ -138,6 +146,12 @@ let filters = {
   favoriteOnly: false,
   view: "card",
   sort: "recent",
+  searchScopes: {
+    title: true,
+    tags: true,
+    body: true,
+    prompt: true,
+  },
 };
 let formDraft = {
   categories: [],
@@ -159,12 +173,14 @@ let statusCheckTimer = null;
 let confirmResolver = null;
 let duplicateCheckBypassId = "";
 let tagInputTouched = false;
+let categoryInputTouched = false;
 
 const $ = (selector) => document.querySelector(selector);
 
 const elements = {
   search: $("#searchInput"),
   searchBtn: $("#searchBtn"),
+  searchScopeControls: $("#searchScopeControls"),
   summaryChips: $("#summaryChips"),
   platformFilters: $("#platformFilters"),
   categoryFilters: $("#categoryFilters"),
@@ -173,6 +189,7 @@ const elements = {
   itemsView: $("#itemsView"),
   favoriteSection: $("#favoriteSection"),
   popularSection: $("#popularSection"),
+  searchResultsSection: $("#searchResultsSection"),
   resultCount: $("#resultCount"),
   hoverPreview: $("#hoverPreview"),
   toast: $("#toast"),
@@ -197,7 +214,9 @@ const elements = {
   selectedTags: $("#selectedTags"),
   tagInput: $("#tagInput"),
   tagSuggestions: $("#tagSuggestions"),
+  urlField: $("#urlField"),
   urlInput: $("#urlInput"),
+  promptField: $("#promptField"),
   promptInput: $("#promptInput"),
   useCaseInput: $("#useCaseInput"),
   notesInput: $("#notesInput"),
@@ -270,6 +289,7 @@ initCloudSession();
 
 function bindEvents() {
   elements.platformInput.innerHTML = PLATFORM_ORDER.map((platform) => `<option value="${platform}">${platform}</option>`).join("");
+  renderSearchScopeControls();
 
   elements.search.addEventListener("input", () => {
     filters.query = elements.search.value.trim();
@@ -289,6 +309,7 @@ function bindEvents() {
   });
   elements.typeInput.addEventListener("change", () => {
     elements.platformInput.value = getDefaultPlatformForType(elements.typeInput.value);
+    updateTypeFields();
   });
 
   elements.viewButtons.forEach((button) => {
@@ -471,6 +492,19 @@ function getDefaultPlatformForType(type) {
 function normalizePlatform(platform, type = "text_prompt") {
   const mappedPlatform = LEGACY_PLATFORM_MAP[platform] || platform;
   return PLATFORM_ORDER.includes(mappedPlatform) ? mappedPlatform : getDefaultPlatformForType(type);
+}
+
+function updateTypeFields() {
+  const type = elements.typeInput.value;
+  const needsPrompt = type === "text_prompt" || type === "workflow";
+  const needsUrl = type === "gpt" || type === "gem" || type === "link" || type === "workflow";
+  elements.promptField.classList.toggle("hidden", !needsPrompt);
+  elements.urlField.classList.toggle("hidden", !needsUrl);
+  elements.promptInput.disabled = !needsPrompt;
+  elements.urlInput.disabled = !needsUrl;
+  if (!needsPrompt) elements.promptInput.value = "";
+  if (!needsUrl) elements.urlInput.value = "";
+  renderTagSuggestions();
 }
 
 function saveState(options = {}) {
@@ -1022,10 +1056,31 @@ function runSearch() {
   elements.search.focus();
 }
 
+function renderSearchScopeControls() {
+  elements.searchScopeControls.innerHTML = SEARCH_SCOPES.map((scope) => `
+    <button class="scope-chip ${filters.searchScopes[scope.key] ? "active" : ""}" data-search-scope="${scope.key}" type="button">
+      ${escapeHtml(scope.label)}
+    </button>
+  `).join("");
+  elements.searchScopeControls.querySelectorAll("[data-search-scope]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const key = button.dataset.searchScope;
+      const enabledCount = Object.values(filters.searchScopes).filter(Boolean).length;
+      if (filters.searchScopes[key] && enabledCount === 1) return;
+      filters.searchScopes[key] = !filters.searchScopes[key];
+      renderSearchScopeControls();
+      renderItems();
+    });
+  });
+}
+
 function renderItems() {
   renderSummaryChips();
-  const visible = getVisibleItems();
-  elements.resultCount.textContent = `${visible.length}개 항목`;
+  const baseItems = getBaseVisibleItems();
+  const searching = Boolean(filters.query.trim());
+  const searchMatches = searching ? baseItems.filter((item) => itemMatchesSearch(item, filters.query)) : [];
+  const archiveItems = searching ? baseItems.filter((item) => !itemMatchesSearch(item, filters.query)) : baseItems;
+  elements.resultCount.textContent = `${searching ? searchMatches.length : archiveItems.length}개 항목`;
 
   const favorites = getFavoriteItems().slice(0, 8);
   elements.favoriteSection.innerHTML = favorites.length
@@ -1033,30 +1088,26 @@ function renderItems() {
     : "";
   const popularItems = getPopularItems().slice(0, 6);
   elements.popularSection.innerHTML = popularItems.length ? renderPopularDock(popularItems) : "";
+  elements.searchResultsSection.innerHTML = searching ? renderSearchResultsDock(searchMatches) : "";
 
-  elements.itemsView.className = `items-grid ${filters.view === "list" ? "list-view" : ""}`;
-  if (!visible.length) {
-    elements.itemsView.innerHTML = `<div class="empty-state"><p>조건에 맞는 항목이 없습니다. 검색어를 줄이거나 새 항목을 추가해보세요.</p></div>`;
-  } else if (filters.view === "list") {
-    elements.itemsView.innerHTML = visible.map(renderListRow).join("");
-  } else {
-    elements.itemsView.innerHTML = visible.map(renderCard).join("");
-  }
+  elements.itemsView.className = "archive-shell";
+  elements.itemsView.innerHTML = renderArchiveDock(archiveItems);
   attachItemEvents();
-  bindFavoriteDockControls();
+  bindDockControls();
 }
 
-function getVisibleItems() {
-  const query = normalizeText(filters.query);
+function getBaseVisibleItems() {
   return [...state.items]
     .filter((item) => filters.platform === "전체" || item.platform === filters.platform)
     .filter((item) => !filters.favoriteOnly || item.favorite)
     .filter((item) => !filters.categories.length || filters.categories.some((category) => item.categories.includes(category)))
-    .filter((item) => {
-      if (!query) return true;
-      return normalizeText(searchBlob(item)).includes(query);
-    })
     .sort(sortItems);
+}
+
+function getVisibleItems() {
+  const baseItems = getBaseVisibleItems();
+  if (!filters.query.trim()) return baseItems;
+  return baseItems.filter((item) => itemMatchesSearch(item, filters.query));
 }
 
 function getFavoriteItems() {
@@ -1213,10 +1264,7 @@ function renderFavoriteDock(favorites) {
   return `
     <div class="favorite-dock ${collapsed ? "collapsed" : ""}">
       <div class="dock-title">
-        <div>
-          <h3>고정 즐겨찾기</h3>
-          <small>${favorites.length}개 · 드래그로 순서 변경</small>
-        </div>
+        <h3>즐겨찾기 <small>${favorites.length}개</small></h3>
         <button class="subtle-button" id="favoriteToggleBtn" type="button">${collapsed ? "펼치기" : "접기"}</button>
       </div>
       <div class="favorite-rail">${favorites.map(renderFavoriteTile).join("")}</div>
@@ -1225,13 +1273,12 @@ function renderFavoriteDock(favorites) {
 }
 
 function renderPopularDock(items) {
+  const collapsed = state.settings?.popularCollapsed === true;
   return `
-    <div class="popular-dock">
+    <div class="popular-dock ${collapsed ? "collapsed" : ""}">
       <div class="dock-title">
-        <div>
-          <h3>자주 쓰는 프롬프트</h3>
-          <small>사용 횟수 기준 자동 정렬</small>
-        </div>
+        <h3>자주 쓰는 프롬프트 <small>${items.length}개</small></h3>
+        <button class="subtle-button" id="popularToggleBtn" type="button">${collapsed ? "펼치기" : "접기"}</button>
       </div>
       <div class="popular-list">
         ${items.map((item) => `
@@ -1243,6 +1290,36 @@ function renderPopularDock(items) {
       </div>
     </div>
   `;
+}
+
+function renderSearchResultsDock(items) {
+  return `
+    <div class="search-results-dock">
+      <div class="dock-title">
+        <h3>검색 결과 <small>${items.length}개</small></h3>
+      </div>
+      ${items.length ? renderItemCollection(items) : `<div class="empty-state compact"><p>검색어와 맞는 항목이 없습니다.</p></div>`}
+    </div>
+  `;
+}
+
+function renderArchiveDock(items) {
+  const collapsed = state.settings?.archiveCollapsed === true;
+  return `
+    <div class="archive-dock ${collapsed ? "collapsed" : ""}">
+      <div class="dock-title">
+        <h3>보관함 <small>${items.length}개</small></h3>
+        <button class="subtle-button" id="archiveToggleBtn" type="button">${collapsed ? "펼치기" : "접기"}</button>
+      </div>
+      ${collapsed ? "" : items.length ? renderItemCollection(items) : `<div class="empty-state compact"><p>조건에 맞는 항목이 없습니다.</p></div>`}
+    </div>
+  `;
+}
+
+function renderItemCollection(items) {
+  const viewClass = `items-grid ${filters.view === "list" ? "list-view" : ""}`;
+  const renderer = filters.view === "list" ? renderListRow : renderCard;
+  return `<div class="${viewClass}">${items.map(renderer).join("")}</div>`;
 }
 
 function renderCategoryPill(category) {
@@ -1405,8 +1482,12 @@ function openItemDialog(item = null) {
     tags: item?.tags ? [...item.tags] : [],
   };
   tagInputTouched = editing;
+  categoryInputTouched = editing;
+  updateTypeFields();
   renderFormCategories();
+  autoFillCategoriesFromContext();
   autoFillTagsFromContext();
+  renderFormCategories();
   renderSelectedTags();
   renderTagSuggestions();
   showDialog(elements.itemDialog);
@@ -1430,6 +1511,7 @@ function renderFormCategories() {
 }
 
 function toggleFormCategory(category) {
+  categoryInputTouched = true;
   if (formDraft.categories.includes(category)) {
     formDraft.categories = formDraft.categories.filter((item) => item !== category);
   } else {
@@ -1454,8 +1536,20 @@ function renderSelectedTags() {
 }
 
 function handleTagContextChange() {
+  autoFillCategoriesFromContext();
   autoFillTagsFromContext();
+  renderFormCategories();
   renderTagSuggestions();
+}
+
+function autoFillCategoriesFromContext() {
+  if (categoryInputTouched) return;
+  const context = getTagContext();
+  if (!context.normalized) return;
+  const suggestedCategories = getAutoCategorySuggestions(context).slice(0, 2);
+  if (!suggestedCategories.length) return;
+  if (suggestedCategories.join("|") === formDraft.categories.join("|")) return;
+  formDraft.categories = suggestedCategories;
 }
 
 function autoFillTagsFromContext() {
@@ -1486,8 +1580,8 @@ function getTagSuggestions(query) {
     .filter((tag) => {
       if (formDraft.tags.includes(tag)) return false;
       if (!lowerQuery) return true;
-      const blob = normalizeText([tag, ...(tagAliases[tag] || [])].join(" "));
-      return blob.includes(lowerQuery) || romanizeKorean(tag).includes(lowerQuery);
+      const blob = expandSearchText([tag, ...(tagAliases[tag] || [])].join(" "));
+      return blob.includes(lowerQuery) || hasSemanticOverlap([tag, ...(tagAliases[tag] || [])].join(" "), query) || romanizeKorean(tag).includes(lowerQuery);
     })
     .sort((a, b) => tagScore(b, query, context) - tagScore(a, query, context) || a.localeCompare(b, "ko"));
 }
@@ -1501,10 +1595,23 @@ function getAutoTagSuggestions() {
     .sort((a, b) => tagScore(b, "", context) - tagScore(a, "", context) || a.localeCompare(b, "ko"));
 }
 
+function getAutoCategorySuggestions(context = getTagContext()) {
+  const inferredTags = inferContextTags(context.raw);
+  return state.categories
+    .filter((category) => isContextTagMatch(category, context, inferredTags))
+    .sort((a, b) => tagScore(b, "", context) - tagScore(a, "", context) || a.localeCompare(b, "ko"));
+}
+
 function isContextTagMatch(tag, context, inferredTags = inferContextTags(context.raw)) {
   const normalized = normalizeText(tag);
-  const aliasMatch = (tagAliases[tag] || []).some((alias) => context.normalized.includes(normalizeText(alias)));
-  return context.normalized.includes(normalized) || aliasMatch || inferredTags.includes(tag);
+  const tagText = [tag, ...(tagAliases[tag] || [])].join(" ");
+  return context.normalized.includes(normalized) || hasSemanticOverlap(context.raw, tagText) || inferredTags.includes(tag);
+}
+
+function hasSemanticOverlap(left, right) {
+  const leftWords = new Set(getSemanticWords(left).map(normalizeText));
+  const rightWords = getSemanticWords(right).map(normalizeText);
+  return rightWords.some((word) => word && leftWords.has(word));
 }
 
 function buildTagCandidates() {
@@ -1563,20 +1670,32 @@ function tagScore(tag, query, context = getTagContext()) {
   const starts = lowerQuery && normalized.startsWith(lowerQuery) ? 20 : 0;
   const exact = lowerQuery && normalized === lowerQuery ? 30 : 0;
   const aliasBlob = normalizeText([tag, ...(tagAliases[tag] || [])].join(" "));
-  const aliasMatch = lowerQuery && aliasBlob.includes(lowerQuery) ? 14 : 0;
-  const contextMatch = context.normalized.includes(normalized) || (tagAliases[tag] || []).some((alias) => context.normalized.includes(normalizeText(alias))) ? 18 : 0;
+  const semanticBlob = expandSearchText([tag, ...(tagAliases[tag] || [])].join(" "));
+  const aliasMatch = lowerQuery && (aliasBlob.includes(lowerQuery) || semanticBlob.includes(lowerQuery) || hasSemanticOverlap([tag, ...(tagAliases[tag] || [])].join(" "), query)) ? 14 : 0;
+  const contextMatch = isContextTagMatch(tag, context) ? 18 : 0;
   const categoryMatch = formDraft.categories.includes(tag) ? 16 : 0;
   return usage * 5 + starts + exact + aliasMatch + contextMatch + categoryMatch;
 }
 
 function addTag(value) {
-  const tag = value.trim().replace(/^#/, "");
+  const tag = resolveTagValue(value);
   if (!tag) return;
   tagInputTouched = true;
   if (!formDraft.tags.includes(tag)) formDraft.tags.push(tag);
   elements.tagInput.value = "";
   renderSelectedTags();
   renderTagSuggestions();
+}
+
+function resolveTagValue(value) {
+  const input = value.trim().replace(/^#/, "");
+  if (!input) return "";
+  const normalizedInput = normalizeText(input);
+  const candidates = buildTagCandidates();
+  const exact = candidates.find((tag) => normalizeText(tag) === normalizedInput);
+  if (exact) return exact;
+  const semantic = candidates.find((tag) => hasSemanticOverlap([tag, ...(tagAliases[tag] || [])].join(" "), input));
+  return semantic || input;
 }
 
 async function saveItemFromForm() {
@@ -1609,7 +1728,17 @@ async function saveItemFromForm() {
     useCount: existing?.useCount || 0,
   });
 
-  if (!item.prompt && !item.url) {
+  if (item.type === "text_prompt" && !item.prompt) {
+    showToast("텍스트 프롬프트를 입력해주세요.");
+    return;
+  }
+
+  if ((item.type === "gpt" || item.type === "gem" || item.type === "link") && !item.url) {
+    showToast("링크를 입력해주세요.");
+    return;
+  }
+
+  if (item.type === "workflow" && !item.prompt && !item.url) {
     showToast("프롬프트나 링크 중 하나는 입력해주세요.");
     return;
   }
@@ -2167,9 +2296,19 @@ function bindFavoriteDrag() {
   });
 }
 
-function bindFavoriteDockControls() {
+function bindDockControls() {
   document.querySelector("#favoriteToggleBtn")?.addEventListener("click", () => {
     state.settings.favoritesCollapsed = state.settings?.favoritesCollapsed !== true;
+    saveState();
+    renderItems();
+  });
+  document.querySelector("#popularToggleBtn")?.addEventListener("click", () => {
+    state.settings.popularCollapsed = state.settings?.popularCollapsed !== true;
+    saveState();
+    renderItems();
+  });
+  document.querySelector("#archiveToggleBtn")?.addEventListener("click", () => {
+    state.settings.archiveCollapsed = state.settings?.archiveCollapsed !== true;
     saveState();
     renderItems();
   });
@@ -2449,22 +2588,60 @@ function findItem(id) {
 }
 
 function searchBlob(item) {
-  return [
-    item.title,
-    item.platform,
-    item.type,
-    item.summary,
-    item.useCase,
-    item.prompt,
-    item.url,
-    item.notes,
-    ...item.categories,
-    ...item.tags,
-  ].join(" ");
+  return getSearchScopeText(item, ["title", "tags", "body", "prompt"]);
+}
+
+function itemMatchesSearch(item, query) {
+  const scopeKeys = SEARCH_SCOPES.filter((scope) => filters.searchScopes[scope.key]).map((scope) => scope.key);
+  const haystack = getSearchScopeText(item, scopeKeys);
+  const normalizedHaystack = expandSearchText(haystack);
+  const terms = String(query || "").trim().split(/\s+/).filter(Boolean);
+  if (!terms.length) return true;
+  return terms.every((term) => {
+    const normalizedTerm = normalizeText(term);
+    return normalizedHaystack.includes(normalizedTerm) || hasSemanticOverlap(haystack, term) || normalizeText(romanizeKorean(haystack)).includes(normalizedTerm);
+  });
+}
+
+function getSearchScopeText(item, scopeKeys) {
+  const fields = {
+    title: [item.title],
+    tags: [...(item.tags || []), ...(item.categories || [])],
+    body: [item.summary, item.useCase, item.notes, item.platform, item.type, item.url],
+    prompt: [item.prompt],
+  };
+  return scopeKeys.flatMap((key) => fields[key] || []).join(" ");
 }
 
 function normalizeText(value) {
   return String(value || "").toLowerCase().replace(/\s+/g, "");
+}
+
+function expandSearchText(value) {
+  const raw = String(value || "");
+  const normalized = normalizeText(raw);
+  const semanticWords = getSemanticWords(raw);
+  return normalizeText([raw, romanizeKorean(raw), ...semanticWords].join(" "));
+}
+
+function getSemanticWords(value) {
+  const normalized = normalizeText(value);
+  const groups = [
+    ["요약", "summary", "summarize", "brief", "정리", "핵심"],
+    ["회의", "회의록", "미팅", "meeting", "minutes", "actionitem", "액션아이템"],
+    ["글쓰기", "writing", "copywriting", "draft", "초안", "원고", "블로그", "blog", "seo"],
+    ["리서치", "research", "조사", "분석", "시장조사", "경쟁사", "market", "competitor"],
+    ["코딩", "coding", "code", "dev", "개발", "디버깅", "debug", "api", "버그"],
+    ["마케팅", "marketing", "sales", "세일즈", "광고", "ad", "campaign", "캠페인"],
+    ["이미지", "image", "visual", "design", "비주얼", "디자인", "사진"],
+    ["업무", "work", "productivity", "생산성", "자동화", "automation"],
+    ["메일", "email", "mail", "이메일", "답장", "reply", "회신"],
+    ["번역", "translation", "translate", "영어", "english", "한국어", "korean"],
+    ["기획", "idea", "아이디어", "strategy", "전략", "제안", "proposal"],
+  ];
+  return groups
+    .filter((group) => group.some((word) => normalized.includes(normalizeText(word))))
+    .flat();
 }
 
 function getCategoryColor(category) {

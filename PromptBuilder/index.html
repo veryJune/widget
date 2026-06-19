@@ -47,6 +47,7 @@
           <input id="searchInput" type="search" placeholder="프롬프트 검색" />
           <button class="search-submit" id="searchBtn" type="button">검색</button>
         </label>
+        <div class="search-scope" id="searchScopeControls" aria-label="검색 범위"></div>
       </section>
 
       <section class="summary-strip" id="summaryChips" aria-label="요약"></section>
@@ -85,7 +86,7 @@
         </section>
 
         <section class="content-area">
-          <div class="content-head">
+          <div class="content-head hidden">
             <div>
               <h2>보관함</h2>
               <p id="resultCount">0개 항목</p>
@@ -94,6 +95,7 @@
 
           <div id="favoriteSection" class="dock-section"></div>
           <div id="popularSection" class="dock-section"></div>
+          <div id="searchResultsSection" class="dock-section"></div>
           <div id="itemsView" class="items-grid"></div>
         </section>
       </main>
@@ -158,12 +160,12 @@
           <div id="tagSuggestions" class="suggestions"></div>
         </div>
 
-        <label>
+        <label id="urlField">
           링크
           <input id="urlInput" type="url" placeholder="GPTs, Gems, Perplexity, 참고 URL" />
         </label>
 
-        <label>
+        <label id="promptField">
           프롬프트
           <textarea id="promptInput" rows="7" placeholder="텍스트 프롬프트를 붙여넣으세요. {주제}, {톤} 같은 변수는 자동으로 입력칸이 만들어집니다."></textarea>
         </label>
