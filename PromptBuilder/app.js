@@ -6,13 +6,20 @@ const DEFAULT_SETTINGS = {
   blobWeeklyBackup: false,
   favoritesCollapsed: false,
 };
-const PLATFORM_ORDER = ["Any", "GPTs", "Gems", "Perplexity", "ChatGPT", "Gemini", "Claude", "Other"];
+const PLATFORM_ORDER = ["Any", "Perplexity", "ChatGPT", "Gemini", "Claude", "Other"];
+const PLATFORM_BY_TYPE = {
+  text_prompt: "Any",
+  gpt: "ChatGPT",
+  gem: "Gemini",
+};
+const LEGACY_PLATFORM_MAP = {
+  GPTs: "ChatGPT",
+  Gems: "Gemini",
+};
 const DEFAULT_CATEGORIES = ["요약", "글쓰기", "리서치", "업무", "코딩", "마케팅", "이미지", "학습"];
 
 const platformClass = {
   Any: "platform-any",
-  GPTs: "platform-gpts",
-  Gems: "platform-gems",
   Perplexity: "platform-perplexity",
   ChatGPT: "platform-chatgpt",
   Gemini: "platform-gemini",
@@ -151,6 +158,7 @@ let pendingRemoteUpdatedAt = "";
 let statusCheckTimer = null;
 let confirmResolver = null;
 let duplicateCheckBypassId = "";
+let tagInputTouched = false;
 
 const $ = (selector) => document.querySelector(selector);
 
@@ -279,6 +287,9 @@ function bindEvents() {
     filters.sort = elements.sort.value;
     renderItems();
   });
+  elements.typeInput.addEventListener("change", () => {
+    elements.platformInput.value = getDefaultPlatformForType(elements.typeInput.value);
+  });
 
   elements.viewButtons.forEach((button) => {
     button.addEventListener("click", () => {
@@ -318,7 +329,7 @@ function bindEvents() {
 
   elements.tagInput.addEventListener("input", renderTagSuggestions);
   [elements.titleInput, elements.summaryInput, elements.promptInput, elements.useCaseInput].forEach((input) => {
-    input.addEventListener("input", renderTagSuggestions);
+    input.addEventListener("input", handleTagContextChange);
   });
   elements.tagInput.addEventListener("keydown", (event) => {
     if (event.key === "Enter" || event.key === ",") {
@@ -326,6 +337,7 @@ function bindEvents() {
       addTag(elements.tagInput.value);
     }
     if (event.key === "Backspace" && !elements.tagInput.value && formDraft.tags.length) {
+      tagInputTouched = true;
       formDraft.tags.pop();
       renderSelectedTags();
     }
@@ -430,11 +442,12 @@ function normalizeState(input) {
 function normalizeItem(item = {}) {
   item = item || {};
   const now = new Date().toISOString();
-  const platform = PLATFORM_ORDER.includes(item.platform) ? item.platform : "Any";
+  const type = item.type || "text_prompt";
+  const platform = normalizePlatform(item.platform, type);
   return {
     id: item.id || makeId(),
     title: String(item.title || "제목 없음").trim(),
-    type: item.type || "text_prompt",
+    type,
     platform,
     categories: Array.isArray(item.categories) ? item.categories.filter(Boolean) : splitList(item.categories),
     tags: Array.isArray(item.tags) ? item.tags.filter(Boolean) : splitList(item.tags),
@@ -449,6 +462,15 @@ function normalizeItem(item = {}) {
     lastUsedAt: item.lastUsedAt || "",
     useCount: Number(item.useCount || 0),
   };
+}
+
+function getDefaultPlatformForType(type) {
+  return PLATFORM_BY_TYPE[type] || "Any";
+}
+
+function normalizePlatform(platform, type = "text_prompt") {
+  const mappedPlatform = LEGACY_PLATFORM_MAP[platform] || platform;
+  return PLATFORM_ORDER.includes(mappedPlatform) ? mappedPlatform : getDefaultPlatformForType(type);
 }
 
 function saveState(options = {}) {
@@ -945,7 +967,7 @@ function renderSettingsControls() {
 }
 
 function renderFilters() {
-  const primaryPlatforms = ["전체", "Any", "GPTs", "Gems"];
+  const primaryPlatforms = ["전체", "Any", "ChatGPT", "Gemini"];
   const extraPlatforms = PLATFORM_ORDER.filter((platform) => !primaryPlatforms.includes(platform));
   const platformOptions = platformExpanded ? [...primaryPlatforms, ...extraPlatforms] : primaryPlatforms;
   elements.platformFilters.innerHTML = [
@@ -1371,7 +1393,7 @@ function openItemDialog(item = null) {
   elements.itemId.value = item?.id || "";
   elements.titleInput.value = item?.title || "";
   elements.typeInput.value = item?.type || "text_prompt";
-  elements.platformInput.value = item?.platform || "Any";
+  elements.platformInput.value = normalizePlatform(item?.platform, elements.typeInput.value);
   elements.summaryInput.value = item?.summary || "";
   elements.urlInput.value = item?.url || "";
   elements.promptInput.value = item?.prompt || "";
@@ -1382,7 +1404,9 @@ function openItemDialog(item = null) {
     categories: item?.categories ? [...item.categories] : [],
     tags: item?.tags ? [...item.tags] : [],
   };
+  tagInputTouched = editing;
   renderFormCategories();
+  autoFillTagsFromContext();
   renderSelectedTags();
   renderTagSuggestions();
   showDialog(elements.itemDialog);
@@ -1412,7 +1436,7 @@ function toggleFormCategory(category) {
     formDraft.categories.push(category);
   }
   renderFormCategories();
-  renderTagSuggestions();
+  handleTagContextChange();
 }
 
 function renderSelectedTags() {
@@ -1422,10 +1446,25 @@ function renderSelectedTags() {
   elements.selectedTags.querySelectorAll("[data-remove-tag]").forEach((button) => {
     button.addEventListener("click", () => {
       formDraft.tags = formDraft.tags.filter((tag) => tag !== button.dataset.removeTag);
+      tagInputTouched = true;
       renderSelectedTags();
       renderTagSuggestions();
     });
   });
+}
+
+function handleTagContextChange() {
+  autoFillTagsFromContext();
+  renderTagSuggestions();
+}
+
+function autoFillTagsFromContext() {
+  if (tagInputTouched || elements.tagInput.value.trim()) return;
+  const autoTags = getAutoTagSuggestions();
+  const nextTags = [...new Set(autoTags)].slice(0, 3);
+  if (nextTags.join("|") === formDraft.tags.join("|")) return;
+  formDraft.tags = nextTags;
+  renderSelectedTags();
 }
 
 function renderTagSuggestions() {
@@ -1451,6 +1490,21 @@ function getTagSuggestions(query) {
       return blob.includes(lowerQuery) || romanizeKorean(tag).includes(lowerQuery);
     })
     .sort((a, b) => tagScore(b, query, context) - tagScore(a, query, context) || a.localeCompare(b, "ko"));
+}
+
+function getAutoTagSuggestions() {
+  const context = getTagContext();
+  if (!context.normalized) return [];
+  const inferredTags = inferContextTags(context.raw);
+  return buildTagCandidates()
+    .filter((tag) => isContextTagMatch(tag, context, inferredTags))
+    .sort((a, b) => tagScore(b, "", context) - tagScore(a, "", context) || a.localeCompare(b, "ko"));
+}
+
+function isContextTagMatch(tag, context, inferredTags = inferContextTags(context.raw)) {
+  const normalized = normalizeText(tag);
+  const aliasMatch = (tagAliases[tag] || []).some((alias) => context.normalized.includes(normalizeText(alias)));
+  return context.normalized.includes(normalized) || aliasMatch || inferredTags.includes(tag);
 }
 
 function buildTagCandidates() {
@@ -1518,6 +1572,7 @@ function tagScore(tag, query, context = getTagContext()) {
 function addTag(value) {
   const tag = value.trim().replace(/^#/, "");
   if (!tag) return;
+  tagInputTouched = true;
   if (!formDraft.tags.includes(tag)) formDraft.tags.push(tag);
   elements.tagInput.value = "";
   renderSelectedTags();
