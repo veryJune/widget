@@ -317,7 +317,7 @@ p {
 .toolbar {
   align-self: start;
   position: sticky;
-  top: 116px;
+  top: 150px;
   display: grid;
   gap: 16px;
 }
@@ -325,11 +325,32 @@ p {
 .search-hero {
   display: grid;
   width: min(980px, calc(100% - 36px));
-  margin: 24px auto 10px;
-  padding: 7px 0 10px;
+  margin: 24px auto 12px;
+  padding: 10px 10px 14px;
   position: sticky;
   top: 10px;
   z-index: 11;
+  border: 1px solid color-mix(in srgb, var(--line) 46%, transparent);
+  border-radius: 34px;
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--surface-alpha) 90%, transparent), color-mix(in srgb, var(--surface-alpha) 72%, transparent));
+  backdrop-filter: blur(26px) saturate(1.08);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.22),
+    0 18px 42px rgba(0, 0, 0, 0.08);
+}
+
+.search-hero::after {
+  content: "";
+  position: absolute;
+  left: 18px;
+  right: 18px;
+  bottom: -14px;
+  height: 18px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--surface-alpha) 52%, transparent);
+  filter: blur(14px);
+  pointer-events: none;
 }
 
 .search-box {
@@ -509,6 +530,13 @@ select:focus {
   color: var(--ink);
   transform: translateY(-1px);
   box-shadow: var(--small-shadow);
+}
+
+.summary-chip.active {
+  background: color-mix(in srgb, var(--category-color, var(--accent-3)) 13%, var(--surface-solid));
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--category-color, var(--accent-3)) 22%, transparent),
+    0 10px 22px color-mix(in srgb, var(--category-color, var(--accent-3)) 12%, transparent);
 }
 
 .summary-icon,

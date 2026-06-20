@@ -465,13 +465,15 @@ function normalizeItem(item = {}) {
   const now = new Date().toISOString();
   const type = item.type || "text_prompt";
   const platform = normalizePlatform(item.platform, type);
+  const categories = Array.isArray(item.categories) ? item.categories.filter(Boolean) : splitList(item.categories);
+  const tags = cleanTags(Array.isArray(item.tags) ? item.tags.filter(Boolean) : splitList(item.tags), categories);
   return {
     id: item.id || makeId(),
     title: String(item.title || "제목 없음").trim(),
     type,
     platform,
-    categories: Array.isArray(item.categories) ? item.categories.filter(Boolean) : splitList(item.categories),
-    tags: Array.isArray(item.tags) ? item.tags.filter(Boolean) : splitList(item.tags),
+    categories,
+    tags,
     summary: item.summary || "",
     useCase: item.useCase || "",
     prompt: item.prompt || "",
@@ -492,6 +494,16 @@ function getDefaultPlatformForType(type) {
 function normalizePlatform(platform, type = "text_prompt") {
   const mappedPlatform = LEGACY_PLATFORM_MAP[platform] || platform;
   return PLATFORM_ORDER.includes(mappedPlatform) ? mappedPlatform : getDefaultPlatformForType(type);
+}
+
+function cleanTags(tags = [], categories = []) {
+  const categorySet = new Set(categories.map(normalizeText));
+  const duplicateCategoryTags = new Set(["기획", "아이디어"].map(normalizeText));
+  return [...new Set(tags)]
+    .map((tag) => String(tag || "").trim().replace(/^#/, ""))
+    .filter(Boolean)
+    .filter((tag) => !categorySet.has(normalizeText(tag)))
+    .filter((tag) => !duplicateCategoryTags.has(normalizeText(tag)));
 }
 
 function updateTypeFields() {
@@ -1555,7 +1567,7 @@ function autoFillCategoriesFromContext() {
 function autoFillTagsFromContext() {
   if (tagInputTouched || elements.tagInput.value.trim()) return;
   const autoTags = getAutoTagSuggestions();
-  const nextTags = [...new Set(autoTags)].slice(0, 3);
+  const nextTags = cleanTags([...new Set(autoTags)], formDraft.categories).slice(0, 3);
   if (nextTags.join("|") === formDraft.tags.join("|")) return;
   formDraft.tags = nextTags;
   renderSelectedTags();
@@ -1616,10 +1628,10 @@ function hasSemanticOverlap(left, right) {
 
 function buildTagCandidates() {
   const existingTags = [...new Set(state.items.flatMap((item) => item.tags))].filter(Boolean);
-  const categoryTags = state.categories.flatMap((category) => [category, ...(tagAliases[category] || [])]);
+  const categoryTags = state.categories.flatMap((category) => tagAliases[category] || []);
   const contextualTags = inferContextTags(getTagContext().raw);
   const aliasTags = Object.entries(tagAliases).flatMap(([tag, aliases]) => [tag, ...aliases]);
-  return [...new Set([...contextualTags, ...existingTags, ...categoryTags, ...aliasTags])].filter(Boolean);
+  return cleanTags([...new Set([...contextualTags, ...existingTags, ...categoryTags, ...aliasTags])], formDraft.categories).filter(Boolean);
 }
 
 function getAllTags() {
@@ -1655,7 +1667,7 @@ function inferContextTags(text) {
     { tags: ["코드", "디버깅", "개발"], words: ["코드", "개발", "버그", "디버그", "api"] },
     { tags: ["이미지", "프롬프트", "비주얼"], words: ["이미지", "사진", "비주얼", "디자인"] },
     { tags: ["번역", "영어", "한국어"], words: ["번역", "영어", "한국어", "translation"] },
-    { tags: ["기획", "아이디어", "전략"], words: ["기획", "아이디어", "전략", "제안"] },
+    { tags: ["전략", "제안"], words: ["기획", "아이디어", "전략", "제안"] },
   ];
   const normalized = normalizeText(text);
   return rules
@@ -1681,7 +1693,8 @@ function addTag(value) {
   const tag = resolveTagValue(value);
   if (!tag) return;
   tagInputTouched = true;
-  if (!formDraft.tags.includes(tag)) formDraft.tags.push(tag);
+  const nextTags = cleanTags([...formDraft.tags, tag], formDraft.categories);
+  formDraft.tags = nextTags;
   elements.tagInput.value = "";
   renderSelectedTags();
   renderTagSuggestions();
@@ -1715,7 +1728,7 @@ async function saveItemFromForm() {
     type: elements.typeInput.value,
     platform: elements.platformInput.value,
     categories: formDraft.categories,
-    tags: formDraft.tags,
+    tags: cleanTags(formDraft.tags, formDraft.categories),
     summary: elements.summaryInput.value.trim(),
     url: elements.urlInput.value.trim(),
     prompt: elements.promptInput.value.trim(),
