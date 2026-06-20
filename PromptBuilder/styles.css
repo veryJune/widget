@@ -330,14 +330,14 @@ p {
   position: sticky;
   top: 10px;
   z-index: 11;
-  border: 1px solid color-mix(in srgb, var(--line) 46%, transparent);
+  border: 1px solid color-mix(in srgb, var(--line) 34%, transparent);
   border-radius: 34px;
   background:
-    linear-gradient(180deg, color-mix(in srgb, var(--surface-alpha) 90%, transparent), color-mix(in srgb, var(--surface-alpha) 72%, transparent));
-  backdrop-filter: blur(26px) saturate(1.08);
+    linear-gradient(180deg, color-mix(in srgb, var(--surface-alpha) 68%, transparent), color-mix(in srgb, var(--surface-alpha) 46%, transparent));
+  backdrop-filter: blur(30px) saturate(1.14);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.22),
-    0 18px 42px rgba(0, 0, 0, 0.08);
+    inset 0 1px 0 rgba(255, 255, 255, 0.3),
+    0 18px 42px rgba(0, 0, 0, 0.075);
 }
 
 .search-hero::after {
@@ -441,8 +441,8 @@ select:focus {
   padding-left: 58px;
   padding-right: 104px;
   font-size: 17px;
-  background: color-mix(in srgb, var(--surface-alpha) 88%, transparent);
-  backdrop-filter: blur(24px) saturate(1.02);
+  background: color-mix(in srgb, var(--surface-alpha) 70%, transparent);
+  backdrop-filter: blur(22px) saturate(1.08);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.16),
     inset 8px 8px 20px rgba(0, 0, 0, 0.055),
@@ -451,6 +451,14 @@ select:focus {
     border-color 160ms ease,
     box-shadow 160ms ease,
     transform 160ms ease;
+}
+
+.search-box input::-webkit-search-cancel-button {
+  cursor: pointer;
+}
+
+.search-box input::-webkit-search-cancel-button:hover {
+  filter: brightness(0.9);
 }
 
 .search-scope {
@@ -1008,6 +1016,26 @@ label,
   gap: 5px;
 }
 
+.match-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 3px;
+}
+
+.match-badge {
+  display: inline-flex;
+  min-height: 21px;
+  align-items: center;
+  border: 1px solid color-mix(in srgb, var(--accent-3) 24%, var(--line));
+  border-radius: 999px;
+  padding: 0 7px;
+  background: color-mix(in srgb, var(--accent-3) 9%, var(--surface-solid));
+  color: color-mix(in srgb, var(--accent-3) 70%, var(--ink));
+  font-size: 10px;
+  font-weight: 820;
+}
+
 .tag-pill,
 .category-pill,
 .stat-pill {
@@ -1352,6 +1380,14 @@ label,
 .field-head small {
   color: var(--muted);
   font-size: 12px;
+}
+
+.field-head span small {
+  display: inline;
+  margin-left: 6px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 720;
 }
 
 .selectable .chip {

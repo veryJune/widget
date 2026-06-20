@@ -1228,6 +1228,7 @@ function renderCard(item) {
   const id = escapeAttribute(item.id);
   const platformName = escapeHtml(item.platform);
   const platformBadgeClass = platformClass[item.platform] || platformClass.Other;
+  const matchBadges = renderMatchBadges(item);
   return `
     <article class="prompt-card" data-id="${id}" tabindex="0">
       <div class="card-top">
@@ -1242,6 +1243,7 @@ function renderCard(item) {
         ${item.categories.slice(0, 3).map(renderCategoryPill).join("")}
         <span class="stat-pill">사용 ${Number(item.useCount || 0)}회</span>
       </div>
+      ${matchBadges}
       <div class="card-actions">
         ${item.prompt ? `<button class="tool-button" data-action="copy" data-id="${id}" type="button" aria-label="프롬프트 복사">⧉</button>` : ""}
         ${item.url ? `<button class="tool-button" data-action="open" data-id="${id}" type="button" aria-label="링크 열기">↗</button>` : ""}
@@ -1338,9 +1340,31 @@ function renderCategoryPill(category) {
   return `<span class="category-pill" ${categoryStyleAttribute(category)}>${escapeHtml(category)}</span>`;
 }
 
+function renderMatchBadges(item) {
+  const fields = getMatchedSearchFields(item);
+  if (!fields.length) return "";
+  return `<div class="match-badges" aria-label="검색 매치 위치">${fields.map((field) => `<span class="match-badge">${escapeHtml(field)}</span>`).join("")}</div>`;
+}
+
+function getMatchedSearchFields(item) {
+  const query = String(filters.query || "").trim();
+  if (!query) return [];
+  const labels = {
+    title: "제목",
+    tags: "태그",
+    body: "내용",
+    prompt: "프롬프트",
+  };
+  return SEARCH_SCOPES
+    .filter((scope) => filters.searchScopes[scope.key])
+    .filter((scope) => scopeMatchesSearch(item, scope.key, query))
+    .map((scope) => labels[scope.key] || scope.label);
+}
+
 function renderListRow(item) {
   const id = escapeAttribute(item.id);
   const platformBadgeClass = platformClass[item.platform] || platformClass.Other;
+  const matchBadges = renderMatchBadges(item);
   return `
     <article class="list-row" data-id="${id}" tabindex="0">
       <div class="row-title">
@@ -1348,7 +1372,10 @@ function renderListRow(item) {
         <small>${highlightMatches(item.summary || item.useCase || "요약 없음")} · 사용 ${Number(item.useCount || 0)}회</small>
       </div>
       <span class="platform-badge ${platformBadgeClass}">${escapeHtml(item.platform)}</span>
-      <div class="meta-line">${item.categories.slice(0, 2).map(renderCategoryPill).join("")}</div>
+      <div>
+        <div class="meta-line">${item.categories.slice(0, 2).map(renderCategoryPill).join("")}</div>
+        ${matchBadges}
+      </div>
       <div class="row-actions">
         <button class="star-button ${item.favorite ? "active" : ""}" data-action="favorite" data-id="${id}" type="button" aria-label="${item.favorite ? "즐겨찾기 해제" : "즐겨찾기"}">${item.favorite ? "★" : "☆"}</button>
         ${item.prompt ? `<button class="tool-button" data-action="copy" data-id="${id}" type="button" aria-label="프롬프트 복사">⧉</button>` : ""}
@@ -2606,7 +2633,12 @@ function searchBlob(item) {
 
 function itemMatchesSearch(item, query) {
   const scopeKeys = SEARCH_SCOPES.filter((scope) => filters.searchScopes[scope.key]).map((scope) => scope.key);
-  const haystack = getSearchScopeText(item, scopeKeys);
+  return scopeMatchesSearch(item, scopeKeys, query);
+}
+
+function scopeMatchesSearch(item, scopeKeys, query) {
+  const keys = Array.isArray(scopeKeys) ? scopeKeys : [scopeKeys];
+  const haystack = getSearchScopeText(item, keys);
   const normalizedHaystack = expandSearchText(haystack);
   const terms = String(query || "").trim().split(/\s+/).filter(Boolean);
   if (!terms.length) return true;
