@@ -40,6 +40,18 @@ const copy = {
     sampleBrief: "Use sample brief",
     insight: "Insight",
     preference: "Preference signal",
+    resetView: "Reset",
+    autoEngines: "Auto engines",
+    applySuggested: "Apply suggested",
+    customTone: "Add tone and press Enter",
+    customAvoid: "Add avoid tone and press Enter",
+    creativityNotes: [
+      "Plainspoken: clear before clever.",
+      "Polished: familiar, but not flat.",
+      "Brandable: fresh with a steady pulse.",
+      "Bold: memorable with a little voltage.",
+      "Wildcard: strange enough to earn a second look."
+    ],
     viewDetails: "View details",
     moreLike: "More like this",
     shorter: "Shorter",
@@ -75,6 +87,18 @@ const copy = {
     sampleBrief: "Use sample brief",
     insight: "Insight",
     preference: "Preference signal",
+    resetView: "Reset",
+    autoEngines: "Auto engines",
+    applySuggested: "Apply suggested",
+    customTone: "톤 입력 후 Enter",
+    customAvoid: "피할 톤 입력 후 Enter",
+    creativityNotes: [
+      "담백한 직관형: 멋보다 이해가 먼저.",
+      "정돈된 균형형: 익숙하지만 심심하진 않게.",
+      "브랜드형: 설명 가능하면서도 새롭게.",
+      "과감한 조어형: 기억에 걸리는 전압을 살짝.",
+      "와일드카드형: 낯설지만 다시 보게 만드는 이름."
+    ],
     viewDetails: "자세히",
     moreLike: "비슷하게",
     shorter: "더 짧게",
@@ -105,36 +129,36 @@ const categories = [
   "Other"
 ];
 
-const tones = [
-  "Modern",
-  "Trustworthy",
-  "Warm",
-  "Premium",
-  "Playful",
-  "Technical",
-  "Minimal",
-  "Bold",
-  "Calm",
-  "Editorial",
-  "Human",
-  "Sharp",
-  "Global",
-  "Elegant",
-  "Friendly",
-  "Inventive"
+const tones: Array<{ value: string; ko: string }> = [
+  { value: "Modern", ko: "모던" },
+  { value: "Trustworthy", ko: "신뢰감" },
+  { value: "Warm", ko: "따뜻함" },
+  { value: "Premium", ko: "프리미엄" },
+  { value: "Playful", ko: "위트" },
+  { value: "Technical", ko: "기술적" },
+  { value: "Minimal", ko: "미니멀" },
+  { value: "Bold", ko: "대담함" },
+  { value: "Calm", ko: "차분함" },
+  { value: "Editorial", ko: "에디토리얼" },
+  { value: "Human", ko: "사람다움" },
+  { value: "Sharp", ko: "선명함" },
+  { value: "Global", ko: "글로벌" },
+  { value: "Elegant", ko: "우아함" },
+  { value: "Friendly", ko: "친근함" },
+  { value: "Inventive", ko: "창의적" }
 ];
 
-const avoidTonePresets = [
-  "Too generic",
-  "Hard to pronounce",
-  "Childish",
-  "Corporate jargon",
-  "Too cute",
-  "Too abstract",
-  "Overly trendy",
-  "Luxury cliché",
-  "AI buzzword-heavy",
-  "Korean-only feel"
+const avoidTonePresets: Array<{ value: string; ko: string }> = [
+  { value: "Too generic", ko: "너무 흔함" },
+  { value: "Hard to pronounce", ko: "발음 어려움" },
+  { value: "Childish", ko: "유치함" },
+  { value: "Corporate jargon", ko: "회사 말투" },
+  { value: "Too cute", ko: "과한 귀여움" },
+  { value: "Too abstract", ko: "너무 추상적" },
+  { value: "Overly trendy", ko: "유행어 느낌" },
+  { value: "Luxury cliché", ko: "럭셔리 클리셰" },
+  { value: "AI buzzword-heavy", ko: "AI buzzword 과함" },
+  { value: "Korean-only feel", ko: "국내용 느낌" }
 ];
 
 const engines: Array<{ value: Technique; label: string; description: string; cues: string[] }> = [
@@ -312,6 +336,7 @@ export function Workspace() {
   const [cooldownUntil, setCooldownUntil] = useState(0);
   const [uiLanguage, setUiLanguage] = useState<UiLanguage>("ko");
   const [focusedCandidateId, setFocusedCandidateId] = useState("");
+  const [autoEngines, setAutoEngines] = useState(true);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -397,6 +422,12 @@ export function Workspace() {
     updateBrief({ desiredTone });
   }
 
+  function addTone(value: string) {
+    const tone = value.trim();
+    if (!tone || project.brief.desiredTone.includes(tone)) return;
+    updateBrief({ desiredTone: [...project.brief.desiredTone, tone] });
+  }
+
   function toggleEngine(engine: Technique) {
     const techniques = project.settings.techniques.includes(engine)
       ? project.settings.techniques.filter((item) => item !== engine)
@@ -430,6 +461,23 @@ export function Workspace() {
     updateBrief({ avoidTone: next.join(", ") });
   }
 
+  function applyRecommendedEngines() {
+    if (recommendedEngines.length === 0) return;
+    updateSettings({ techniques: recommendedEngines });
+  }
+
+  function resetView() {
+    const clear = window.confirm(
+      uiLanguage === "ko"
+        ? "현재 화면의 후보를 지울까요?\n\n확인: 후보를 삭제하고 빈 화면으로 돌아갑니다.\n취소: 그대로 둡니다."
+        : "Clear current candidates?\n\nOK clears the current view. Cancel keeps everything."
+    );
+    if (!clear) return;
+    updateProject((item) => ({ ...item, candidates: [], picks: [], lastInsight: "" }));
+    setMessage("");
+    setFocusedCandidateId("");
+  }
+
   async function generateNames() {
     if (!project.brief.oneLineDescription.trim()) {
       setMessage("Add a one-line brief first.");
@@ -445,12 +493,13 @@ export function Workspace() {
     setMessage("Shaping naming directions...");
     setActiveTab("studio");
 
+    const techniques = autoEngines && recommendedEngines.length > 0 ? recommendedEngines : project.settings.techniques;
     const payload: GenerationPayload = {
       projectId: project.id,
       mode: "generate",
       uiLanguage,
       brief: project.brief,
-      settings: project.settings,
+      settings: { ...project.settings, techniques },
       pickedContext: {
         pickedNames: pickedCandidates.map((candidate) => candidate.displayName),
         preferenceSummary
@@ -676,6 +725,9 @@ export function Workspace() {
             </button>
           </div>
           <span className="status-pill">{loading ? t.generating : cooldownLeft > 0 ? `Ready in ${cooldownLeft}s` : t.ready}</span>
+          <button className="ghost-button" onClick={resetView}>
+            {t.resetView}
+          </button>
           <button className="ghost-button" onClick={logout}>
             {t.lock}
           </button>
@@ -742,15 +794,25 @@ export function Workspace() {
             <div className="chip-grid">
               {tones.map((tone) => (
                 <button
-                  key={tone}
-                  className={project.brief.desiredTone.includes(tone) ? "chip selected" : "chip"}
-                  onClick={() => toggleTone(tone)}
+                  key={tone.value}
+                  className={project.brief.desiredTone.includes(tone.value) ? "chip selected" : "chip"}
+                  onClick={() => toggleTone(tone.value)}
                   type="button"
                 >
-                  {tone}
+                  {uiLanguage === "ko" ? tone.ko : tone.value}
                 </button>
               ))}
             </div>
+            <input
+              className="soft-input"
+              placeholder={t.customTone}
+              onKeyDown={(event) => {
+                if (event.key !== "Enter") return;
+                event.preventDefault();
+                addTone(event.currentTarget.value);
+                event.currentTarget.value = "";
+              }}
+            />
           </div>
 
           <label>
@@ -764,12 +826,12 @@ export function Workspace() {
           <div className="preset-grid" aria-label="Avoid tone templates">
             {avoidTonePresets.map((tone) => (
               <button
-                key={tone}
-                className={parseList(project.brief.avoidTone).includes(tone) ? "preset-chip selected" : "preset-chip"}
-                onClick={() => toggleAvoidTone(tone)}
+                key={tone.value}
+                className={parseList(project.brief.avoidTone).includes(tone.value) ? "preset-chip selected" : "preset-chip"}
+                onClick={() => toggleAvoidTone(tone.value)}
                 type="button"
               >
-                {tone}
+                {uiLanguage === "ko" ? tone.ko : tone.value}
               </button>
             ))}
           </div>
@@ -790,6 +852,7 @@ export function Workspace() {
               <span>Clear</span>
               <span>Bold</span>
             </div>
+            <p className="creative-note">{t.creativityNotes[project.settings.creativityLevel - 1]}</p>
           </div>
 
           <label>
@@ -810,6 +873,18 @@ export function Workspace() {
               <span className="field-label">Naming engines</span>
               {recommendedEngines.length > 0 ? <span className="recommend-note">Suggested from brief</span> : null}
             </div>
+            <div className="engine-mode-row">
+              <button
+                className={autoEngines ? "mode-pill active" : "mode-pill"}
+                onClick={() => setAutoEngines((value) => !value)}
+                type="button"
+              >
+                {t.autoEngines}
+              </button>
+              <button className="mode-pill" onClick={applyRecommendedEngines} disabled={recommendedEngines.length === 0} type="button">
+                {t.applySuggested}
+              </button>
+            </div>
             <div className="chip-grid">
               {engines.map((engine) => (
                 <button
@@ -820,7 +895,6 @@ export function Workspace() {
                     recommendedEngines.includes(engine.value) ? "recommended" : ""
                   ].join(" ")}
                   onClick={() => toggleEngine(engine.value)}
-                  title={engine.description}
                   type="button"
                 >
                   {engine.label}
@@ -869,7 +943,7 @@ export function Workspace() {
           </div>
 
           {message ? <div className="notice">{message}</div> : null}
-          {project.lastInsight ? <div className="insight">{t.insight}: {project.lastInsight}</div> : null}
+          {project.lastInsight && !loading ? <div className="insight">{t.insight}: {project.lastInsight}</div> : null}
 
           {loading ? <GeneratingState uiLanguage={uiLanguage} /> : null}
 
@@ -1072,9 +1146,9 @@ function CandidateCard({
         </button>
       </div>
 
-      <button className="candidate-focus-hit" onClick={onFocus} aria-label={`Open focus mode for ${candidate.displayName}`} />
-
-      <div className="candidate-main">
+      <div className="candidate-main" onClick={onFocus} role="button" tabIndex={0} onKeyDown={(event) => {
+        if (event.key === "Enter") onFocus();
+      }}>
         <div>
           <h3>{candidate.displayName}</h3>
           <p className="pronunciation">{candidate.pronunciation}</p>

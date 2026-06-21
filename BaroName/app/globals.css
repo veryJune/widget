@@ -46,6 +46,15 @@ select {
   font: inherit;
 }
 
+::placeholder {
+  color: rgba(104, 112, 125, 0.42);
+}
+
+.soft-input {
+  margin-top: 8px;
+  background: rgba(255, 255, 255, 0.54);
+}
+
 button {
   cursor: pointer;
   transition:
@@ -322,6 +331,7 @@ select:focus {
 
 .workspace-grid {
   min-height: 0;
+  height: calc(100vh - 64px);
   display: grid;
   grid-template-columns: 320px minmax(520px, 1fr) 320px;
   gap: 14px;
@@ -407,6 +417,18 @@ select:focus {
   margin-top: -8px;
 }
 
+.creative-note {
+  margin: 2px 0 0;
+  border: 1px solid rgba(205, 215, 230, 0.72);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.48);
+  color: var(--muted);
+  padding: 9px 10px;
+  font-size: 12px;
+  font-weight: 720;
+  line-height: 1.45;
+}
+
 .preset-chip {
   border: 1px solid rgba(205, 215, 230, 0.8);
   border-radius: 999px;
@@ -434,6 +456,28 @@ select:focus {
   color: var(--accent);
   font-size: 11px;
   font-weight: 800;
+}
+
+.engine-mode-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 2px;
+}
+
+.mode-pill {
+  border: 1px solid rgba(205, 215, 230, 0.82);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.62);
+  color: var(--muted);
+  padding: 7px 10px;
+  font-size: 12px;
+  font-weight: 780;
+}
+
+.mode-pill.active {
+  border-color: rgba(22, 119, 255, 0.3);
+  background: rgba(22, 119, 255, 0.1);
+  color: #145fd0;
 }
 
 .engine-chip {
@@ -607,7 +651,8 @@ select:focus {
     radial-gradient(circle at 10% 0%, rgba(22, 119, 255, 0.12), transparent 34%),
     linear-gradient(160deg, rgba(255, 255, 255, 0.96), rgba(247, 250, 255, 0.82)),
     rgba(255, 255, 255, 0.88);
-  padding: 17px;
+  min-height: 198px;
+  padding: 18px;
   box-shadow:
     var(--inner-glow),
     0 24px 60px rgba(20, 30, 50, 0.12),
@@ -712,7 +757,7 @@ select:focus {
 
 .candidate-main h3 {
   margin: 0;
-  font-size: 28px;
+  font-size: clamp(26px, 2.7vw, 38px);
   letter-spacing: 0;
   line-height: 1.02;
 }
@@ -738,7 +783,7 @@ select:focus {
 }
 
 .ai-take {
-  margin: 13px 0 7px;
+  margin: 15px 0 7px;
   color: #20242b;
   font-size: 14px;
   font-weight: 760;
@@ -752,6 +797,40 @@ select:focus {
   font-size: 13px;
   font-weight: 700;
   line-height: 1.45;
+}
+
+@media (hover: hover) and (min-width: 821px) {
+  .candidate-card .ai-take,
+  .candidate-card .positioning,
+  .candidate-card .candidate-details,
+  .candidate-card .card-actions {
+    max-height: 0;
+    opacity: 0;
+    overflow: hidden;
+    transform: translateY(8px);
+    transition:
+      max-height 220ms ease,
+      opacity 180ms ease,
+      transform 180ms ease,
+      margin 180ms ease;
+  }
+
+  .candidate-card:hover .ai-take,
+  .candidate-card:hover .positioning,
+  .candidate-card:hover .candidate-details,
+  .candidate-card:hover .card-actions,
+  .candidate-card:focus-within .ai-take,
+  .candidate-card:focus-within .positioning,
+  .candidate-card:focus-within .candidate-details,
+  .candidate-card:focus-within .card-actions {
+    max-height: 520px;
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  .candidate-card:hover {
+    z-index: 5;
+  }
 }
 
 .rationale,
@@ -842,13 +921,16 @@ select:focus {
 }
 
 .generating-state {
-  position: sticky;
-  top: 16px;
-  z-index: 4;
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  z-index: 45;
+  width: min(560px, calc(100vw - 40px));
+  transform: translate(-50%, -50%);
   display: flex;
   align-items: center;
   gap: 16px;
-  margin: 16px 18px 0;
+  margin: 0;
   border: 1px solid rgba(255, 255, 255, 0.78);
   border-radius: 22px;
   padding: 18px 20px;
