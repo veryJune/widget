@@ -52,56 +52,42 @@ export async function callGeminiJson<T>({
     throw new Error("GEMINI_API_KEY is missing. Add it to .env.local or Vercel environment variables.");
   }
 
-  const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-goog-api-key": apiKey
-      },
-      body: JSON.stringify({
-        contents: [
+  const requestBody = {
+    contents: [
+      {
+        role: "user",
+        parts: [
           {
-            role: "user",
-            parts: [
-              {
-                text: `${systemPrompt}\n\n${prompt}`
-              }
-            ]
+            text: `${systemPrompt}\n\n${prompt}`
           }
-        ],
-        generationConfig: {
-          temperature,
-          responseFormat: {
-            text: {
-              mimeType: "application/json",
-              schema
-            }
-          }
-        }
-      })
-    }
-  );
-
-  const raw = await response.text();
-
-  if (!response.ok) {
-    let message = `Gemini request failed (${response.status}).`;
-    try {
-      const parsed = JSON.parse(raw) as { error?: { message?: string } };
-      message = parsed.error?.message || message;
-    } catch {
-      if (raw) {
-        message = raw.slice(0, 220);
+        ]
       }
+    ],
+    generationConfig: {
+      temperature,
+      responseMimeType: "application/json",
+      responseSchema: schema
     }
-    const error = new Error(message);
-    error.name = response.status === 429 ? "RateLimitError" : "GeminiError";
-    throw error;
+  };
+
+  let raw: { text: string };
+  try {
+    raw = await postGemini(model, apiKey, requestBody);
+  } catch (error) {
+    if (!(error instanceof Error) || !isSchemaCompatibilityError(error.message)) {
+      throw error;
+    }
+
+    raw = await postGemini(model, apiKey, {
+      ...requestBody,
+      generationConfig: {
+        temperature,
+        responseMimeType: "application/json"
+      }
+    });
   }
 
-  const payload = JSON.parse(raw) as {
+  const payload = JSON.parse(raw.text) as {
     candidates?: Array<{
       content?: {
         parts?: Array<{ text?: string }>;
@@ -120,6 +106,52 @@ export async function callGeminiJson<T>({
   }
 
   return JSON.parse(text) as T;
+}
+
+async function postGemini(model: string, apiKey: string, body: unknown) {
+  const response = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-goog-api-key": apiKey
+      },
+      body: JSON.stringify(body)
+    }
+  );
+
+  const text = await response.text();
+
+  if (!response.ok) {
+    let message = `Gemini request failed (${response.status}).`;
+    try {
+      const parsed = JSON.parse(text) as { error?: { message?: string } };
+      message = parsed.error?.message || message;
+    } catch {
+      if (text) {
+        message = text.slice(0, 220);
+      }
+    }
+    const error = new Error(message);
+    error.name = response.status === 429 ? "RateLimitError" : "GeminiError";
+    throw error;
+  }
+
+  return { text, message: "" };
+}
+
+function isSchemaCompatibilityError(message: string) {
+  const normalized = message.toLowerCase();
+  return (
+    normalized.includes("response_schema") ||
+    normalized.includes("responseschema") ||
+    normalized.includes("response_format") ||
+    normalized.includes("responseformat") ||
+    normalized.includes("mime_type") ||
+    normalized.includes("mimetype") ||
+    normalized.includes("schema")
+  );
 }
 
 export function normalizeCandidate(candidate: Partial<Candidate>, index: number): Candidate | null {
