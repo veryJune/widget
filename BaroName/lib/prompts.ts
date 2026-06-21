@@ -32,6 +32,16 @@ export function buildGenerationPrompt(payload: GenerationPayload) {
     payload.uiLanguage === "ko"
       ? "Korean analysis mode. Keep brand names in English or their natural script. Write aiTake, positioning, rationale, risks, soundProfile rhythm/mouthfeel, bestFor, avoidIf, taglineSeeds, strategy, and sessionInsight in natural Korean with useful English terms left intact. The tone should feel like ChatGPT/Gemini naturally advising a Korean user about global naming candidates."
       : "English analysis mode. Write aiTake, positioning, rationale, risks, sound notes, strategy, and insights in concise natural English.";
+  const nameLanguageGuidance = {
+    english_first:
+      "Generate mostly English or globally readable coined names. Korean names are allowed only if exceptionally natural globally.",
+    english_korean:
+      "Generate a balanced mix of English names, English+Korean hybrid names, and Korean-friendly global names. Set candidate language accurately.",
+    korean_global:
+      "Generate Korean or Korean-rooted names that can still travel globally. Romanization or pronunciation help is important. Set language to korean or english_korean.",
+    open_mix:
+      "Generate the strongest names regardless of script, but keep global readability. Use english, english_korean, korean, or open_mix accurately."
+  }[settings.languageMode];
 
   return `Create 12 brand name candidates for the following naming brief.
 
@@ -47,6 +57,7 @@ Brand brief:
 
 Naming settings:
 - Language mode: ${settings.languageMode}
+- Name language guidance: ${nameLanguageGuidance}
 - UI response language: ${payload.uiLanguage || "en"}
 - Response language instruction: ${responseLanguage}
 - Creativity level: ${settings.creativityLevel} out of 5
@@ -68,8 +79,8 @@ Creativity interpretation:
 
 Requirements:
 - Generate exactly 12 candidates.
-- Prefer English-first global names.
-- Include Korean or mixed names only if they feel globally natural.
+- Follow the Name language guidance. Do not blindly mark every candidate as English.
+- Use candidate.language accurately: english for English-only names, korean for Korean-only names, english_korean for mixed/dual-script names, open_mix for other global hybrids.
 - Use the selected naming techniques, but keep quality higher than mechanical coverage.
 - Each candidate must include pronunciation guidance.
 - Each candidate must include at least one practical risk.
@@ -182,7 +193,8 @@ Requirements:
 - Do not only change spelling by one letter unless the result is meaningfully better.
 - Preserve the user's global-first preference.
 - Avoid all banned words.
-- Follow the UI response language instruction. Do not translate the brand name itself unless a Korean/mixed name is genuinely better.
+- Follow the analysis language instruction. Do not translate the brand name itself unless a Korean/mixed name is genuinely better.
+- Set candidate.language accurately.
 - Return only JSON matching this shape:
 {
   "sourceName": "source",

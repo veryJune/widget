@@ -105,17 +105,87 @@ const categories = [
   "Other"
 ];
 
-const tones = ["Modern", "Trustworthy", "Warm", "Premium", "Playful", "Technical", "Minimal", "Bold"];
+const tones = [
+  "Modern",
+  "Trustworthy",
+  "Warm",
+  "Premium",
+  "Playful",
+  "Technical",
+  "Minimal",
+  "Bold",
+  "Calm",
+  "Editorial",
+  "Human",
+  "Sharp",
+  "Global",
+  "Elegant",
+  "Friendly",
+  "Inventive"
+];
 
-const engines: Array<{ value: Technique; label: string }> = [
-  { value: "blend", label: "Blend" },
-  { value: "invented", label: "Invented" },
-  { value: "metaphor", label: "Metaphor" },
-  { value: "phonetic", label: "Phonetic" },
-  { value: "descriptive", label: "Descriptive" },
-  { value: "benefit_led", label: "Benefit-led" },
-  { value: "persona_led", label: "Persona-led" },
-  { value: "story", label: "Story" }
+const avoidTonePresets = [
+  "Too generic",
+  "Hard to pronounce",
+  "Childish",
+  "Corporate jargon",
+  "Too cute",
+  "Too abstract",
+  "Overly trendy",
+  "Luxury cliché",
+  "AI buzzword-heavy",
+  "Korean-only feel"
+];
+
+const engines: Array<{ value: Technique; label: string; description: string; cues: string[] }> = [
+  {
+    value: "blend",
+    label: "Blend",
+    description: "두 단어를 자연스럽게 합쳐 의미와 고유성을 함께 만드는 방식입니다.",
+    cues: ["platform", "tool", "app", "ai", "fast", "creator", "maker"]
+  },
+  {
+    value: "invented",
+    label: "Invented",
+    description: "완전히 새로운 조어를 만들어 검색성, 상표성, 글로벌 확장성을 노립니다.",
+    cues: ["global", "new", "future", "saas", "startup", "brand"]
+  },
+  {
+    value: "metaphor",
+    label: "Metaphor",
+    description: "제품의 감정, 세계관, 결과 상태를 상징적인 단어로 표현합니다.",
+    cues: ["calm", "focus", "nature", "story", "community", "creative"]
+  },
+  {
+    value: "phonetic",
+    label: "Phonetic",
+    description: "발음, 리듬, 음절감을 중심으로 기억하기 쉬운 이름을 만듭니다.",
+    cues: ["simple", "short", "sound", "viral", "consumer", "channel"]
+  },
+  {
+    value: "descriptive",
+    label: "Descriptive",
+    description: "무엇을 하는지 바로 이해되는 직관적인 이름을 만듭니다.",
+    cues: ["local", "service", "utility", "clear", "simple"]
+  },
+  {
+    value: "benefit_led",
+    label: "Benefit-led",
+    description: "사용자가 얻게 되는 이익이나 변화에 초점을 맞춥니다.",
+    cues: ["save", "grow", "better", "boost", "easy", "help"]
+  },
+  {
+    value: "persona_led",
+    label: "Persona-led",
+    description: "타깃 사용자의 정체성, 소속감, 커뮤니티 감각을 이름에 담습니다.",
+    cues: ["founder", "creator", "mom", "team", "student", "community"]
+  },
+  {
+    value: "story",
+    label: "Story",
+    description: "창업 배경, 철학, 장소, 시작 계기를 브랜드 스토리로 전환합니다.",
+    cues: ["mission", "origin", "local", "founder", "why"]
+  }
 ];
 
 const defaultBrief: Brief = {
@@ -241,6 +311,7 @@ export function Workspace() {
   const [sortMode, setSortMode] = useState("recommended");
   const [cooldownUntil, setCooldownUntil] = useState(0);
   const [uiLanguage, setUiLanguage] = useState<UiLanguage>("ko");
+  const [focusedCandidateId, setFocusedCandidateId] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -287,6 +358,19 @@ export function Workspace() {
     () => buildPreferenceSummaryForLanguage(pickedCandidates, uiLanguage),
     [pickedCandidates, uiLanguage]
   );
+  const recommendedEngines = useMemo(() => {
+    const text = `${project.brief.oneLineDescription} ${project.brief.keywords.join(" ")} ${project.brief.audience}`.toLowerCase();
+    return engines
+      .map((engine) => ({
+        value: engine.value,
+        score: engine.cues.reduce((count, cue) => count + (text.includes(cue) ? 1 : 0), 0)
+      }))
+      .filter((item) => item.score > 0)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 3)
+      .map((item) => item.value);
+  }, [project.brief.audience, project.brief.keywords, project.brief.oneLineDescription]);
+  const focusedCandidate = project.candidates.find((candidate) => candidate.id === focusedCandidateId);
   const t = copy[uiLanguage];
   const cooldownLeft = Math.max(0, Math.ceil((cooldownUntil - Date.now()) / 1000));
 
@@ -340,6 +424,12 @@ export function Workspace() {
     updateBrief({ [field]: project.brief[field].filter((item) => item !== value) } as Partial<Brief>);
   }
 
+  function toggleAvoidTone(tone: string) {
+    const current = parseList(project.brief.avoidTone);
+    const next = current.includes(tone) ? current.filter((item) => item !== tone) : [...current, tone];
+    updateBrief({ avoidTone: next.join(", ") });
+  }
+
   async function generateNames() {
     if (!project.brief.oneLineDescription.trim()) {
       setMessage("Add a one-line brief first.");
@@ -385,7 +475,8 @@ export function Workspace() {
       }
       updateProject((item) => ({
         ...item,
-        candidates: [...stored, ...item.candidates].slice(0, 80),
+        candidates: stored,
+        picks: [],
         lastInsight: data.sessionInsight
       }));
       setMessage(data.cached ? `Loaded ${stored.length} cached candidates.` : `Generated ${stored.length} candidates.`);
@@ -670,6 +761,18 @@ export function Workspace() {
               placeholder="childish, too corporate, hard to say"
             />
           </label>
+          <div className="preset-grid" aria-label="Avoid tone templates">
+            {avoidTonePresets.map((tone) => (
+              <button
+                key={tone}
+                className={parseList(project.brief.avoidTone).includes(tone) ? "preset-chip selected" : "preset-chip"}
+                onClick={() => toggleAvoidTone(tone)}
+                type="button"
+              >
+                {tone}
+              </button>
+            ))}
+          </div>
 
           <div className="field-block">
             <div className="range-row">
@@ -703,16 +806,25 @@ export function Workspace() {
           </label>
 
           <div className="field-block">
-            <span className="field-label">Naming engines</span>
+            <div className="field-title-row">
+              <span className="field-label">Naming engines</span>
+              {recommendedEngines.length > 0 ? <span className="recommend-note">Suggested from brief</span> : null}
+            </div>
             <div className="chip-grid">
               {engines.map((engine) => (
                 <button
                   key={engine.value}
-                  className={project.settings.techniques.includes(engine.value) ? "chip selected" : "chip"}
+                  className={[
+                    "chip engine-chip",
+                    project.settings.techniques.includes(engine.value) ? "selected" : "",
+                    recommendedEngines.includes(engine.value) ? "recommended" : ""
+                  ].join(" ")}
                   onClick={() => toggleEngine(engine.value)}
+                  title={engine.description}
                   type="button"
                 >
                   {engine.label}
+                  <span className="engine-tooltip">{engine.description}</span>
                 </button>
               ))}
             </div>
@@ -740,7 +852,7 @@ export function Workspace() {
           {message ? <p className="inline-status" aria-live="polite">{message}</p> : null}
         </aside>
 
-        <section className={`panel studio-panel ${activeTab === "studio" ? "mobile-active" : ""}`}>
+        <section className={`panel studio-panel ${activeTab === "studio" ? "mobile-active" : ""} ${loading ? "is-generating" : ""}`}>
           <div className="studio-toolbar">
             <div>
               <p className="eyebrow">{t.namingStudio}</p>
@@ -779,7 +891,7 @@ export function Workspace() {
                 {t.sampleBrief}
               </button>
             </div>
-          ) : (
+          ) : project.candidates.length > 0 ? (
             <div className="candidate-list">
               {sortedCandidates.map((candidate) => (
                 <CandidateCard
@@ -789,10 +901,11 @@ export function Workspace() {
                   onPick={() => togglePick(candidate.id)}
                   onVariation={(transformation) => createVariation(candidate, transformation)}
                   uiLanguage={uiLanguage}
+                  onFocus={() => setFocusedCandidateId(candidate.id)}
                 />
               ))}
             </div>
-          )}
+          ) : null}
         </section>
 
         <aside className={`panel picks-panel ${activeTab === "picks" ? "mobile-active" : ""}`}>
@@ -871,6 +984,16 @@ export function Workspace() {
           </div>
         </aside>
       </section>
+      {focusedCandidate ? (
+        <FocusMode
+          candidate={focusedCandidate}
+          uiLanguage={uiLanguage}
+          picked={project.picks.includes(focusedCandidate.id)}
+          onClose={() => setFocusedCandidateId("")}
+          onPick={() => togglePick(focusedCandidate.id)}
+          onVariation={(transformation) => createVariation(focusedCandidate, transformation)}
+        />
+      ) : null}
     </main>
   );
 }
@@ -925,13 +1048,15 @@ function CandidateCard({
   picked,
   onPick,
   onVariation,
-  uiLanguage
+  uiLanguage,
+  onFocus
 }: {
   candidate: StoredCandidate;
   picked: boolean;
   onPick: () => void;
   onVariation: (transformation: Transformation) => void;
   uiLanguage: UiLanguage;
+  onFocus: () => void;
 }) {
   const avg = scoreAverage(candidate);
   const t = copy[uiLanguage];
@@ -946,6 +1071,8 @@ function CandidateCard({
           {picked ? "★" : "☆"}
         </button>
       </div>
+
+      <button className="candidate-focus-hit" onClick={onFocus} aria-label={`Open focus mode for ${candidate.displayName}`} />
 
       <div className="candidate-main">
         <div>
@@ -992,13 +1119,14 @@ function CandidateCard({
 
 function GeneratingState({ uiLanguage }: { uiLanguage: UiLanguage }) {
   const t = copy[uiLanguage];
+  const glyphs = ["/", "\\", "+", "-", "*", "name", "tone", "fit"];
 
   return (
     <div className="generating-state" aria-live="polite">
-      <div className="generating-orbit">
-        <span />
-        <span />
-        <span />
+      <div className="glyph-stage" aria-hidden="true">
+        {glyphs.map((glyph, index) => (
+          <span key={`${glyph}-${index}`}>{glyph}</span>
+        ))}
       </div>
       <div className="generating-copy">
         <strong>{t.generating}</strong>
@@ -1008,6 +1136,67 @@ function GeneratingState({ uiLanguage }: { uiLanguage: UiLanguage }) {
           ))}
         </div>
       </div>
+    </div>
+  );
+}
+
+function FocusMode({
+  candidate,
+  uiLanguage,
+  picked,
+  onClose,
+  onPick,
+  onVariation
+}: {
+  candidate: StoredCandidate;
+  uiLanguage: UiLanguage;
+  picked: boolean;
+  onClose: () => void;
+  onPick: () => void;
+  onVariation: (transformation: Transformation) => void;
+}) {
+  const t = copy[uiLanguage];
+  const avg = scoreAverage(candidate);
+
+  return (
+    <div className="focus-backdrop" role="dialog" aria-modal="true" aria-label={`${candidate.displayName} focus mode`}>
+      <button className="focus-scrim" onClick={onClose} aria-label="Close focus mode" />
+      <article className="focus-panel">
+        <header className="focus-header">
+          <div>
+            <p className="eyebrow">{candidate.techniques.join(" / ")} · {candidate.language.replace("_", " + ")}</p>
+            <h2>{candidate.displayName}</h2>
+            <p>{candidate.pronunciation}</p>
+          </div>
+          <div className="focus-actions">
+            <span className="fit-score">{avg}</span>
+            <button className="pick-button" onClick={onPick}>{picked ? "★" : "☆"}</button>
+            <button className="ghost-button" onClick={onClose}>Close</button>
+          </div>
+        </header>
+        <div className="focus-body">
+          <section className="focus-main">
+            <h3>{candidate.aiTake || candidate.positioning}</h3>
+            <p>{candidate.positioning}</p>
+            <p>{candidate.rationale}</p>
+            <div className="risk-line">
+              <strong>{t.risk}:</strong> {candidate.risks[0]?.note || "Manual check needed before final use."}
+            </div>
+          </section>
+          <aside className="focus-side">
+            <p><strong>{t.sound}</strong><br />{candidate.soundProfile.rhythm}. {candidate.soundProfile.mouthfeel}.</p>
+            <p><strong>{t.bestFor}</strong><br />{candidate.bestFor.join(", ")}</p>
+            <p><strong>{t.taglineSeeds}</strong><br />{candidate.taglineSeeds.join(" / ")}</p>
+            <p><strong>{t.variants}</strong><br />{candidate.variants.join(", ")}</p>
+          </aside>
+        </div>
+        <footer className="focus-footer">
+          <button onClick={() => onVariation("more_like_this")}>{t.moreLike}</button>
+          <button onClick={() => onVariation("shorter")}>{t.shorter}</button>
+          <button onClick={() => onVariation("more_premium")}>{t.premium}</button>
+          <button onClick={() => navigator.clipboard?.writeText(candidate.displayName)}>{t.copyName}</button>
+        </footer>
+      </article>
     </div>
   );
 }

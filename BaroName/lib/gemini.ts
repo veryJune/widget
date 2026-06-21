@@ -231,7 +231,7 @@ export function normalizeCandidate(candidate: Partial<Candidate>, index: number)
     displayName: String(candidate.displayName || name),
     pronunciation: String(candidate.pronunciation || "Pronunciation needs review"),
     aiTake: String(candidate.aiTake || candidate.positioning || "Balanced candidate with practical brand potential."),
-    language: candidate.language || "english",
+    language: normalizeLanguage(candidate.language, name),
     techniques: Array.isArray(candidate.techniques) && candidate.techniques.length > 0 ? candidate.techniques : ["invented"],
     globalFit: candidate.globalFit || "good",
     positioning: String(candidate.positioning || "A global-first naming candidate for this brief."),
@@ -345,6 +345,29 @@ function coerceLooseCandidate(candidate: unknown) {
       globalReadiness: scores.globalReadiness || scores.global || scores.globalFit || 70
     }
   };
+}
+
+function normalizeLanguage(value: unknown, name: string): Candidate["language"] {
+  const raw = String(value || "").toLowerCase();
+  if (raw === "english_korean" || raw === "english+korean" || raw === "mixed") {
+    return "english_korean";
+  }
+  if (raw === "korean" || raw === "korean_global" || raw === "hangul") {
+    return "korean";
+  }
+  if (raw === "open_mix" || raw === "open") {
+    return "open_mix";
+  }
+
+  const hasHangul = /[가-힣]/.test(name);
+  const hasLatin = /[a-z]/i.test(name);
+  if (hasHangul && hasLatin) {
+    return "english_korean";
+  }
+  if (hasHangul) {
+    return "korean";
+  }
+  return "english";
 }
 
 function clampScore(value: unknown) {
