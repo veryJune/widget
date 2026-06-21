@@ -1,17 +1,18 @@
 :root {
-  --bg: #f7f8fb;
+  --bg: #f6f7f9;
   --panel: #ffffff;
-  --panel-soft: #f1f4f8;
-  --text: #15171c;
-  --muted: #69707d;
-  --line: #dde3eb;
-  --line-strong: #c8d1dd;
-  --accent: #2367ff;
-  --accent-soft: #e8efff;
-  --green: #118a5b;
-  --amber: #a96c00;
-  --red: #c93333;
-  --shadow: 0 18px 48px rgba(26, 35, 55, 0.1);
+  --panel-soft: #f3f4f6;
+  --text: #161719;
+  --muted: #6f737b;
+  --soft-muted: #8c919b;
+  --line: #e4e7ec;
+  --line-strong: #cfd5df;
+  --accent: #0a84ff;
+  --accent-soft: #eaf3ff;
+  --green: #15835b;
+  --amber: #9a6500;
+  --red: #c53636;
+  --shadow: 0 18px 42px rgba(15, 23, 42, 0.08);
 }
 
 * {
@@ -29,6 +30,8 @@ body {
   color: var(--text);
   font-family:
     Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
 button,
@@ -40,6 +43,16 @@ select {
 
 button {
   cursor: pointer;
+  transition:
+    background 160ms ease,
+    border-color 160ms ease,
+    color 160ms ease,
+    box-shadow 160ms ease,
+    transform 160ms ease;
+}
+
+button:hover:not(:disabled) {
+  transform: translateY(-1px);
 }
 
 button:disabled {
@@ -125,6 +138,10 @@ select {
   color: var(--text);
   padding: 11px 12px;
   outline: none;
+  transition:
+    border-color 160ms ease,
+    box-shadow 160ms ease,
+    background 160ms ease;
 }
 
 textarea {
@@ -144,10 +161,16 @@ select:focus {
   width: 100%;
   border: 0;
   border-radius: 8px;
-  background: var(--accent);
+  background: #111317;
   color: white;
   padding: 12px 16px;
   font-weight: 760;
+  box-shadow: 0 10px 24px rgba(17, 19, 23, 0.14);
+}
+
+.primary-button:hover:not(:disabled),
+.lock-form button:hover:not(:disabled) {
+  background: #24272d;
 }
 
 .secondary-button,
@@ -162,6 +185,16 @@ select:focus {
   color: var(--text);
   padding: 9px 11px;
   font-weight: 650;
+}
+
+.secondary-button:hover:not(:disabled),
+.ghost-button:hover:not(:disabled),
+.export-grid button:hover:not(:disabled),
+.card-actions button:hover:not(:disabled),
+.chip:hover:not(:disabled),
+.pick-card button:hover:not(:disabled) {
+  border-color: var(--line-strong);
+  background: var(--panel-soft);
 }
 
 .ghost-button {
@@ -183,6 +216,9 @@ select:focus {
   min-height: 100vh;
   display: grid;
   grid-template-rows: 64px 1fr;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.8), rgba(246, 247, 249, 0)),
+    var(--bg);
 }
 
 .topbar {
@@ -190,9 +226,9 @@ select:focus {
   grid-template-columns: 260px minmax(180px, 1fr) auto;
   gap: 18px;
   align-items: center;
-  padding: 10px 18px;
+  padding: 10px 20px;
   border-bottom: 1px solid var(--line);
-  background: rgba(255, 255, 255, 0.86);
+  background: rgba(255, 255, 255, 0.78);
   backdrop-filter: blur(16px);
   position: sticky;
   top: 0;
@@ -207,6 +243,7 @@ select:focus {
   max-width: 520px;
   font-size: 15px;
   font-weight: 700;
+  background: rgba(255, 255, 255, 0.72);
 }
 
 .topbar-actions {
@@ -222,7 +259,7 @@ select:focus {
   border: 1px solid var(--line);
   border-radius: 999px;
   padding: 0 12px;
-  background: var(--panel-soft);
+  background: rgba(243, 244, 246, 0.86);
   color: var(--muted);
   font-size: 13px;
   font-weight: 700;
@@ -232,16 +269,17 @@ select:focus {
   min-height: 0;
   display: grid;
   grid-template-columns: 320px minmax(520px, 1fr) 320px;
-  gap: 14px;
-  padding: 14px;
+  gap: 12px;
+  padding: 12px;
 }
 
 .panel {
   min-height: 0;
   overflow: auto;
   border: 1px solid var(--line);
-  border-radius: 10px;
-  background: rgba(255, 255, 255, 0.86);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: 0 8px 28px rgba(15, 23, 42, 0.04);
 }
 
 .brief-panel,
@@ -255,7 +293,8 @@ select:focus {
 .panel-heading h2,
 .studio-toolbar h2 {
   margin: 0;
-  font-size: 19px;
+  font-size: 18px;
+  letter-spacing: 0;
 }
 
 .panel-heading p,
@@ -324,8 +363,13 @@ select:focus {
   justify-content: space-between;
   align-items: center;
   gap: 16px;
-  padding: 16px;
+  padding: 18px;
   border-bottom: 1px solid var(--line);
+}
+
+.toolbar-subtitle {
+  margin-top: 6px;
+  color: var(--soft-muted);
 }
 
 .studio-toolbar select {
@@ -336,7 +380,7 @@ select:focus {
 .insight {
   margin: 14px 16px 0;
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: 10px;
   padding: 11px 12px;
   background: var(--panel-soft);
   color: var(--muted);
@@ -363,7 +407,7 @@ select:focus {
   place-content: center;
   gap: 12px;
   border: 1px dashed var(--line-strong);
-  border-radius: 10px;
+  border-radius: 12px;
   padding: 32px;
   text-align: center;
 }
@@ -381,21 +425,30 @@ select:focus {
 
 .candidate-list {
   display: grid;
-  gap: 12px;
+  gap: 10px;
   padding: 16px;
 }
 
 .candidate-card {
   border: 1px solid var(--line);
-  border-radius: 10px;
+  border-radius: 12px;
   background: #fff;
-  padding: 16px;
-  box-shadow: 0 8px 22px rgba(26, 35, 55, 0.04);
+  padding: 18px;
+  box-shadow: 0 8px 22px rgba(15, 23, 42, 0.035);
+  transition:
+    border-color 160ms ease,
+    box-shadow 160ms ease,
+    transform 160ms ease;
+}
+
+.candidate-card:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 16px 34px rgba(15, 23, 42, 0.07);
 }
 
 .candidate-card.picked {
   border-color: rgba(35, 103, 255, 0.5);
-  box-shadow: 0 12px 28px rgba(35, 103, 255, 0.1);
+  box-shadow: 0 14px 30px rgba(10, 132, 255, 0.1);
 }
 
 .candidate-meta {
@@ -442,7 +495,7 @@ select:focus {
 
 .candidate-main h3 {
   margin: 0;
-  font-size: 32px;
+  font-size: 31px;
   letter-spacing: 0;
 }
 
@@ -457,7 +510,7 @@ select:focus {
   min-height: 68px;
   display: grid;
   place-items: center;
-  border-radius: 8px;
+  border-radius: 10px;
   background: var(--panel-soft);
 }
 
@@ -494,7 +547,7 @@ select:focus {
 
 .score {
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: 10px;
   padding: 9px;
   background: var(--panel-soft);
 }
@@ -549,7 +602,7 @@ select:focus {
   justify-content: space-between;
   gap: 12px;
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: 10px;
   padding: 10px;
   background: #fff;
 }
@@ -600,7 +653,7 @@ select:focus {
   grid-template-columns: 1.4fr 0.7fr 0.7fr 0.7fr;
   gap: 8px;
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: 10px;
   padding: 8px;
   background: #fff;
   font-size: 12px;

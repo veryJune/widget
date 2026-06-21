@@ -605,7 +605,7 @@ export function Workspace() {
           />
 
           <button className="primary-button" onClick={generateNames} disabled={loading || cooldownLeft > 0}>
-            {loading ? "Generating..." : cooldownLeft > 0 ? `Ready in ${cooldownLeft}s` : "Generate 12 names"}
+            {loading ? "Generating" : cooldownLeft > 0 ? `Ready in ${cooldownLeft}s` : "Generate"}
           </button>
           {message ? <p className="inline-status" aria-live="polite">{message}</p> : null}
         </aside>
@@ -615,6 +615,7 @@ export function Workspace() {
             <div>
               <p className="eyebrow">Naming Studio</p>
               <h2>Generate, pick, and refine</h2>
+              <p className="toolbar-subtitle">12 candidates per round · English-first · Global fit review</p>
             </div>
             <select value={sortMode} onChange={(event) => setSortMode(event.target.value)} aria-label="Sort candidates">
               <option value="recommended">Recommended</option>
@@ -632,8 +633,7 @@ export function Workspace() {
             <div className="empty-state">
               <h3>Start with a short brief.</h3>
               <p>
-                BaroName will create 12 global-first candidates with pronunciation, risks, and quick
-                refinement actions.
+                Create global-first candidates with pronunciation, risks, and quick refinement actions.
               </p>
               <button
                 className="ghost-button"

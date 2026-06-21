@@ -65,8 +65,7 @@ export async function callGeminiJson<T>({
     ],
     generationConfig: {
       temperature,
-      responseMimeType: "application/json",
-      responseSchema: schema
+      responseMimeType: "application/json"
     }
   };
 
@@ -144,6 +143,7 @@ async function postGemini(model: string, apiKey: string, body: unknown) {
 function isSchemaCompatibilityError(message: string) {
   const normalized = message.toLowerCase();
   return (
+    normalized.includes("invalid argument") ||
     normalized.includes("response_schema") ||
     normalized.includes("responseschema") ||
     normalized.includes("response_format") ||
