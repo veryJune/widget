@@ -41,6 +41,10 @@ const copy = {
     insight: "Insight",
     preference: "Preference signal",
     resetView: "Reset",
+    promptOnly: "Prompt only",
+    promptBuilder: "Prompt Builder",
+    copyPrompt: "Copy prompt",
+    generatedPrompt: "Generated prompt",
     autoEngines: "Auto engines",
     applySuggested: "Apply suggested",
     customTone: "Add tone and press Enter",
@@ -88,6 +92,10 @@ const copy = {
     insight: "Insight",
     preference: "Preference signal",
     resetView: "Reset",
+    promptOnly: "Prompt only",
+    promptBuilder: "Prompt Builder",
+    copyPrompt: "Copy prompt",
+    generatedPrompt: "Generated prompt",
     autoEngines: "Auto engines",
     applySuggested: "Apply suggested",
     customTone: "톤 입력 후 Enter",
@@ -250,7 +258,8 @@ function createProject(): Project {
     settings: defaultSettings,
     candidates: [],
     picks: [],
-    lastInsight: ""
+    lastInsight: "",
+    generatedPrompt: ""
   };
 }
 
@@ -326,6 +335,56 @@ function buildPreferenceSummaryForLanguage(picks: StoredCandidate[], uiLanguage:
     : "선호가 아직 다양합니다. 다음 라운드는 글로벌 가독성을 유지하면서 폭넓게 제안합니다.";
 }
 
+function buildUserPrompt({
+  brief,
+  settings,
+  techniques,
+  uiLanguage,
+  preferenceSummary
+}: {
+  brief: Brief;
+  settings: Settings;
+  techniques: Technique[];
+  uiLanguage: UiLanguage;
+  preferenceSummary: string;
+}) {
+  const analysisLanguage =
+    uiLanguage === "ko"
+      ? "이름 후보 자체는 글로벌 관점에서 자연스러운 언어로 만들고, 설명/평가/리스크/어감 분석은 자연스러운 한국어로 작성해 주세요. 필요한 영문 용어는 그대로 섞어도 됩니다."
+      : "Write names and analysis in concise English, keeping a global-first brand perspective.";
+
+  return [
+    "Act as a senior global brand naming strategist.",
+    "",
+    "Create 12 high-quality name candidates using professional naming methods.",
+    "",
+    `Category: ${brief.category}`,
+    `One-line brief: ${brief.oneLineDescription || "(not provided)"}`,
+    `Keywords: ${brief.keywords.join(", ") || "(none)"}`,
+    `Target audience: ${brief.audience || "(not specified)"}`,
+    `Desired tone: ${brief.desiredTone.join(", ") || "(not specified)"}`,
+    `Avoid tone: ${brief.avoidTone || "(none)"}`,
+    `Must include: ${brief.mustInclude.join(", ") || "(none)"}`,
+    `Banned words: ${brief.bannedWords.join(", ") || "(none)"}`,
+    `Language direction: ${settings.languageMode}`,
+    `Creativity level: ${settings.creativityLevel}/5`,
+    `Naming methods to use: ${techniques.join(", ")}`,
+    `Preference signal from picked names: ${preferenceSummary}`,
+    "",
+    analysisLanguage,
+    "",
+    "For each candidate, include:",
+    "- Name",
+    "- Pronunciation help",
+    "- One-line AI take",
+    "- Why it fits",
+    "- Risk to check manually",
+    "- Best use case",
+    "",
+    "Do not claim trademark, domain, or social handle availability."
+  ].join("\n");
+}
+
 export function Workspace() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [currentId, setCurrentId] = useState("");
@@ -337,6 +396,7 @@ export function Workspace() {
   const [uiLanguage, setUiLanguage] = useState<UiLanguage>("ko");
   const [focusedCandidateId, setFocusedCandidateId] = useState("");
   const [autoEngines, setAutoEngines] = useState(true);
+  const [promptOnly, setPromptOnly] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -478,6 +538,20 @@ export function Workspace() {
     setFocusedCandidateId("");
   }
 
+  function generatePromptOnly() {
+    const techniques = autoEngines && recommendedEngines.length > 0 ? recommendedEngines : project.settings.techniques;
+    const prompt = buildUserPrompt({
+      brief: project.brief,
+      settings: project.settings,
+      techniques,
+      uiLanguage,
+      preferenceSummary
+    });
+    updateProject((item) => ({ ...item, generatedPrompt: prompt }));
+    setMessage(uiLanguage === "ko" ? "프롬프트를 생성했습니다." : "Generated a reusable prompt.");
+    return prompt;
+  }
+
   async function generateNames() {
     if (!project.brief.oneLineDescription.trim()) {
       setMessage("Add a one-line brief first.");
@@ -486,6 +560,12 @@ export function Workspace() {
     }
 
     if (loading || cooldownLeft > 0) {
+      return;
+    }
+
+    const generatedPrompt = generatePromptOnly();
+    if (promptOnly) {
+      setActiveTab("studio");
       return;
     }
 
@@ -526,7 +606,8 @@ export function Workspace() {
         ...item,
         candidates: stored,
         picks: [],
-        lastInsight: data.sessionInsight
+        lastInsight: data.sessionInsight,
+        generatedPrompt
       }));
       setMessage(data.cached ? `Loaded ${stored.length} cached candidates.` : `Generated ${stored.length} candidates.`);
       setActiveTab("studio");
@@ -919,6 +1000,30 @@ export function Workspace() {
             onKeyDown={(event) => handleKeyword(event, "bannedWords")}
             onRemove={(value) => removeChip("bannedWords", value)}
           />
+
+          <div className="prompt-builder">
+            <div className="prompt-row">
+              <div>
+                <strong>{t.promptBuilder}</strong>
+                <p>Build a reusable AI prompt from this brief.</p>
+              </div>
+              <label className="switch-label">
+                <input type="checkbox" checked={promptOnly} onChange={(event) => setPromptOnly(event.target.checked)} />
+                {t.promptOnly}
+              </label>
+            </div>
+            <button className="secondary-button" type="button" onClick={generatePromptOnly}>
+              {t.generatedPrompt}
+            </button>
+            {project.generatedPrompt ? (
+              <div className="prompt-preview">
+                <textarea readOnly value={project.generatedPrompt} rows={7} />
+                <button type="button" onClick={() => navigator.clipboard?.writeText(project.generatedPrompt || "")}>
+                  {t.copyPrompt}
+                </button>
+              </div>
+            ) : null}
+          </div>
 
           <button className="primary-button" onClick={generateNames} disabled={loading || cooldownLeft > 0}>
             {loading ? t.generating : cooldownLeft > 0 ? `Ready in ${cooldownLeft}s` : t.generate}

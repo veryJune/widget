@@ -143,4 +143,5 @@ export type Project = {
   candidates: StoredCandidate[];
   picks: string[];
   lastInsight: string;
+  generatedPrompt?: string;
 };

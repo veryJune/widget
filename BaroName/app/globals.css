@@ -480,6 +480,70 @@ select:focus {
   color: #145fd0;
 }
 
+.prompt-builder {
+  display: grid;
+  gap: 10px;
+  border: 1px solid rgba(205, 215, 230, 0.8);
+  border-radius: 16px;
+  background:
+    radial-gradient(circle at 12% 0%, rgba(22, 119, 255, 0.1), transparent 34%),
+    rgba(255, 255, 255, 0.56);
+  padding: 12px;
+  box-shadow: var(--inner-glow);
+}
+
+.prompt-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.prompt-row strong {
+  font-size: 13px;
+}
+
+.prompt-row p {
+  margin: 3px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.switch-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  white-space: nowrap;
+  color: var(--text);
+}
+
+.switch-label input {
+  width: auto;
+}
+
+.prompt-preview {
+  display: grid;
+  gap: 8px;
+}
+
+.prompt-preview textarea {
+  min-height: 148px;
+  max-height: 260px;
+  color: #3e4652;
+  font-size: 12px;
+  line-height: 1.5;
+  background: rgba(255, 255, 255, 0.74);
+}
+
+.prompt-preview button {
+  border: 1px solid rgba(202, 213, 229, 0.86);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.76);
+  padding: 9px 10px;
+  font-weight: 780;
+}
+
 .engine-chip {
   position: relative;
 }
@@ -644,7 +708,7 @@ select:focus {
 
 .candidate-card {
   position: relative;
-  overflow: hidden;
+  overflow: clip;
   border: 1px solid rgba(255, 255, 255, 0.74);
   border-radius: 22px;
   background:
@@ -753,6 +817,8 @@ select:focus {
 .candidate-main {
   margin-top: 10px;
   align-items: flex-start;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
 }
 
 .candidate-main h3 {
@@ -760,6 +826,7 @@ select:focus {
   font-size: clamp(26px, 2.7vw, 38px);
   letter-spacing: 0;
   line-height: 1.02;
+  overflow-wrap: anywhere;
 }
 
 .pronunciation {
@@ -773,6 +840,7 @@ select:focus {
   display: inline-grid;
   place-items: center;
   min-width: 42px;
+  flex: 0 0 auto;
   height: 32px;
   border-radius: 999px;
   background: #111317;
