@@ -1,0 +1,224 @@
+import crypto from "crypto";
+import type { Candidate, GenerationResponse } from "@/lib/types";
+import { systemPrompt } from "@/lib/prompts";
+
+const cache = new Map<string, unknown>();
+let activeRequest = false;
+
+export function hashPayload(payload: unknown) {
+  return crypto.createHash("sha256").update(JSON.stringify(payload)).digest("hex");
+}
+
+export function getCached<T>(key: string) {
+  return cache.get(key) as T | undefined;
+}
+
+export function setCached<T>(key: string, value: T) {
+  if (cache.size > 50) {
+    const firstKey = cache.keys().next().value;
+    if (firstKey) {
+      cache.delete(firstKey);
+    }
+  }
+  cache.set(key, value);
+}
+
+export async function runExclusive<T>(fn: () => Promise<T>) {
+  if (activeRequest) {
+    throw new Error("A naming request is already running. Please wait for it to finish.");
+  }
+
+  activeRequest = true;
+  try {
+    return await fn();
+  } finally {
+    activeRequest = false;
+  }
+}
+
+export async function callGeminiJson<T>({
+  prompt,
+  schema,
+  temperature
+}: {
+  prompt: string;
+  schema: unknown;
+  temperature: number;
+}) {
+  const apiKey = process.env.GEMINI_API_KEY;
+  const model = process.env.GEMINI_MODEL || "gemini-3.5-flash";
+
+  if (!apiKey) {
+    throw new Error("GEMINI_API_KEY is missing. Add it to .env.local or Vercel environment variables.");
+  }
+
+  const response = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        contents: [
+          {
+            role: "user",
+            parts: [
+              {
+                text: `${systemPrompt}\n\n${prompt}`
+              }
+            ]
+          }
+        ],
+        generationConfig: {
+          temperature,
+          responseMimeType: "application/json",
+          responseSchema: schema
+        }
+      })
+    }
+  );
+
+  const raw = await response.text();
+
+  if (!response.ok) {
+    let message = `Gemini request failed (${response.status}).`;
+    try {
+      const parsed = JSON.parse(raw) as { error?: { message?: string } };
+      message = parsed.error?.message || message;
+    } catch {
+      if (raw) {
+        message = raw.slice(0, 220);
+      }
+    }
+    const error = new Error(message);
+    error.name = response.status === 429 ? "RateLimitError" : "GeminiError";
+    throw error;
+  }
+
+  const payload = JSON.parse(raw) as {
+    candidates?: Array<{
+      content?: {
+        parts?: Array<{ text?: string }>;
+      };
+    }>;
+  };
+
+  const text =
+    payload.candidates?.[0]?.content?.parts
+      ?.map((part) => part.text || "")
+      .join("")
+      .trim() || "";
+
+  if (!text) {
+    throw new Error("Gemini returned an empty response.");
+  }
+
+  return JSON.parse(text) as T;
+}
+
+export function normalizeCandidate(candidate: Partial<Candidate>, index: number): Candidate | null {
+  const name = String(candidate.name || candidate.displayName || "").trim();
+  if (!name) {
+    return null;
+  }
+
+  const scores = candidate.scores || {
+    memorability: 70,
+    pronunciation: 70,
+    distinctiveness: 70,
+    scalability: 70,
+    globalReadiness: 70
+  };
+
+  return {
+    idHint: String(candidate.idHint || name.toLowerCase().replace(/[^a-z0-9]+/g, "-") || `name-${index}`),
+    name,
+    displayName: String(candidate.displayName || name),
+    pronunciation: String(candidate.pronunciation || "Pronunciation needs review"),
+    language: candidate.language || "english",
+    techniques: Array.isArray(candidate.techniques) && candidate.techniques.length > 0 ? candidate.techniques : ["invented"],
+    globalFit: candidate.globalFit || "good",
+    positioning: String(candidate.positioning || "A global-first naming candidate for this brief."),
+    rationale: String(candidate.rationale || "This candidate was generated to balance memorability, sound, and brand fit."),
+    soundProfile: {
+      syllables: Number(candidate.soundProfile?.syllables || 2),
+      rhythm: String(candidate.soundProfile?.rhythm || "Simple rhythm"),
+      mouthfeel: String(candidate.soundProfile?.mouthfeel || "Easy to say")
+    },
+    scores: {
+      memorability: clampScore(scores.memorability),
+      pronunciation: clampScore(scores.pronunciation),
+      distinctiveness: clampScore(scores.distinctiveness),
+      scalability: clampScore(scores.scalability),
+      globalReadiness: clampScore(scores.globalReadiness)
+    },
+    risks:
+      Array.isArray(candidate.risks) && candidate.risks.length > 0
+        ? candidate.risks.slice(0, 4).map((risk) => ({
+            level: risk.level || "medium",
+            label: String(risk.label || "Manual check needed"),
+            note: String(risk.note || "Check domain, social, and trademark conflicts before final use.")
+          }))
+        : [
+            {
+              level: "medium",
+              label: "Manual check needed",
+              note: "Check domain, social, and trademark conflicts before final use."
+            }
+          ],
+    bestFor: arrayOfStrings(candidate.bestFor, ["Global-first brand"]),
+    avoidIf: arrayOfStrings(candidate.avoidIf, []),
+    taglineSeeds: arrayOfStrings(candidate.taglineSeeds, ["Name the next thing clearly"]),
+    variants: arrayOfStrings(candidate.variants, [`${name}ly`, `${name} Studio`]).slice(0, 5),
+    recommendedTransformations:
+      Array.isArray(candidate.recommendedTransformations) && candidate.recommendedTransformations.length > 0
+        ? candidate.recommendedTransformations.slice(0, 5)
+        : ["more_like_this", "shorter", "more_premium"]
+  };
+}
+
+export function normalizeGenerationResponse(response: Partial<GenerationResponse>, bannedWords: string[]) {
+  const seen = new Set<string>();
+  const banned = bannedWords.map((word) => word.trim().toLowerCase()).filter(Boolean);
+  const candidates = (response.candidates || [])
+    .map(normalizeCandidate)
+    .filter((candidate): candidate is Candidate => Boolean(candidate))
+    .filter((candidate) => {
+      const key = candidate.displayName.toLowerCase();
+      if (seen.has(key)) {
+        return false;
+      }
+      seen.add(key);
+      return !banned.some((word) => key.includes(word));
+    })
+    .slice(0, 12);
+
+  return {
+    briefSummary: String(response.briefSummary || "Global-first naming sprint"),
+    strategy: response.strategy || {
+      primaryDirection: "Generate memorable global-first names.",
+      languageGuidance: "Prefer English names unless a Korean or mixed name feels natural globally.",
+      creativityInterpretation: "Balanced brandable naming."
+    },
+    candidates,
+    sessionInsight: String(response.sessionInsight || "Pick names you like to steer the next round."),
+    suggestedNextActions: response.suggestedNextActions || ["Pick strong candidates", "Try variations"]
+  };
+}
+
+function clampScore(value: unknown) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) {
+    return 70;
+  }
+  return Math.max(0, Math.min(100, Math.round(number)));
+}
+
+function arrayOfStrings(value: unknown, fallback: string[]) {
+  if (!Array.isArray(value)) {
+    return fallback;
+  }
+  const cleaned = value.map((item) => String(item).trim()).filter(Boolean);
+  return cleaned.length > 0 ? cleaned : fallback;
+}
