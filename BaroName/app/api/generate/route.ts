@@ -32,7 +32,11 @@ export async function POST(request: NextRequest) {
         schema: generationResponseSchema,
         temperature: temperatureFromSettings(payload.settings)
       });
-      return normalizeGenerationResponse(response, payload.brief.bannedWords);
+      const normalized = normalizeGenerationResponse(response, payload.brief.bannedWords);
+      if (normalized.candidates.length === 0) {
+        throw new Error("Gemini responded, but BaroName could not find usable name candidates. Try Generate once more.");
+      }
+      return normalized;
     });
 
     setCached(key, data);

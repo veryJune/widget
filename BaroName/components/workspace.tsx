@@ -267,12 +267,15 @@ export function Workspace() {
       }
 
       const stored = data.candidates.map((candidate) => toStoredCandidate(candidate, "generation"));
+      if (stored.length === 0) {
+        throw new Error("No usable names were returned. Try Generate again with a slightly clearer brief.");
+      }
       updateProject((item) => ({
         ...item,
         candidates: [...stored, ...item.candidates].slice(0, 80),
         lastInsight: data.sessionInsight
       }));
-      setMessage(data.cached ? "Loaded a cached round." : "Generated 12 name candidates.");
+      setMessage(data.cached ? `Loaded ${stored.length} cached candidates.` : `Generated ${stored.length} candidates.`);
       setActiveTab("studio");
       setCooldownUntil(Date.now() + COOLDOWN_MS);
     } catch (error) {

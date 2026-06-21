@@ -70,7 +70,56 @@ Requirements:
 - Include 1 to 3 tagline seeds per candidate.
 - Avoid all banned words.
 - Do not include names that are obvious copies of famous brands.
-- Do not state or imply that domain, trademark, or social handles are available.`;
+- Do not state or imply that domain, trademark, or social handles are available.
+
+Return this exact JSON shape:
+{
+  "briefSummary": "short summary",
+  "strategy": {
+    "primaryDirection": "strategy sentence",
+    "languageGuidance": "language sentence",
+    "creativityInterpretation": "creativity sentence"
+  },
+  "candidates": [
+    {
+      "idHint": "short-slug",
+      "name": "Name",
+      "displayName": "Name",
+      "pronunciation": "simple pronunciation guide",
+      "language": "english",
+      "techniques": ["invented"],
+      "globalFit": "strong",
+      "positioning": "one-line positioning",
+      "rationale": "why this name fits",
+      "soundProfile": {
+        "syllables": 2,
+        "rhythm": "short rhythm note",
+        "mouthfeel": "mouthfeel note"
+      },
+      "scores": {
+        "memorability": 80,
+        "pronunciation": 80,
+        "distinctiveness": 80,
+        "scalability": 80,
+        "globalReadiness": 80
+      },
+      "risks": [
+        {
+          "level": "medium",
+          "label": "Manual check needed",
+          "note": "Check domain, social, and trademark conflicts before final use."
+        }
+      ],
+      "bestFor": ["best use"],
+      "avoidIf": ["avoid condition"],
+      "taglineSeeds": ["tagline seed"],
+      "variants": ["Variant"],
+      "recommendedTransformations": ["more_like_this", "shorter", "more_premium"]
+    }
+  ],
+  "sessionInsight": "short insight",
+  "suggestedNextActions": ["next action"]
+}`;
 }
 
 export function buildVariationPrompt(payload: VariationPayload) {
@@ -116,5 +165,13 @@ Requirements:
 - Do not only change spelling by one letter unless the result is meaningfully better.
 - Preserve the user's global-first preference.
 - Avoid all banned words.
-- Return only JSON matching the variation response schema.`;
+- Return only JSON matching this shape:
+{
+  "sourceName": "source",
+  "transformation": "more_like_this",
+  "candidates": [],
+  "variationInsight": "short insight"
+}
+
+The candidates array must use the same candidate object structure as the main generation response.`;
 }

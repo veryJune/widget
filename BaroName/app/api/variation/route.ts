@@ -27,12 +27,18 @@ export async function POST(request: NextRequest) {
         temperature: Math.min(1.2, temperatureFromSettings(payload.settings) + 0.05)
       });
 
+      const candidates = (response.candidates || [])
+        .map(normalizeCandidate)
+        .filter((candidate): candidate is Candidate => Boolean(candidate))
+        .slice(0, 6);
+
+      if (candidates.length === 0) {
+        throw new Error("Gemini responded, but BaroName could not find usable variations. Try another refinement.");
+      }
+
       return {
         ...response,
-        candidates: (response.candidates || [])
-          .map(normalizeCandidate)
-          .filter((candidate): candidate is Candidate => Boolean(candidate))
-          .slice(0, 6)
+        candidates
       };
     });
 

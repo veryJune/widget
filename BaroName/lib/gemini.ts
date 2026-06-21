@@ -216,10 +216,24 @@ export function normalizeCandidate(candidate: Partial<Candidate>, index: number)
 }
 
 export function normalizeGenerationResponse(response: Partial<GenerationResponse>, bannedWords: string[]) {
+  const loose = response as Partial<GenerationResponse> & {
+    names?: unknown[];
+    nameCandidates?: unknown[];
+    candidateNames?: unknown[];
+    results?: unknown[];
+  };
+  const rawCandidates =
+    response.candidates ||
+    loose.names ||
+    loose.nameCandidates ||
+    loose.candidateNames ||
+    loose.results ||
+    [];
+
   const seen = new Set<string>();
   const banned = bannedWords.map((word) => word.trim().toLowerCase()).filter(Boolean);
-  const candidates = (response.candidates || [])
-    .map(normalizeCandidate)
+  const candidates = rawCandidates
+    .map((candidate, index) => normalizeCandidate(coerceLooseCandidate(candidate), index))
     .filter((candidate): candidate is Candidate => Boolean(candidate))
     .filter((candidate) => {
       const key = candidate.displayName.toLowerCase();
@@ -241,6 +255,32 @@ export function normalizeGenerationResponse(response: Partial<GenerationResponse
     candidates,
     sessionInsight: String(response.sessionInsight || "Pick names you like to steer the next round."),
     suggestedNextActions: response.suggestedNextActions || ["Pick strong candidates", "Try variations"]
+  };
+}
+
+function coerceLooseCandidate(candidate: unknown) {
+  if (!candidate || typeof candidate !== "object") {
+    return {};
+  }
+
+  const item = candidate as Record<string, unknown>;
+  const scores = (item.scores || item.score || {}) as Record<string, unknown>;
+
+  return {
+    ...item,
+    name: item.name || item.title || item.brandName || item.candidate || item.value,
+    displayName: item.displayName || item.name || item.title || item.brandName || item.candidate || item.value,
+    positioning: item.positioning || item.summary || item.description || item.tagline,
+    rationale: item.rationale || item.reason || item.explanation || item.meaning,
+    pronunciation: item.pronunciation || item.pronunciationGuide || item.sound,
+    globalFit: item.globalFit || item.global_fit || "good",
+    scores: {
+      memorability: scores.memorability || scores.memory || scores.memorable || 70,
+      pronunciation: scores.pronunciation || scores.sound || scores.speakability || 70,
+      distinctiveness: scores.distinctiveness || scores.distinct || scores.uniqueness || 70,
+      scalability: scores.scalability || scores.expandability || scores.expand || 70,
+      globalReadiness: scores.globalReadiness || scores.global || scores.globalFit || 70
+    }
   };
 }
 
