@@ -4,13 +4,15 @@ export const systemPrompt = `You are BaroName, an expert naming strategist for g
 
 Create brand name candidates using professional naming methods: descriptive, blended, metaphorical, invented, benefit-led, persona-led, phonetic, and founder/story-driven naming.
 
-Default to English-first names. Korean or English+Korean names are allowed only when they feel globally usable, pronounceable, and brandable.
+Default to English-first brand names. The generated name itself should usually stay in English or a globally readable coined form.
 
 Do not claim that a name is legally available, trademark-safe, domain-available, or already unused. Identify practical risks that the user should manually check.
 
 Avoid generic startup cliches unless the brief clearly asks for them. Avoid banned words exactly and conceptually. Favor names that are memorable, pronounceable, distinctive, scalable, and globally readable.
 
-Return only valid JSON matching the provided schema. Do not include markdown, comments, or text outside JSON.`;
+When Korean analysis mode is requested, think like a bilingual Korean brand strategist: keep the name and useful English terms as-is, but explain why it works, risks, pronunciation help, and usage context in natural Korean. Do not awkwardly translate product UI labels or brand names. Mix English only where it helps judgment.
+
+Return only valid JSON. Do not include markdown, comments, or text outside JSON.`;
 
 export function temperatureFromSettings(settings: Settings) {
   const map: Record<number, number> = {
@@ -28,8 +30,8 @@ export function buildGenerationPrompt(payload: GenerationPayload) {
   const { brief, settings, pickedContext } = payload;
   const responseLanguage =
     payload.uiLanguage === "ko"
-      ? "Korean UI mode. Keep the generated brand names in their natural script, usually English. Explain positioning, rationale, risks, sound notes, best use, avoid-if notes, tagline seeds, strategy, and session insight in natural Korean where helpful. Pronunciation may include English phonetic guidance plus Korean reading hints when useful."
-      : "English UI mode. Write explanations, risks, sound notes, strategy, and insights in concise natural English.";
+      ? "Korean analysis mode. Keep brand names in English or their natural script. Write aiTake, positioning, rationale, risks, soundProfile rhythm/mouthfeel, bestFor, avoidIf, taglineSeeds, strategy, and sessionInsight in natural Korean with useful English terms left intact. The tone should feel like ChatGPT/Gemini naturally advising a Korean user about global naming candidates."
+      : "English analysis mode. Write aiTake, positioning, rationale, risks, sound notes, strategy, and insights in concise natural English.";
 
   return `Create 12 brand name candidates for the following naming brief.
 
@@ -77,7 +79,8 @@ Requirements:
 - Avoid all banned words.
 - Do not include names that are obvious copies of famous brands.
 - Do not state or imply that domain, trademark, or social handles are available.
-- Follow the UI response language instruction. Do not translate the brand name itself unless a Korean/mixed name is genuinely better.
+- Follow the analysis language instruction carefully. Do not translate the brand name itself unless a Korean/mixed name is genuinely better.
+- Add aiTake: one practical evaluator sentence that helps the user decide quickly.
 
 Return this exact JSON shape:
 {
@@ -93,6 +96,7 @@ Return this exact JSON shape:
       "name": "Name",
       "displayName": "Name",
       "pronunciation": "simple pronunciation guide",
+      "aiTake": "one practical evaluator sentence",
       "language": "english",
       "techniques": ["invented"],
       "globalFit": "strong",
@@ -133,7 +137,7 @@ export function buildVariationPrompt(payload: VariationPayload) {
   const { brief, sourceCandidate, transformation } = payload;
   const responseLanguage =
     payload.uiLanguage === "ko"
-      ? "Korean UI mode. Keep brand names natural, usually English, but write explanations, risks, sound notes, and insight in natural Korean where helpful."
+      ? "Korean analysis mode. Keep brand names natural, usually English, but write aiTake, positioning, rationale, risks, sound notes, and insight in natural Korean with useful English terms left intact."
       : "English UI mode. Write explanations, risks, sound notes, and insight in concise natural English.";
 
   return `Create 6 naming variations based on the source candidate and requested transformation.

@@ -1,18 +1,18 @@
 :root {
-  --bg: #f5f6f8;
-  --panel: #ffffff;
-  --panel-soft: #f3f4f6;
-  --text: #161719;
-  --muted: #6f737b;
-  --soft-muted: #8c919b;
-  --line: #e4e7ec;
-  --line-strong: #cfd5df;
-  --accent: #0a84ff;
-  --accent-soft: #eaf3ff;
-  --green: #15835b;
-  --amber: #9a6500;
+  --bg: #eef1f6;
+  --panel: rgba(255, 255, 255, 0.78);
+  --panel-soft: rgba(245, 247, 251, 0.84);
+  --text: #111318;
+  --muted: #68707d;
+  --soft-muted: #8f97a4;
+  --line: rgba(215, 222, 233, 0.86);
+  --line-strong: rgba(181, 193, 212, 0.96);
+  --accent: #1677ff;
+  --accent-soft: rgba(22, 119, 255, 0.1);
+  --green: #0c8c61;
+  --amber: #9b6400;
   --red: #c53636;
-  --shadow: 0 22px 54px rgba(15, 23, 42, 0.1);
+  --shadow: 0 30px 80px rgba(20, 30, 50, 0.14);
   --inner-glow: inset 0 1px 0 rgba(255, 255, 255, 0.75);
 }
 
@@ -28,9 +28,10 @@ body {
 body {
   margin: 0;
   background:
-    radial-gradient(circle at 18% 6%, rgba(10, 132, 255, 0.08), transparent 28%),
-    radial-gradient(circle at 82% 0%, rgba(21, 131, 91, 0.08), transparent 25%),
-    linear-gradient(180deg, #ffffff 0%, var(--bg) 38%, #eef1f5 100%);
+    radial-gradient(circle at 10% 4%, rgba(22, 119, 255, 0.22), transparent 28%),
+    radial-gradient(circle at 86% 12%, rgba(12, 140, 97, 0.16), transparent 24%),
+    radial-gradient(circle at 50% 100%, rgba(17, 19, 24, 0.1), transparent 34%),
+    linear-gradient(180deg, #fbfcff 0%, var(--bg) 42%, #e7ebf2 100%);
   color: var(--text);
   font-family:
     Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
@@ -230,7 +231,9 @@ select:focus {
   inset: 72px 24px 24px;
   z-index: -1;
   border-radius: 28px;
-  background: rgba(255, 255, 255, 0.38);
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.58), rgba(255, 255, 255, 0.18)),
+    rgba(255, 255, 255, 0.22);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.72),
     0 28px 90px rgba(15, 23, 42, 0.08);
@@ -244,8 +247,8 @@ select:focus {
   align-items: center;
   padding: 10px 20px;
   border-bottom: 1px solid var(--line);
-  background: rgba(255, 255, 255, 0.72);
-  backdrop-filter: blur(16px);
+  background: rgba(250, 252, 255, 0.68);
+  backdrop-filter: blur(22px) saturate(1.2);
   position: sticky;
   top: 0;
   z-index: 10;
@@ -268,18 +271,26 @@ select:focus {
   gap: 10px;
 }
 
-.language-toggle {
+.analysis-toggle {
   display: inline-grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: auto 1fr 1fr;
+  align-items: center;
   gap: 3px;
   border: 1px solid var(--line);
   border-radius: 999px;
   padding: 3px;
-  background: rgba(255, 255, 255, 0.72);
+  background: rgba(255, 255, 255, 0.7);
   box-shadow: var(--inner-glow);
 }
 
-.language-toggle button {
+.analysis-toggle span {
+  padding: 0 8px 0 10px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 780;
+}
+
+.analysis-toggle button {
   min-width: 46px;
   border: 0;
   border-radius: 999px;
@@ -290,7 +301,7 @@ select:focus {
   font-weight: 780;
 }
 
-.language-toggle button.active {
+.analysis-toggle button.active {
   background: #111317;
   color: #fff;
   box-shadow: 0 8px 18px rgba(17, 19, 23, 0.16);
@@ -320,15 +331,16 @@ select:focus {
 .panel {
   min-height: 0;
   overflow: auto;
-  border: 1px solid rgba(220, 226, 235, 0.92);
-  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.72);
+  border-radius: 22px;
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(252, 253, 255, 0.88)),
-    rgba(255, 255, 255, 0.9);
+    linear-gradient(145deg, rgba(255, 255, 255, 0.88), rgba(245, 248, 253, 0.66)),
+    var(--panel);
+  backdrop-filter: blur(24px) saturate(1.15);
   box-shadow:
     var(--inner-glow),
-    0 18px 52px rgba(15, 23, 42, 0.08),
-    0 2px 6px rgba(15, 23, 42, 0.04);
+    0 28px 76px rgba(20, 30, 50, 0.13),
+    0 2px 6px rgba(20, 30, 50, 0.04);
 }
 
 .brief-panel,
@@ -479,35 +491,49 @@ select:focus {
 
 .candidate-list {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(252px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(238px, 1fr));
   align-items: start;
   gap: 14px;
   padding: 18px;
 }
 
 .candidate-card {
-  border: 1px solid rgba(217, 224, 234, 0.92);
-  border-radius: 16px;
+  position: relative;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.74);
+  border-radius: 22px;
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 1), rgba(250, 252, 255, 0.96)),
-    #fff;
-  padding: 16px;
+    radial-gradient(circle at 10% 0%, rgba(22, 119, 255, 0.12), transparent 34%),
+    linear-gradient(160deg, rgba(255, 255, 255, 0.96), rgba(247, 250, 255, 0.82)),
+    rgba(255, 255, 255, 0.88);
+  padding: 17px;
   box-shadow:
     var(--inner-glow),
-    0 16px 42px rgba(15, 23, 42, 0.08),
-    0 3px 10px rgba(15, 23, 42, 0.04);
+    0 24px 60px rgba(20, 30, 50, 0.12),
+    0 3px 10px rgba(20, 30, 50, 0.04);
   transition:
     border-color 160ms ease,
     box-shadow 160ms ease,
     transform 160ms ease;
 }
 
+.candidate-card::after {
+  content: "";
+  position: absolute;
+  inset: auto -20% -36% 22%;
+  height: 84px;
+  border-radius: 999px;
+  background: rgba(22, 119, 255, 0.08);
+  filter: blur(24px);
+  pointer-events: none;
+}
+
 .candidate-card:hover {
-  transform: translateY(-2px);
+  transform: translateY(-4px);
   border-color: rgba(190, 200, 216, 0.95);
   box-shadow:
     var(--inner-glow),
-    0 24px 58px rgba(15, 23, 42, 0.12),
+    0 34px 76px rgba(20, 30, 50, 0.16),
     0 4px 12px rgba(15, 23, 42, 0.05);
 }
 
@@ -523,11 +549,14 @@ select:focus {
   font-size: 12px;
   font-weight: 700;
   text-transform: capitalize;
-  min-height: 36px;
+  min-height: 32px;
 }
 
 .fit {
-  display: none;
+  display: inline-flex;
+  border-radius: 999px;
+  background: rgba(17, 19, 24, 0.06);
+  padding: 5px 8px;
   margin-right: auto;
 }
 
@@ -552,7 +581,8 @@ select:focus {
   height: 36px;
   border: 1px solid var(--line);
   border-radius: 999px;
-  background: #fff;
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(10px);
   color: var(--accent);
   font-size: 20px;
 }
@@ -564,7 +594,7 @@ select:focus {
 
 .candidate-main h3 {
   margin: 0;
-  font-size: 26px;
+  font-size: 28px;
   letter-spacing: 0;
   line-height: 1.02;
 }
@@ -576,30 +606,32 @@ select:focus {
   font-size: 13px;
 }
 
-.avg-score {
-  min-width: 54px;
-  min-height: 54px;
-  display: grid;
+.fit-score {
+  display: inline-grid;
   place-items: center;
-  border-radius: 10px;
-  background: var(--panel-soft);
+  min-width: 42px;
+  height: 32px;
+  border-radius: 999px;
+  background: #111317;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 820;
+  box-shadow: 0 12px 24px rgba(17, 19, 24, 0.18);
 }
 
-.avg-score strong {
-  font-size: 20px;
-}
-
-.avg-score span {
-  color: var(--muted);
-  font-size: 11px;
-  font-weight: 700;
-  text-transform: uppercase;
+.ai-take {
+  margin: 13px 0 7px;
+  color: #20242b;
+  font-size: 14px;
+  font-weight: 760;
+  line-height: 1.45;
 }
 
 .positioning {
-  min-height: 44px;
-  margin: 12px 0 10px;
-  font-size: 14px;
+  min-height: 40px;
+  margin: 0 0 10px;
+  color: var(--muted);
+  font-size: 13px;
   font-weight: 700;
   line-height: 1.45;
 }
@@ -612,7 +644,7 @@ select:focus {
 }
 
 .score-grid {
-  display: grid;
+  display: none;
   grid-template-columns: repeat(2, minmax(72px, 1fr));
   gap: 8px;
   margin: 14px 0;
@@ -645,7 +677,7 @@ select:focus {
 
 .candidate-details {
   margin-top: 12px;
-  border-top: 1px solid var(--line);
+  border-top: 1px solid rgba(214, 223, 237, 0.8);
   padding-top: 10px;
 }
 
@@ -654,6 +686,9 @@ select:focus {
   cursor: pointer;
   font-weight: 700;
   list-style: none;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.58);
+  padding: 9px 10px;
 }
 
 .candidate-details summary::-webkit-details-marker {
@@ -682,7 +717,10 @@ select:focus {
 .card-actions button {
   flex: 1 1 auto;
   padding: 8px 9px;
+  border-color: rgba(202, 213, 229, 0.72);
+  background: rgba(255, 255, 255, 0.66);
   font-size: 12px;
+  backdrop-filter: blur(10px);
 }
 
 .generating-state {

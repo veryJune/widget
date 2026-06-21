@@ -60,6 +60,7 @@ export type Candidate = {
   name: string;
   displayName: string;
   pronunciation: string;
+  aiTake?: string;
   language: CandidateLanguage;
   techniques: Technique[];
   globalFit: GlobalFit;

@@ -57,24 +57,24 @@ const copy = {
     workingLines: ["Reading the brief", "Shaping sound", "Filtering weak names"]
   },
   ko: {
-    privateWorkspace: "개인 네이밍 작업공간",
-    ready: "준비됨",
-    generating: "생성 중",
-    lock: "잠금",
-    brief: "브리프",
-    studio: "스튜디오",
-    picks: "픽",
-    brandBrief: "브랜드 브리프",
-    briefHelp: "영문 이름 우선, 글로벌 가독성 중심.",
-    generate: "생성",
-    namingStudio: "네이밍 스튜디오",
-    studioTitle: "생성하고, 고르고, 다듬기",
-    studioSubtitle: "라운드당 12개 후보 · 영문 우선 · 글로벌 적합성 검토",
-    startBrief: "짧은 브리프부터 시작하세요.",
-    emptyHelp: "발음, 리스크, 빠른 변주 액션이 포함된 글로벌 후보를 생성합니다.",
-    sampleBrief: "샘플 브리프 사용",
-    insight: "인사이트",
-    preference: "선호 신호",
+    privateWorkspace: "Private naming workspace",
+    ready: "Ready",
+    generating: "Generating",
+    lock: "Lock",
+    brief: "Brief",
+    studio: "Studio",
+    picks: "Picks",
+    brandBrief: "Brand Brief",
+    briefHelp: "English-first names, explained for Korean judgment.",
+    generate: "Generate",
+    namingStudio: "Naming Studio",
+    studioTitle: "Generate, pick, and refine",
+    studioSubtitle: "12 candidates per round · Korean analysis · Global fit review",
+    startBrief: "Start with a short brief.",
+    emptyHelp: "영문 중심 후보를 만들고, 판단에 필요한 설명은 자연스럽게 한국어로 보여줍니다.",
+    sampleBrief: "Use sample brief",
+    insight: "Insight",
+    preference: "Preference signal",
     viewDetails: "자세히",
     moreLike: "비슷하게",
     shorter: "더 짧게",
@@ -85,10 +85,10 @@ const copy = {
     bestFor: "어울리는 용도",
     taglineSeeds: "태그라인 씨앗",
     variants: "변형",
-    memory: "기억성",
-    distinct: "차별성",
-    expand: "확장성",
-    global: "글로벌",
+    memory: "Memory",
+    distinct: "Distinct",
+    expand: "Expand",
+    global: "Global",
     workingLines: ["브리프 읽는 중", "어감 다듬는 중", "약한 후보 걸러내는 중"]
   }
 };
@@ -575,7 +575,8 @@ export function Workspace() {
           aria-label="Project title"
         />
         <div className="topbar-actions">
-          <div className="language-toggle" aria-label="UI language">
+          <div className="analysis-toggle" aria-label="Analysis language">
+            <span>Analysis</span>
             <button className={uiLanguage === "ko" ? "active" : ""} onClick={() => setUiLanguage("ko")}>
               KOR
             </button>
@@ -940,7 +941,7 @@ function CandidateCard({
       <div className="candidate-meta">
         <span>{candidate.techniques[0]?.replace("_", "-") || "invented"}</span>
         <span>{candidate.language.replace("_", " + ")}</span>
-        <span className={`fit fit-${candidate.globalFit}`}>Global fit: {candidate.globalFit}</span>
+        <span className={`fit fit-${candidate.globalFit}`}>{candidate.globalFit}</span>
         <button className="pick-button" onClick={onPick} aria-label={`Pick ${candidate.displayName}`}>
           {picked ? "★" : "☆"}
         </button>
@@ -951,25 +952,16 @@ function CandidateCard({
           <h3>{candidate.displayName}</h3>
           <p className="pronunciation">{candidate.pronunciation}</p>
         </div>
-        <div className="avg-score">
-          <strong>{avg}</strong>
-          <span>avg</span>
-        </div>
+        <span className="fit-score">{avg}</span>
       </div>
 
+      <p className="ai-take">{candidate.aiTake || candidate.positioning}</p>
       <p className="positioning">{candidate.positioning}</p>
 
       <details className="candidate-details">
         <summary>{t.viewDetails}</summary>
         <div>
           <p className="rationale">{candidate.rationale}</p>
-          <div className="score-grid">
-            <Score label={t.memory} value={candidate.scores.memorability} />
-            <Score label={t.sound} value={candidate.scores.pronunciation} />
-            <Score label={t.distinct} value={candidate.scores.distinctiveness} />
-            <Score label={t.expand} value={candidate.scores.scalability} />
-            <Score label={t.global} value={candidate.scores.globalReadiness} />
-          </div>
           <div className="risk-line">
             <strong>{t.risk}:</strong> {candidate.risks[0]?.note || "Manual check needed before final use."}
           </div>
