@@ -38,6 +38,7 @@ export async function POST(request: NextRequest) {
     setCached(key, data);
     return NextResponse.json(data);
   } catch (error) {
+    console.error("BaroName generate failed", error);
     const message = error instanceof Error ? error.message : "Name generation failed.";
     const status = error instanceof Error && error.name === "RateLimitError" ? 429 : 500;
     return NextResponse.json({ message }, { status });

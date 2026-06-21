@@ -241,6 +241,7 @@ export function Workspace() {
 
     setLoading(true);
     setMessage("Shaping naming directions...");
+    setActiveTab("studio");
 
     const payload: GenerationPayload = {
       projectId: project.id,
@@ -259,7 +260,7 @@ export function Workspace() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
       });
-      const data = (await response.json()) as GenerationResponse & { message?: string };
+      const data = (await readJsonResponse(response)) as GenerationResponse & { message?: string };
 
       if (!response.ok) {
         throw new Error(data.message || "Name generation failed.");
@@ -276,6 +277,7 @@ export function Workspace() {
       setCooldownUntil(Date.now() + COOLDOWN_MS);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Name generation failed.");
+      setActiveTab("studio");
     } finally {
       setLoading(false);
     }
@@ -301,7 +303,7 @@ export function Workspace() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
       });
-      const data = (await response.json()) as { candidates?: Candidate[]; variationInsight?: string; message?: string };
+      const data = (await readJsonResponse(response)) as { candidates?: Candidate[]; variationInsight?: string; message?: string };
 
       if (!response.ok) {
         throw new Error(data.message || "Variation failed.");
@@ -317,6 +319,7 @@ export function Workspace() {
       setActiveTab("studio");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Variation failed.");
+      setActiveTab("studio");
     } finally {
       setLoading(false);
     }
@@ -604,6 +607,7 @@ export function Workspace() {
           <button className="primary-button" onClick={generateNames} disabled={loading || cooldownLeft > 0}>
             {loading ? "Generating..." : cooldownLeft > 0 ? `Ready in ${cooldownLeft}s` : "Generate 12 names"}
           </button>
+          {message ? <p className="inline-status" aria-live="polite">{message}</p> : null}
         </aside>
 
         <section className={`panel studio-panel ${activeTab === "studio" ? "mobile-active" : ""}`}>
@@ -738,6 +742,23 @@ export function Workspace() {
       </section>
     </main>
   );
+}
+
+async function readJsonResponse(response: Response) {
+  const text = await response.text();
+  if (!text) {
+    return {};
+  }
+
+  try {
+    return JSON.parse(text);
+  } catch {
+    return {
+      message: response.ok
+        ? "The server returned a response BaroName could not read."
+        : `Server returned ${response.status}. Check Vercel logs and environment variables.`
+    };
+  }
 }
 
 function ChipInput({
