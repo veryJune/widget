@@ -86,7 +86,7 @@ export async function callGeminiJson<T>({
     });
   }
 
-  const payload = JSON.parse(raw.text) as {
+  const payload = parseJsonLoose(raw.text) as {
     candidates?: Array<{
       content?: {
         parts?: Array<{ text?: string }>;
@@ -104,7 +104,7 @@ export async function callGeminiJson<T>({
     throw new Error("Gemini returned an empty response.");
   }
 
-  return JSON.parse(text) as T;
+  return parseJsonLoose(text) as T;
 }
 
 async function postGemini(model: string, apiKey: string, body: unknown) {
@@ -152,6 +152,63 @@ function isSchemaCompatibilityError(message: string) {
     normalized.includes("mimetype") ||
     normalized.includes("schema")
   );
+}
+
+function parseJsonLoose(text: string): unknown {
+  try {
+    return JSON.parse(text);
+  } catch {
+    const extracted = extractFirstJsonObject(text);
+    if (!extracted) {
+      throw new Error("Gemini returned text that was not valid JSON.");
+    }
+    return JSON.parse(extracted);
+  }
+}
+
+function extractFirstJsonObject(text: string) {
+  const start = text.indexOf("{");
+  if (start < 0) {
+    return "";
+  }
+
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+
+  for (let index = start; index < text.length; index += 1) {
+    const char = text[index];
+
+    if (escaped) {
+      escaped = false;
+      continue;
+    }
+
+    if (char === "\\") {
+      escaped = true;
+      continue;
+    }
+
+    if (char === "\"") {
+      inString = !inString;
+      continue;
+    }
+
+    if (inString) {
+      continue;
+    }
+
+    if (char === "{") {
+      depth += 1;
+    } else if (char === "}") {
+      depth -= 1;
+      if (depth === 0) {
+        return text.slice(start, index + 1);
+      }
+    }
+  }
+
+  return "";
 }
 
 export function normalizeCandidate(candidate: Partial<Candidate>, index: number): Candidate | null {
@@ -230,20 +287,7 @@ export function normalizeGenerationResponse(response: Partial<GenerationResponse
     loose.results ||
     [];
 
-  const seen = new Set<string>();
-  const banned = bannedWords.map((word) => word.trim().toLowerCase()).filter(Boolean);
-  const candidates = rawCandidates
-    .map((candidate, index) => normalizeCandidate(coerceLooseCandidate(candidate), index))
-    .filter((candidate): candidate is Candidate => Boolean(candidate))
-    .filter((candidate) => {
-      const key = candidate.displayName.toLowerCase();
-      if (seen.has(key)) {
-        return false;
-      }
-      seen.add(key);
-      return !banned.some((word) => key.includes(word));
-    })
-    .slice(0, 12);
+  const candidates = normalizeCandidateCollection(rawCandidates, bannedWords, 12);
 
   return {
     briefSummary: String(response.briefSummary || "Global-first naming sprint"),
@@ -256,6 +300,23 @@ export function normalizeGenerationResponse(response: Partial<GenerationResponse
     sessionInsight: String(response.sessionInsight || "Pick names you like to steer the next round."),
     suggestedNextActions: response.suggestedNextActions || ["Pick strong candidates", "Try variations"]
   };
+}
+
+export function normalizeCandidateCollection(rawCandidates: unknown[], bannedWords: string[], limit: number) {
+  const seen = new Set<string>();
+  const banned = bannedWords.map((word) => word.trim().toLowerCase()).filter(Boolean);
+  return rawCandidates
+    .map((candidate, index) => normalizeCandidate(coerceLooseCandidate(candidate), index))
+    .filter((candidate): candidate is Candidate => Boolean(candidate))
+    .filter((candidate) => {
+      const key = candidate.displayName.toLowerCase();
+      if (seen.has(key)) {
+        return false;
+      }
+      seen.add(key);
+      return !banned.some((word) => key.includes(word));
+    })
+    .slice(0, limit);
 }
 
 function coerceLooseCandidate(candidate: unknown) {

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import type { Candidate, VariationPayload } from "@/lib/types";
 import { isValidSession } from "@/lib/auth";
-import { callGeminiJson, normalizeCandidate, runExclusive } from "@/lib/gemini";
+import { callGeminiJson, normalizeCandidateCollection, runExclusive } from "@/lib/gemini";
 import { buildVariationPrompt, temperatureFromSettings } from "@/lib/prompts";
 import { variationResponseSchema } from "@/lib/schemas";
 
@@ -27,10 +27,17 @@ export async function POST(request: NextRequest) {
         temperature: Math.min(1.2, temperatureFromSettings(payload.settings) + 0.05)
       });
 
-      const candidates = (response.candidates || [])
-        .map(normalizeCandidate)
-        .filter((candidate): candidate is Candidate => Boolean(candidate))
-        .slice(0, 6);
+      const loose = response as VariationResponse & {
+        names?: unknown[];
+        nameCandidates?: unknown[];
+        candidateNames?: unknown[];
+        results?: unknown[];
+      };
+      const candidates = normalizeCandidateCollection(
+        response.candidates || loose.names || loose.nameCandidates || loose.candidateNames || loose.results || [],
+        payload.brief.bannedWords,
+        6
+      );
 
       if (candidates.length === 0) {
         throw new Error("Gemini responded, but BaroName could not find usable variations. Try another refinement.");

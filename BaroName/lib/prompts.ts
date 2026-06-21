@@ -26,6 +26,10 @@ export function temperatureFromSettings(settings: Settings) {
 
 export function buildGenerationPrompt(payload: GenerationPayload) {
   const { brief, settings, pickedContext } = payload;
+  const responseLanguage =
+    payload.uiLanguage === "ko"
+      ? "Korean UI mode. Keep the generated brand names in their natural script, usually English. Explain positioning, rationale, risks, sound notes, best use, avoid-if notes, tagline seeds, strategy, and session insight in natural Korean where helpful. Pronunciation may include English phonetic guidance plus Korean reading hints when useful."
+      : "English UI mode. Write explanations, risks, sound notes, strategy, and insights in concise natural English.";
 
   return `Create 12 brand name candidates for the following naming brief.
 
@@ -41,6 +45,8 @@ Brand brief:
 
 Naming settings:
 - Language mode: ${settings.languageMode}
+- UI response language: ${payload.uiLanguage || "en"}
+- Response language instruction: ${responseLanguage}
 - Creativity level: ${settings.creativityLevel} out of 5
 - Selected naming techniques: ${settings.techniques.join(", ")}
 - Result count: 12
@@ -71,6 +77,7 @@ Requirements:
 - Avoid all banned words.
 - Do not include names that are obvious copies of famous brands.
 - Do not state or imply that domain, trademark, or social handles are available.
+- Follow the UI response language instruction. Do not translate the brand name itself unless a Korean/mixed name is genuinely better.
 
 Return this exact JSON shape:
 {
@@ -124,11 +131,17 @@ Return this exact JSON shape:
 
 export function buildVariationPrompt(payload: VariationPayload) {
   const { brief, sourceCandidate, transformation } = payload;
+  const responseLanguage =
+    payload.uiLanguage === "ko"
+      ? "Korean UI mode. Keep brand names natural, usually English, but write explanations, risks, sound notes, and insight in natural Korean where helpful."
+      : "English UI mode. Write explanations, risks, sound notes, and insight in concise natural English.";
 
   return `Create 6 naming variations based on the source candidate and requested transformation.
 
 Original brand brief:
 - Category: ${brief.category}
+- UI response language: ${payload.uiLanguage || "en"}
+- Response language instruction: ${responseLanguage}
 - One-line description: ${brief.oneLineDescription}
 - Keywords: ${brief.keywords.join(", ") || "none"}
 - Target audience: ${brief.audience || "not specified"}
@@ -165,6 +178,7 @@ Requirements:
 - Do not only change spelling by one letter unless the result is meaningfully better.
 - Preserve the user's global-first preference.
 - Avoid all banned words.
+- Follow the UI response language instruction. Do not translate the brand name itself unless a Korean/mixed name is genuinely better.
 - Return only JSON matching this shape:
 {
   "sourceName": "source",

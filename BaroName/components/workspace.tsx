@@ -12,11 +12,86 @@ import type {
   StoredCandidate,
   Technique,
   Transformation,
+  UiLanguage,
   VariationPayload
 } from "@/lib/types";
 
 const STORAGE_KEY = "baroname.projects.v1";
+const UI_LANGUAGE_KEY = "baroname.ui-language.v1";
 const COOLDOWN_MS = 8000;
+
+const copy = {
+  en: {
+    privateWorkspace: "Private naming workspace",
+    ready: "Ready",
+    generating: "Generating",
+    lock: "Lock",
+    brief: "Brief",
+    studio: "Studio",
+    picks: "Picks",
+    brandBrief: "Brand Brief",
+    briefHelp: "English-first names, global readability.",
+    generate: "Generate",
+    namingStudio: "Naming Studio",
+    studioTitle: "Generate, pick, and refine",
+    studioSubtitle: "12 candidates per round · English-first · Global fit review",
+    startBrief: "Start with a short brief.",
+    emptyHelp: "Create global-first candidates with pronunciation, risks, and quick refinement actions.",
+    sampleBrief: "Use sample brief",
+    insight: "Insight",
+    preference: "Preference signal",
+    viewDetails: "View details",
+    moreLike: "More like this",
+    shorter: "Shorter",
+    premium: "Premium",
+    copyName: "Copy",
+    risk: "Risk",
+    sound: "Sound",
+    bestFor: "Best for",
+    taglineSeeds: "Tagline seeds",
+    variants: "Variants",
+    memory: "Memory",
+    distinct: "Distinct",
+    expand: "Expand",
+    global: "Global",
+    workingLines: ["Reading the brief", "Shaping sound", "Filtering weak names"]
+  },
+  ko: {
+    privateWorkspace: "개인 네이밍 작업공간",
+    ready: "준비됨",
+    generating: "생성 중",
+    lock: "잠금",
+    brief: "브리프",
+    studio: "스튜디오",
+    picks: "픽",
+    brandBrief: "브랜드 브리프",
+    briefHelp: "영문 이름 우선, 글로벌 가독성 중심.",
+    generate: "생성",
+    namingStudio: "네이밍 스튜디오",
+    studioTitle: "생성하고, 고르고, 다듬기",
+    studioSubtitle: "라운드당 12개 후보 · 영문 우선 · 글로벌 적합성 검토",
+    startBrief: "짧은 브리프부터 시작하세요.",
+    emptyHelp: "발음, 리스크, 빠른 변주 액션이 포함된 글로벌 후보를 생성합니다.",
+    sampleBrief: "샘플 브리프 사용",
+    insight: "인사이트",
+    preference: "선호 신호",
+    viewDetails: "자세히",
+    moreLike: "비슷하게",
+    shorter: "더 짧게",
+    premium: "프리미엄",
+    copyName: "복사",
+    risk: "리스크",
+    sound: "어감",
+    bestFor: "어울리는 용도",
+    taglineSeeds: "태그라인 씨앗",
+    variants: "변형",
+    memory: "기억성",
+    distinct: "차별성",
+    expand: "확장성",
+    global: "글로벌",
+    workingLines: ["브리프 읽는 중", "어감 다듬는 중", "약한 후보 걸러내는 중"]
+  }
+};
 
 const categories = [
   "SaaS / Web App",
@@ -134,6 +209,29 @@ function buildPreferenceSummary(picks: StoredCandidate[]) {
     : "User has mixed preferences. Keep the next round varied but globally readable.";
 }
 
+function buildPreferenceSummaryForLanguage(picks: StoredCandidate[], uiLanguage: UiLanguage) {
+  if (uiLanguage === "en") {
+    return buildPreferenceSummary(picks);
+  }
+
+  if (picks.length === 0) {
+    return "아직 선택한 후보가 없습니다. 영문 우선, 글로벌 발음이 쉬운 이름을 기준으로 생성합니다.";
+  }
+
+  const shortCount = picks.filter((pick) => pick.displayName.length <= 8).length;
+  const inventedCount = picks.filter((pick) => pick.techniques.includes("invented")).length;
+  const softEndingCount = picks.filter((pick) => /[aeiouay]$/i.test(pick.displayName)).length;
+  const signals = [];
+
+  if (shortCount >= Math.ceil(picks.length / 2)) signals.push("짧은 이름");
+  if (inventedCount >= Math.ceil(picks.length / 2)) signals.push("조어형 이름");
+  if (softEndingCount >= Math.ceil(picks.length / 2)) signals.push("부드러운 모음 끝소리");
+
+  return signals.length
+    ? `선택 패턴상 ${signals.join(", ")}을 선호하는 흐름입니다.`
+    : "선호가 아직 다양합니다. 다음 라운드는 글로벌 가독성을 유지하면서 폭넓게 제안합니다.";
+}
+
 export function Workspace() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [currentId, setCurrentId] = useState("");
@@ -142,9 +240,15 @@ export function Workspace() {
   const [activeTab, setActiveTab] = useState<"brief" | "studio" | "picks">("studio");
   const [sortMode, setSortMode] = useState("recommended");
   const [cooldownUntil, setCooldownUntil] = useState(0);
+  const [uiLanguage, setUiLanguage] = useState<UiLanguage>("ko");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
+    const savedLanguage = window.localStorage.getItem(UI_LANGUAGE_KEY);
+    if (savedLanguage === "ko" || savedLanguage === "en") {
+      setUiLanguage(savedLanguage);
+    }
+
     const saved = window.localStorage.getItem(STORAGE_KEY);
     if (saved) {
       try {
@@ -165,6 +269,10 @@ export function Workspace() {
   }, []);
 
   useEffect(() => {
+    window.localStorage.setItem(UI_LANGUAGE_KEY, uiLanguage);
+  }, [uiLanguage]);
+
+  useEffect(() => {
     if (projects.length > 0) {
       window.localStorage.setItem(STORAGE_KEY, JSON.stringify({ projects, currentId }));
     }
@@ -175,7 +283,11 @@ export function Workspace() {
     () => project.candidates.filter((candidate) => project.picks.includes(candidate.id)),
     [project]
   );
-  const preferenceSummary = useMemo(() => buildPreferenceSummary(pickedCandidates), [pickedCandidates]);
+  const preferenceSummary = useMemo(
+    () => buildPreferenceSummaryForLanguage(pickedCandidates, uiLanguage),
+    [pickedCandidates, uiLanguage]
+  );
+  const t = copy[uiLanguage];
   const cooldownLeft = Math.max(0, Math.ceil((cooldownUntil - Date.now()) / 1000));
 
   function updateProject(updater: (project: Project) => Project) {
@@ -246,6 +358,7 @@ export function Workspace() {
     const payload: GenerationPayload = {
       projectId: project.id,
       mode: "generate",
+      uiLanguage,
       brief: project.brief,
       settings: project.settings,
       pickedContext: {
@@ -289,11 +402,16 @@ export function Workspace() {
   async function createVariation(candidate: StoredCandidate, transformation: Transformation) {
     if (loading) return;
     setLoading(true);
-    setMessage(`Creating ${transformation.replaceAll("_", " ")} variations for ${candidate.displayName}...`);
+    setMessage(
+      uiLanguage === "ko"
+        ? `${candidate.displayName} 변주를 만드는 중...`
+        : `Creating ${transformation.replaceAll("_", " ")} variations for ${candidate.displayName}...`
+    );
 
     const payload: VariationPayload = {
       projectId: project.id,
       mode: "variation",
+      uiLanguage,
       brief: project.brief,
       settings: project.settings,
       sourceCandidate: candidate,
@@ -318,7 +436,7 @@ export function Workspace() {
         candidates: [...stored, ...item.candidates].slice(0, 80),
         lastInsight: data.variationInsight || item.lastInsight
       }));
-      setMessage(`Added ${stored.length} variations.`);
+      setMessage(uiLanguage === "ko" ? `${stored.length}개 변주를 추가했습니다.` : `Added ${stored.length} variations.`);
       setActiveTab("studio");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Variation failed.");
@@ -447,7 +565,7 @@ export function Workspace() {
     <main className="app-shell">
       <header className="topbar">
         <div>
-          <p className="eyebrow">Private naming workspace</p>
+          <p className="eyebrow">{t.privateWorkspace}</p>
           <h1>BaroName</h1>
         </div>
         <input
@@ -457,30 +575,38 @@ export function Workspace() {
           aria-label="Project title"
         />
         <div className="topbar-actions">
-          <span className="status-pill">{loading ? "Generating" : cooldownLeft > 0 ? `Ready in ${cooldownLeft}s` : "Ready"}</span>
+          <div className="language-toggle" aria-label="UI language">
+            <button className={uiLanguage === "ko" ? "active" : ""} onClick={() => setUiLanguage("ko")}>
+              KOR
+            </button>
+            <button className={uiLanguage === "en" ? "active" : ""} onClick={() => setUiLanguage("en")}>
+              ENG
+            </button>
+          </div>
+          <span className="status-pill">{loading ? t.generating : cooldownLeft > 0 ? `Ready in ${cooldownLeft}s` : t.ready}</span>
           <button className="ghost-button" onClick={logout}>
-            Lock
+            {t.lock}
           </button>
         </div>
       </header>
 
       <nav className="mobile-tabs" aria-label="Workspace sections">
         <button className={activeTab === "brief" ? "active" : ""} onClick={() => setActiveTab("brief")}>
-          Brief
+          {t.brief}
         </button>
         <button className={activeTab === "studio" ? "active" : ""} onClick={() => setActiveTab("studio")}>
-          Studio
+          {t.studio}
         </button>
         <button className={activeTab === "picks" ? "active" : ""} onClick={() => setActiveTab("picks")}>
-          Picks ({project.picks.length})
+          {t.picks} ({project.picks.length})
         </button>
       </nav>
 
       <section className="workspace-grid">
         <aside className={`panel brief-panel ${activeTab === "brief" ? "mobile-active" : ""}`}>
           <div className="panel-heading">
-            <h2>Brand Brief</h2>
-            <p>English-first names, global readability.</p>
+            <h2>{t.brandBrief}</h2>
+            <p>{t.briefHelp}</p>
           </div>
 
           <label>
@@ -608,7 +734,7 @@ export function Workspace() {
           />
 
           <button className="primary-button" onClick={generateNames} disabled={loading || cooldownLeft > 0}>
-            {loading ? "Generating" : cooldownLeft > 0 ? `Ready in ${cooldownLeft}s` : "Generate"}
+            {loading ? t.generating : cooldownLeft > 0 ? `Ready in ${cooldownLeft}s` : t.generate}
           </button>
           {message ? <p className="inline-status" aria-live="polite">{message}</p> : null}
         </aside>
@@ -616,9 +742,9 @@ export function Workspace() {
         <section className={`panel studio-panel ${activeTab === "studio" ? "mobile-active" : ""}`}>
           <div className="studio-toolbar">
             <div>
-              <p className="eyebrow">Naming Studio</p>
-              <h2>Generate, pick, and refine</h2>
-              <p className="toolbar-subtitle">12 candidates per round · English-first · Global fit review</p>
+              <p className="eyebrow">{t.namingStudio}</p>
+              <h2>{t.studioTitle}</h2>
+              <p className="toolbar-subtitle">{t.studioSubtitle}</p>
             </div>
             <select value={sortMode} onChange={(event) => setSortMode(event.target.value)} aria-label="Sort candidates">
               <option value="recommended">Recommended</option>
@@ -630,14 +756,14 @@ export function Workspace() {
           </div>
 
           {message ? <div className="notice">{message}</div> : null}
-          {project.lastInsight ? <div className="insight">Insight: {project.lastInsight}</div> : null}
+          {project.lastInsight ? <div className="insight">{t.insight}: {project.lastInsight}</div> : null}
 
-          {project.candidates.length === 0 ? (
+          {loading ? <GeneratingState uiLanguage={uiLanguage} /> : null}
+
+          {project.candidates.length === 0 && !loading ? (
             <div className="empty-state">
-              <h3>Start with a short brief.</h3>
-              <p>
-                Create global-first candidates with pronunciation, risks, and quick refinement actions.
-              </p>
+              <h3>{t.startBrief}</h3>
+              <p>{t.emptyHelp}</p>
               <button
                 className="ghost-button"
                 onClick={() => {
@@ -649,7 +775,7 @@ export function Workspace() {
                   setActiveTab("brief");
                 }}
               >
-                Use sample brief
+                {t.sampleBrief}
               </button>
             </div>
           ) : (
@@ -661,6 +787,7 @@ export function Workspace() {
                   picked={project.picks.includes(candidate.id)}
                   onPick={() => togglePick(candidate.id)}
                   onVariation={(transformation) => createVariation(candidate, transformation)}
+                  uiLanguage={uiLanguage}
                 />
               ))}
             </div>
@@ -796,14 +923,17 @@ function CandidateCard({
   candidate,
   picked,
   onPick,
-  onVariation
+  onVariation,
+  uiLanguage
 }: {
   candidate: StoredCandidate;
   picked: boolean;
   onPick: () => void;
   onVariation: (transformation: Transformation) => void;
+  uiLanguage: UiLanguage;
 }) {
   const avg = scoreAverage(candidate);
+  const t = copy[uiLanguage];
 
   return (
     <article className={picked ? "candidate-card picked" : "candidate-card"}>
@@ -828,45 +958,65 @@ function CandidateCard({
       </div>
 
       <p className="positioning">{candidate.positioning}</p>
-      <p className="rationale">{candidate.rationale}</p>
-
-      <div className="score-grid">
-        <Score label="Memory" value={candidate.scores.memorability} />
-        <Score label="Sound" value={candidate.scores.pronunciation} />
-        <Score label="Distinct" value={candidate.scores.distinctiveness} />
-        <Score label="Expand" value={candidate.scores.scalability} />
-        <Score label="Global" value={candidate.scores.globalReadiness} />
-      </div>
-
-      <div className="risk-line">
-        <strong>Risk:</strong> {candidate.risks[0]?.note || "Manual check needed before final use."}
-      </div>
 
       <details className="candidate-details">
-        <summary>Name anatomy</summary>
+        <summary>{t.viewDetails}</summary>
         <div>
+          <p className="rationale">{candidate.rationale}</p>
+          <div className="score-grid">
+            <Score label={t.memory} value={candidate.scores.memorability} />
+            <Score label={t.sound} value={candidate.scores.pronunciation} />
+            <Score label={t.distinct} value={candidate.scores.distinctiveness} />
+            <Score label={t.expand} value={candidate.scores.scalability} />
+            <Score label={t.global} value={candidate.scores.globalReadiness} />
+          </div>
+          <div className="risk-line">
+            <strong>{t.risk}:</strong> {candidate.risks[0]?.note || "Manual check needed before final use."}
+          </div>
           <p>
-            <strong>Sound:</strong> {candidate.soundProfile.rhythm}. {candidate.soundProfile.mouthfeel}.
+            <strong>{t.sound}:</strong> {candidate.soundProfile.rhythm}. {candidate.soundProfile.mouthfeel}.
           </p>
           <p>
-            <strong>Best for:</strong> {candidate.bestFor.join(", ")}
+            <strong>{t.bestFor}:</strong> {candidate.bestFor.join(", ")}
           </p>
           <p>
-            <strong>Tagline seeds:</strong> {candidate.taglineSeeds.join(" / ")}
+            <strong>{t.taglineSeeds}:</strong> {candidate.taglineSeeds.join(" / ")}
           </p>
           <p>
-            <strong>Variants:</strong> {candidate.variants.join(", ")}
+            <strong>{t.variants}:</strong> {candidate.variants.join(", ")}
           </p>
         </div>
       </details>
 
       <div className="card-actions">
-        <button onClick={() => onVariation("more_like_this")}>More like this</button>
-        <button onClick={() => onVariation("shorter")}>Shorter</button>
-        <button onClick={() => onVariation("more_premium")}>Premium</button>
-        <button onClick={() => navigator.clipboard?.writeText(candidate.displayName)}>Copy</button>
+        <button onClick={() => onVariation("more_like_this")}>{t.moreLike}</button>
+        <button onClick={() => onVariation("shorter")}>{t.shorter}</button>
+        <button onClick={() => onVariation("more_premium")}>{t.premium}</button>
+        <button onClick={() => navigator.clipboard?.writeText(candidate.displayName)}>{t.copyName}</button>
       </div>
     </article>
+  );
+}
+
+function GeneratingState({ uiLanguage }: { uiLanguage: UiLanguage }) {
+  const t = copy[uiLanguage];
+
+  return (
+    <div className="generating-state" aria-live="polite">
+      <div className="generating-orbit">
+        <span />
+        <span />
+        <span />
+      </div>
+      <div className="generating-copy">
+        <strong>{t.generating}</strong>
+        <div className="working-lines">
+          {t.workingLines.map((line) => (
+            <span key={line}>{line}</span>
+          ))}
+        </div>
+      </div>
+    </div>
   );
 }
 

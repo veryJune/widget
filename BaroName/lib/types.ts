@@ -33,6 +33,7 @@ export type Transformation =
 
 export type RiskLevel = "low" | "medium" | "high";
 export type GlobalFit = "strong" | "good" | "caution" | "weak";
+export type UiLanguage = "ko" | "en";
 
 export type Brief = {
   category: string;
@@ -99,6 +100,7 @@ export type StoredCandidate = Candidate & {
 export type GenerationPayload = {
   projectId: string;
   mode: "generate";
+  uiLanguage?: UiLanguage;
   brief: Brief;
   settings: Settings;
   pickedContext: {
@@ -110,6 +112,7 @@ export type GenerationPayload = {
 export type VariationPayload = {
   projectId: string;
   mode: "variation";
+  uiLanguage?: UiLanguage;
   brief: Brief;
   settings: Settings;
   sourceCandidate: Candidate;
