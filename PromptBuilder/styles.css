@@ -805,6 +805,23 @@ label,
   margin-bottom: 10px;
 }
 
+.dock-toggle-row {
+  border-radius: 12px;
+  cursor: pointer;
+  padding: 3px;
+  transition:
+    background 160ms ease,
+    transform 160ms ease;
+}
+
+.dock-toggle-row:hover {
+  background: color-mix(in srgb, var(--surface-2) 58%, transparent);
+}
+
+.dock-toggle-row:active {
+  transform: translateY(1px);
+}
+
 .dock-title h3 {
   display: inline-flex;
   align-items: baseline;
@@ -1013,7 +1030,12 @@ label,
 .meta-line {
   display: flex;
   flex-wrap: wrap;
+  align-content: flex-start;
   gap: 5px;
+}
+
+.prompt-card > .meta-line {
+  min-height: 52px;
 }
 
 .match-badges {
@@ -1040,8 +1062,9 @@ label,
 .category-pill,
 .stat-pill {
   display: inline-flex;
-  min-height: 23px;
+  height: 26px;
   align-items: center;
+  flex: 0 0 auto;
   border-radius: 999px;
   padding: 0 8px;
   background: var(--surface-2);
@@ -1920,6 +1943,40 @@ select:disabled {
   text-align: left;
 }
 
+.trash-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 10px 12px;
+  background: var(--surface);
+}
+
+.trash-item strong,
+.trash-item span {
+  display: block;
+}
+
+.trash-item strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.trash-item span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.trash-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: flex-end;
+}
+
 .compare-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -2060,6 +2117,14 @@ select:disabled {
 
   .compare-grid {
     grid-template-columns: 1fr;
+  }
+
+  .trash-item {
+    grid-template-columns: 1fr;
+  }
+
+  .trash-actions {
+    justify-content: flex-start;
   }
 
   .row-actions {

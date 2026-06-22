@@ -30,6 +30,9 @@
           <button class="icon-button" id="categoryBtn" type="button" title="카테고리 관리" aria-label="카테고리 관리">
             <span class="icon" aria-hidden="true">▦</span>
           </button>
+          <button class="icon-button" id="tagManagerBtn" type="button" title="태그 관리" aria-label="태그 관리">
+            <span class="icon" aria-hidden="true">#</span>
+          </button>
           <button class="icon-button" id="syncBtn" type="button" title="설정" aria-label="설정">
             <span class="icon" aria-hidden="true">⚙</span>
           </button>
@@ -236,6 +239,20 @@
             </div>
             <div id="summaryCategoryList" class="category-list"></div>
           </section>
+        </div>
+      </div>
+    </dialog>
+
+    <dialog id="tagDialog" class="dialog">
+      <div class="dialog-inner small-dialog">
+        <div class="dialog-head">
+          <div>
+            <p class="eyebrow">Tag Manager</p>
+            <h2>태그 관리</h2>
+          </div>
+          <button class="icon-button ghost" id="closeTagBtn" type="button" aria-label="닫기">×</button>
+        </div>
+        <div class="category-editor">
           <section class="summary-editor">
             <div class="field-head">
               <span>태그 정리</span>
@@ -267,11 +284,20 @@
             <button class="seg" data-settings-tab="backup" type="button">백업</button>
             <button class="seg" data-settings-tab="sync" type="button">동기화</button>
             <button class="seg" data-settings-tab="diagnostics" type="button">진단</button>
+            <button class="seg" data-settings-tab="data" type="button">데이터</button>
           </div>
           <section class="settings-panel" data-settings-panel="view">
             <label class="checkbox-row">
               <input id="hoverPreviewToggle" type="checkbox" />
               <span>카드 미리보기</span>
+            </label>
+            <label class="checkbox-row">
+              <input id="favoriteSectionToggle" type="checkbox" />
+              <span>즐겨찾기 섹션 표시</span>
+            </label>
+            <label class="checkbox-row">
+              <input id="popularSectionToggle" type="checkbox" />
+              <span>자주 쓰는 섹션 표시</span>
             </label>
           </section>
           <section class="settings-panel hidden" data-settings-panel="backup">
@@ -299,6 +325,16 @@
               <button class="text-button hidden" id="closeDiagnosticsBtn" type="button">진단 닫기</button>
             </div>
             <div class="diagnostics-panel hidden" id="diagnosticsPanel"></div>
+          </section>
+          <section class="settings-panel hidden" data-settings-panel="data">
+            <div class="field-head">
+              <span>휴지통</span>
+              <small id="trashCountText">0개</small>
+            </div>
+            <div id="trashList" class="snapshot-list"></div>
+            <div class="sync-actions">
+              <button class="danger-button" id="emptyTrashBtn" type="button">휴지통 비우기</button>
+            </div>
           </section>
           <p class="help-text" id="syncStatusText">로그인 확인 중...</p>
         </div>

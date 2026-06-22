@@ -7,6 +7,8 @@ const DEFAULT_SETTINGS = {
   favoritesCollapsed: false,
   popularCollapsed: false,
   archiveCollapsed: false,
+  showFavorites: true,
+  showPopular: true,
 };
 const PLATFORM_ORDER = ["Any", "Perplexity", "ChatGPT", "Gemini", "Claude", "Other"];
 const PLATFORM_BY_TYPE = {
@@ -229,11 +231,14 @@ const elements = {
   detailBody: $("#detailBody"),
   closeDetailBtn: $("#closeDetailBtn"),
   categoryBtn: $("#categoryBtn"),
+  tagManagerBtn: $("#tagManagerBtn"),
   syncBtn: $("#syncBtn"),
   themeToggleBtn: $("#themeToggleBtn"),
   themeIcon: $("#themeIcon"),
   categoryDialog: $("#categoryDialog"),
   closeCategoryBtn: $("#closeCategoryBtn"),
+  tagDialog: $("#tagDialog"),
+  closeTagBtn: $("#closeTagBtn"),
   categoryNameInput: $("#categoryNameInput"),
   categoryColorInput: $("#categoryColorInput"),
   addCategoryBtn: $("#addCategoryBtn"),
@@ -254,6 +259,8 @@ const elements = {
   closeDiagnosticsBtn: $("#closeDiagnosticsBtn"),
   logoutBtn: $("#logoutBtn"),
   hoverPreviewToggle: $("#hoverPreviewToggle"),
+  favoriteSectionToggle: $("#favoriteSectionToggle"),
+  popularSectionToggle: $("#popularSectionToggle"),
   blobBackupToggle: $("#blobBackupToggle"),
   syncStatusText: $("#syncStatusText"),
   diagnosticsPanel: $("#diagnosticsPanel"),
@@ -280,6 +287,9 @@ const elements = {
   passwordInput: $("#passwordInput"),
   authMessage: $("#authMessage"),
   resetSampleBtn: $("#resetSampleBtn"),
+  trashList: $("#trashList"),
+  trashCountText: $("#trashCountText"),
+  emptyTrashBtn: $("#emptyTrashBtn"),
 };
 
 bindEvents();
@@ -331,8 +341,10 @@ function bindEvents() {
   elements.deleteItemBtn.addEventListener("click", deleteCurrentItem);
   elements.quickCategoryBtn.addEventListener("click", () => openCategoryDialog());
   elements.categoryBtn.addEventListener("click", openCategoryDialog);
+  elements.tagManagerBtn.addEventListener("click", openTagDialog);
   elements.syncBtn.addEventListener("click", openSyncDialog);
   elements.closeCategoryBtn.addEventListener("click", () => elements.categoryDialog.close());
+  elements.closeTagBtn.addEventListener("click", () => elements.tagDialog.close());
   elements.addCategoryBtn.addEventListener("click", addCategoryFromInput);
   elements.addSummaryCategoryBtn.addEventListener("click", addSummaryCategoryFromSelect);
   elements.renameTagBtn.addEventListener("click", renameOrMergeTag);
@@ -384,6 +396,16 @@ function bindEvents() {
     saveState();
     render();
   });
+  elements.favoriteSectionToggle.addEventListener("change", () => {
+    state.settings.showFavorites = elements.favoriteSectionToggle.checked;
+    saveState();
+    renderItems();
+  });
+  elements.popularSectionToggle.addEventListener("change", () => {
+    state.settings.showPopular = elements.popularSectionToggle.checked;
+    saveState();
+    renderItems();
+  });
   elements.blobBackupToggle.addEventListener("change", () => {
     state.settings.blobWeeklyBackup = elements.blobBackupToggle.checked;
     saveState();
@@ -403,11 +425,13 @@ function bindEvents() {
   });
   bindBackdropClose(elements.itemDialog);
   bindBackdropClose(elements.categoryDialog);
+  bindBackdropClose(elements.tagDialog);
   bindBackdropClose(elements.exportDialog);
   bindBackdropClose(elements.detailDialog);
   bindBackdropClose(elements.syncDialog);
   bindBackdropClose(elements.conflictDialog);
   bindBackdropClose(elements.confirmDialog);
+  elements.emptyTrashBtn.addEventListener("click", emptyTrash);
 
   elements.resetSampleBtn.addEventListener("click", async () => {
     const confirmed = await askConfirm({
@@ -452,6 +476,12 @@ function normalizeState(input) {
     categories,
     categoryColors,
     items: normalizedItems,
+    trash: Array.isArray(input?.trash)
+      ? input.trash.map((item) => ({
+          ...normalizeItem(item),
+          deletedAt: item?.deletedAt || "",
+        }))
+      : [],
     summaryCategories,
     favoriteOrder,
     variableHistory: input?.variableHistory && typeof input.variableHistory === "object" ? input.variableHistory : {},
@@ -536,6 +566,7 @@ function initCloudSession() {
 }
 
 function openSyncDialog() {
+  renderSettingsControls();
   updateCloudStatus();
   showDialog(elements.syncDialog);
 }
@@ -909,6 +940,7 @@ function getCloudPayload() {
     settings: state.settings || DEFAULT_SETTINGS,
     deviceInfo: getClientInfo(),
     items: state.items,
+    trash: state.trash || [],
     updatedAt: state.updatedAt || new Date().toISOString(),
   };
 }
@@ -999,8 +1031,8 @@ function render() {
   renderSettingsControls();
   if (elements.categoryDialog.open) {
     renderCategoryEditor();
-    renderTagManager();
   }
+  if (elements.tagDialog.open) renderTagManager();
 }
 
 function renderUtilityControls() {
@@ -1009,7 +1041,36 @@ function renderUtilityControls() {
 
 function renderSettingsControls() {
   elements.hoverPreviewToggle.checked = state.settings?.hoverPreview !== false;
+  elements.favoriteSectionToggle.checked = state.settings?.showFavorites !== false;
+  elements.popularSectionToggle.checked = state.settings?.showPopular !== false;
   elements.blobBackupToggle.checked = state.settings?.blobWeeklyBackup === true;
+  renderTrashList();
+}
+
+function renderTrashList() {
+  const trash = state.trash || [];
+  elements.trashCountText.textContent = `${trash.length}개`;
+  elements.emptyTrashBtn.disabled = !trash.length;
+  elements.trashList.innerHTML = trash.length
+    ? trash.map((item) => `
+      <div class="trash-item">
+        <div>
+          <strong>${escapeHtml(item.title)}</strong>
+          <span>${item.deletedAt ? formatCloudTime(item.deletedAt) : "삭제 시간 없음"}</span>
+        </div>
+        <div class="trash-actions">
+          <button class="secondary-action" data-trash-restore="${escapeAttribute(item.id)}" type="button">복원</button>
+          <button class="danger-button" data-trash-delete="${escapeAttribute(item.id)}" type="button">영구 삭제</button>
+        </div>
+      </div>
+    `).join("")
+    : `<p class="help-text">휴지통이 비어 있습니다.</p>`;
+  elements.trashList.querySelectorAll("[data-trash-restore]").forEach((button) => {
+    button.addEventListener("click", () => restoreFromTrash(button.dataset.trashRestore));
+  });
+  elements.trashList.querySelectorAll("[data-trash-delete]").forEach((button) => {
+    button.addEventListener("click", () => permanentlyDeleteTrashItem(button.dataset.trashDelete));
+  });
 }
 
 function renderFilters() {
@@ -1095,11 +1156,11 @@ function renderItems() {
   elements.resultCount.textContent = `${searching ? searchMatches.length : archiveItems.length}개 항목`;
 
   const favorites = getFavoriteItems().slice(0, 8);
-  elements.favoriteSection.innerHTML = favorites.length
+  elements.favoriteSection.innerHTML = state.settings?.showFavorites !== false && favorites.length
     ? renderFavoriteDock(favorites)
     : "";
   const popularItems = getPopularItems().slice(0, 6);
-  elements.popularSection.innerHTML = popularItems.length ? renderPopularDock(popularItems) : "";
+  elements.popularSection.innerHTML = state.settings?.showPopular !== false && popularItems.length ? renderPopularDock(popularItems) : "";
   elements.searchResultsSection.innerHTML = searching ? renderSearchResultsDock(searchMatches) : "";
 
   elements.itemsView.className = "archive-shell";
@@ -1277,7 +1338,7 @@ function renderFavoriteDock(favorites) {
   const collapsed = state.settings?.favoritesCollapsed === true;
   return `
     <div class="favorite-dock ${collapsed ? "collapsed" : ""}">
-      <div class="dock-title">
+      <div class="dock-title dock-toggle-row" data-dock-toggle="favorite">
         <h3>즐겨찾기 <small>${favorites.length}개</small></h3>
         <button class="subtle-button" id="favoriteToggleBtn" type="button">${collapsed ? "펼치기" : "접기"}</button>
       </div>
@@ -1290,7 +1351,7 @@ function renderPopularDock(items) {
   const collapsed = state.settings?.popularCollapsed === true;
   return `
     <div class="popular-dock ${collapsed ? "collapsed" : ""}">
-      <div class="dock-title">
+      <div class="dock-title dock-toggle-row" data-dock-toggle="popular">
         <h3>자주 쓰는 프롬프트 <small>${items.length}개</small></h3>
         <button class="subtle-button" id="popularToggleBtn" type="button">${collapsed ? "펼치기" : "접기"}</button>
       </div>
@@ -1321,7 +1382,7 @@ function renderArchiveDock(items) {
   const collapsed = state.settings?.archiveCollapsed === true;
   return `
     <div class="archive-dock ${collapsed ? "collapsed" : ""}">
-      <div class="dock-title">
+      <div class="dock-title dock-toggle-row" data-dock-toggle="archive">
         <h3>보관함 <small>${items.length}개</small></h3>
         <button class="subtle-button" id="archiveToggleBtn" type="button">${collapsed ? "펼치기" : "접기"}</button>
       </div>
@@ -1814,17 +1875,63 @@ async function deleteCurrentItem() {
   if (!item) return;
   const confirmed = await askConfirm({
     eyebrow: "Delete Prompt",
-    title: "프롬프트를 삭제할까요?",
-    message: `"${item.title}" 항목은 삭제 후 스냅샷이나 파일 복원으로만 되돌릴 수 있습니다.`,
-    okText: "삭제",
+    title: "휴지통으로 이동할까요?",
+    message: `"${item.title}" 항목은 휴지통에서 다시 복원할 수 있습니다.`,
+    okText: "휴지통으로 이동",
   });
   if (!confirmed) return;
+  state.trash = state.trash || [];
+  state.trash.unshift({ ...item, deletedAt: new Date().toISOString() });
   state.items = state.items.filter((entry) => entry.id !== id);
   state.favoriteOrder = (state.favoriteOrder || []).filter((entryId) => entryId !== id);
   saveState();
   elements.itemDialog.close();
   render();
-  showToast("삭제했습니다.");
+  showToast("휴지통으로 이동했습니다.");
+}
+
+function restoreFromTrash(id) {
+  const trash = state.trash || [];
+  const item = trash.find((entry) => entry.id === id);
+  if (!item) return;
+  const restored = normalizeItem({ ...item, deletedAt: undefined, updatedAt: new Date().toISOString() });
+  state.items.unshift(restored);
+  state.trash = trash.filter((entry) => entry.id !== id);
+  saveState();
+  render();
+  showToast("휴지통에서 복원했습니다.", "success");
+}
+
+async function permanentlyDeleteTrashItem(id) {
+  const item = (state.trash || []).find((entry) => entry.id === id);
+  if (!item) return;
+  const confirmed = await askConfirm({
+    eyebrow: "Permanent Delete",
+    title: "영구 삭제할까요?",
+    message: `"${item.title}" 항목은 휴지통에서도 제거됩니다.`,
+    okText: "영구 삭제",
+  });
+  if (!confirmed) return;
+  state.trash = (state.trash || []).filter((entry) => entry.id !== id);
+  saveState();
+  renderTrashList();
+  showToast("영구 삭제했습니다.");
+}
+
+async function emptyTrash() {
+  const count = (state.trash || []).length;
+  if (!count) return;
+  const confirmed = await askConfirm({
+    eyebrow: "Empty Trash",
+    title: "휴지통을 비울까요?",
+    message: `${count}개 항목이 영구 삭제됩니다.`,
+    okText: "비우기",
+  });
+  if (!confirmed) return;
+  state.trash = [];
+  saveState();
+  renderTrashList();
+  showToast("휴지통을 비웠습니다.");
 }
 
 function openDetail(item) {
@@ -2044,9 +2151,13 @@ function toggleFavorite(id) {
 
 function openCategoryDialog() {
   renderCategoryEditor();
-  renderTagManager();
   showDialog(elements.categoryDialog);
   elements.categoryNameInput.focus();
+}
+
+function openTagDialog() {
+  renderTagManager();
+  showDialog(elements.tagDialog);
 }
 
 function renderCategoryEditor() {
@@ -2337,21 +2448,33 @@ function bindFavoriteDrag() {
 }
 
 function bindDockControls() {
-  document.querySelector("#favoriteToggleBtn")?.addEventListener("click", () => {
-    state.settings.favoritesCollapsed = state.settings?.favoritesCollapsed !== true;
-    saveState();
-    renderItems();
+  document.querySelectorAll("[data-dock-toggle]").forEach((row) => {
+    row.addEventListener("click", () => toggleDock(row.dataset.dockToggle));
   });
-  document.querySelector("#popularToggleBtn")?.addEventListener("click", () => {
-    state.settings.popularCollapsed = state.settings?.popularCollapsed !== true;
-    saveState();
-    renderItems();
+  document.querySelector("#favoriteToggleBtn")?.addEventListener("click", (event) => {
+    event.stopPropagation();
+    toggleDock("favorite");
   });
-  document.querySelector("#archiveToggleBtn")?.addEventListener("click", () => {
-    state.settings.archiveCollapsed = state.settings?.archiveCollapsed !== true;
-    saveState();
-    renderItems();
+  document.querySelector("#popularToggleBtn")?.addEventListener("click", (event) => {
+    event.stopPropagation();
+    toggleDock("popular");
   });
+  document.querySelector("#archiveToggleBtn")?.addEventListener("click", (event) => {
+    event.stopPropagation();
+    toggleDock("archive");
+  });
+}
+
+function toggleDock(kind) {
+  const settingKey = {
+    favorite: "favoritesCollapsed",
+    popular: "popularCollapsed",
+    archive: "archiveCollapsed",
+  }[kind];
+  if (!settingKey) return;
+  state.settings[settingKey] = state.settings?.[settingKey] !== true;
+  saveState();
+  renderItems();
 }
 
 function reorderFavorites(fromId, toId) {
