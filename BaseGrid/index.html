@@ -1,0 +1,204 @@
+<!doctype html>
+<html lang="ko" class="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Base Grid</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar" aria-label="워크스페이스">
+        <div class="brand">
+          <div class="brand-mark" aria-hidden="true">B</div>
+          <div>
+            <p class="eyebrow">Personal Control Room</p>
+            <h1>Base Grid</h1>
+          </div>
+        </div>
+
+        <nav class="workspace-list" aria-label="워크스페이스 목록">
+          <button class="workspace-item active" data-workspace="home">
+            <span class="workspace-icon">HB</span>
+            <span>
+              <strong>Home Base</strong>
+              <small>오늘의 작업판</small>
+            </span>
+          </button>
+          <button class="workspace-item" data-workspace="creator">
+            <span class="workspace-icon">CD</span>
+            <span>
+              <strong>Creator Desk</strong>
+              <small>영상 제작 허브</small>
+            </span>
+          </button>
+          <button class="workspace-item" data-workspace="utility">
+            <span class="workspace-icon">UD</span>
+            <span>
+              <strong>Utility Dock</strong>
+              <small>작은 도구 모음</small>
+            </span>
+          </button>
+          <button class="workspace-item" data-workspace="business">
+            <span class="workspace-icon">BL</span>
+            <span>
+              <strong>Business Lab</strong>
+              <small>수익화 실험실</small>
+            </span>
+          </button>
+        </nav>
+
+        <section class="sidebar-panel">
+          <p class="panel-label">Workspace Recipe</p>
+          <h2>빈 화면 대신 바로 쓸 수 있는 구조</h2>
+          <p>
+            목적별 템플릿을 고르고, 필요한 블록만 더해 나가는 방식으로
+            설계했습니다.
+          </p>
+        </section>
+      </aside>
+
+      <main class="main-area">
+        <header class="command-bar">
+          <div class="command-input" role="search">
+            <span class="command-key">Ctrl K</span>
+            <input
+              id="searchInput"
+              type="search"
+              placeholder="Ctrl K로 빠르게 찾거나 이동하세요"
+              autocomplete="off"
+              readonly
+            />
+          </div>
+          <div class="command-actions">
+            <button class="icon-button" id="focusButton" type="button" title="중요 블록만 보기">
+              ◎
+            </button>
+            <button class="icon-button" id="themeButton" type="button" title="테마 전환">
+              ◐
+            </button>
+            <button class="primary-button" id="openComposer" type="button">
+              + 블록 추가
+            </button>
+          </div>
+        </header>
+
+        <section class="hero-strip">
+          <div>
+            <p class="eyebrow" id="workspaceEyebrow">Home Base</p>
+            <h2 id="workspaceTitle">오늘의 흐름을 한 화면에서 정리하세요.</h2>
+          </div>
+          <p id="workspaceDescription">
+            링크, 메모, 작업, 프롬프트, AI 도구를 블록처럼 배치하는 개인용
+            모듈러 대시보드입니다.
+          </p>
+        </section>
+
+        <section class="quick-add" aria-label="빠른 블록 추가">
+          <button data-type="link" type="button">Link</button>
+          <button data-type="note" type="button">Note</button>
+          <button data-type="task" type="button">Task</button>
+          <button data-type="prompt" type="button">Prompt</button>
+          <button data-type="utility" type="button">Utility</button>
+        </section>
+
+        <section class="grid-canvas" id="gridCanvas" aria-live="polite"></section>
+      </main>
+
+      <aside class="inspector" id="inspector" aria-label="블록 정보">
+        <div class="inspector-header">
+          <p class="eyebrow">Block DNA</p>
+          <button class="icon-button subtle" id="closeInspector" type="button" title="패널 닫기">
+            ×
+          </button>
+        </div>
+        <h2 id="inspectorTitle">블록을 선택해 주세요</h2>
+        <p id="inspectorText">
+          각 블록은 Link, Think, Do, Create, Utility 같은 성격을 가지고 있어
+          나중에 검색과 필터링이 쉬워집니다.
+        </p>
+        <div class="meta-list" id="inspectorMeta"></div>
+        <div class="inspector-actions">
+          <button class="secondary-button" id="duplicateBlock" type="button" disabled>
+            복제
+          </button>
+          <button class="danger-button" id="deleteBlock" type="button" disabled>
+            삭제
+          </button>
+        </div>
+      </aside>
+    </div>
+
+    <dialog class="composer" id="composer">
+      <form class="composer-card" id="composerForm">
+        <div class="composer-head">
+          <div>
+            <p class="eyebrow">Smart Add</p>
+            <h2>새 블록 만들기</h2>
+          </div>
+          <button class="icon-button subtle" id="closeComposer" type="button" title="닫기">
+            ×
+          </button>
+        </div>
+
+        <label>
+          블록 타입
+          <select id="blockType">
+            <option value="link">Link Block</option>
+            <option value="note">Quick Note</option>
+            <option value="task">Task Stack</option>
+            <option value="prompt">Prompt Shelf</option>
+            <option value="utility">Utility Mini</option>
+          </select>
+        </label>
+
+        <label class="url-field" id="blockUrlField" hidden>
+          링크 URL
+          <input id="blockUrl" type="text" inputmode="url" placeholder="example.com 또는 https://example.com" />
+        </label>
+
+        <label>
+          제목
+          <input id="blockTitle" type="text" placeholder="예: 자막 정리 도구" required />
+        </label>
+
+        <label>
+          내용
+          <textarea
+            id="blockContent"
+            rows="5"
+            placeholder="링크, 메모, 할 일, 프롬프트 등을 적어 주세요."
+            required
+          ></textarea>
+        </label>
+
+        <div class="composer-actions">
+          <button class="secondary-button" id="cancelComposer" type="button">취소</button>
+          <button class="primary-button" id="createBlock" value="default" type="submit">
+            추가
+          </button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog class="command-palette" id="commandPalette">
+      <div class="palette-card">
+        <div class="palette-search">
+          <span class="command-key">Ctrl K</span>
+          <input
+            id="commandSearch"
+            type="search"
+            placeholder="워크스페이스, 블록, 링크를 검색하세요"
+            autocomplete="off"
+          />
+          <button class="icon-button subtle" id="closeCommand" type="button" title="닫기">
+            ×
+          </button>
+        </div>
+        <div class="palette-results" id="commandResults" role="listbox"></div>
+      </div>
+    </dialog>
+
+    <script src="./app.js"></script>
+  </body>
+</html>
