@@ -352,6 +352,14 @@ textarea:focus {
   grid-template-columns: repeat(3, 24px);
 }
 
+.field-tools:not(.ratio-primary-tools) {
+  grid-template-columns: repeat(2, 24px);
+}
+
+.field-tools:not(.ratio-primary-tools) .clear-input {
+  display: none;
+}
+
 .field-tools button {
   background: var(--button-bg);
   border-radius: 5px;
@@ -370,6 +378,13 @@ textarea:focus {
 .clear-input {
   font-size: 15px;
   font-weight: normal;
+  font-size: 0;
+  line-height: 1;
+}
+
+.clear-input::after {
+  content: "×";
+  font-size: 18px;
 }
 
 .action-row {
@@ -625,13 +640,36 @@ input[type="range"] {
 
 @media (max-width: 560px) {
   .stats-grid,
-  .estimate-grid,
   .compare-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .estimate-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
   .input-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  .preset-row,
+  .mode-row {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .field-tools .step-input,
+  .field-tools:not(.ratio-primary-tools) {
+    display: none;
+  }
+
+  .ratio-primary-tools {
+    grid-template-columns: 32px;
+  }
+
+  .ratio-primary-tools .clear-input {
+    display: inline-flex;
+    min-height: 42px;
   }
 
   .tool-tabs {
@@ -667,6 +705,15 @@ input[type="range"] {
   .preview-stage {
     padding: 12px;
   }
+
+  .estimate-grid .stat-card {
+    padding-left: 4px;
+    padding-right: 4px;
+  }
+
+  .estimate-grid .stat-card strong {
+    font-size: 15px;
+  }
 }
 
 @media (max-width: 340px) {
@@ -683,6 +730,12 @@ input[type="range"] {
   }
 
   .action-row {
+    grid-template-columns: 1fr;
+  }
+
+  .stats-grid,
+  .compare-grid,
+  .estimate-grid {
     grid-template-columns: 1fr;
   }
 }
