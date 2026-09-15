@@ -632,10 +632,18 @@ function updatePreview() {
   previewBox.style.width = Math.max(widthRatio * scale, 24) + "px";
   previewBox.style.height = Math.max(heightRatio * scale, 24) + "px";
   const previewText = formatNumber(widthRatio) + ":" + formatNumber(heightRatio);
+  previewLabel.textContent = previewText;
+  previewLabel.style.fontSize = "96px";
   const boxWidth = Math.max(previewBox.getBoundingClientRect().width, 24);
   const boxHeight = Math.max(previewBox.getBoundingClientRect().height, 24);
-  const fittedFontSize = Math.max(8, Math.min(96, boxHeight * 0.58, boxWidth / Math.max(previewText.length * 0.58, 1)));
-  previewLabel.textContent = previewText;
+  const boxStyles = window.getComputedStyle(previewBox);
+  const horizontalInset = parseFloat(boxStyles.paddingLeft) + parseFloat(boxStyles.paddingRight) + parseFloat(boxStyles.borderLeftWidth) + parseFloat(boxStyles.borderRightWidth);
+  const verticalInset = parseFloat(boxStyles.paddingTop) + parseFloat(boxStyles.paddingBottom) + parseFloat(boxStyles.borderTopWidth) + parseFloat(boxStyles.borderBottomWidth);
+  const availableWidth = Math.max(boxWidth - horizontalInset, 1);
+  const availableHeight = Math.max(boxHeight - verticalInset, 1);
+  const renderedWidth = Math.max(previewLabel.scrollWidth, 1);
+  const renderedHeight = Math.max(previewLabel.scrollHeight, 1);
+  const fittedFontSize = Math.max(6, Math.min(96, 96 * availableWidth / renderedWidth, 96 * availableHeight / renderedHeight) * 0.96);
   previewLabel.style.fontSize = fittedFontSize + "px";
   simplifiedOutput.textContent = "Simplified: " + getSimplifiedRatio(widthRatio, heightRatio);
 }
