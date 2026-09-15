@@ -5,7 +5,7 @@ const TEXT_CHARS_PER_MINUTE = 300;
 const HISTORY_LIMIT = 10;
 
 const guideMessages = {
-  ratio: ["Fill any 3 values, then Calculate.", "Use presets to set Input 1:Input 2.", "− / × / + adjusts one field.", "↔ swaps width and height."],
+  ratio: ["Fill any 3 values, then Calculate.", "Use presets to set Input 1:Input 2.", "Use − / + to adjust a field, or × inside it to clear.", "↔ swaps width and height."],
   percent: ["Choose the percent formula first.", "The sentence and use cases explain when to use it.", "Enter A and B values.", "The result updates instantly."],
   text: ["Paste or type text.", "Move the Text speed slider.", "100% uses 300 Korean chars per minute.", "Stats update instantly."],
   fuel: ["Enter distance, efficiency, and fuel price.", "Choose one-way or round trip.", "Fuel prices are manually entered."],
@@ -530,6 +530,13 @@ function updateTargetHighlight() {
   if (emptyIndexes.length === 1) inputElements[emptyIndexes[0]].closest(".input-field").classList.add("is-target");
 }
 
+function syncRatioClearButtons() {
+  inputElements.forEach((input) => {
+    const button = document.querySelector("[data-clear=\"" + input.id + "\"]");
+    if (button) button.hidden = input.value === "";
+  });
+}
+
 function setRatioOutput(message, isHint) {
   output.textContent = message;
   output.className = isHint ? "result-panel hint" : "result-panel";
@@ -539,6 +546,7 @@ function updatePreview() {
   const values = getValues();
   const widthRatio = values[0];
   const heightRatio = values[1];
+  syncRatioClearButtons();
   updateTargetHighlight();
   if (!isNumber(widthRatio) || !isNumber(heightRatio) || widthRatio <= 0 || heightRatio <= 0) {
     preview.classList.add("is-hidden");

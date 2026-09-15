@@ -310,6 +310,15 @@ label {
   grid-template-columns: minmax(0, 1fr) auto;
 }
 
+.input-entry {
+  min-width: 0;
+  position: relative;
+}
+
+.input-entry input {
+  padding-right: 40px;
+}
+
 input,
 select,
 textarea {
@@ -349,15 +358,7 @@ textarea:focus {
 .field-tools {
   display: grid;
   gap: 3px;
-  grid-template-columns: repeat(3, 24px);
-}
-
-.field-tools:not(.ratio-primary-tools) {
   grid-template-columns: repeat(2, 24px);
-}
-
-.field-tools:not(.ratio-primary-tools) .clear-input {
-  display: none;
 }
 
 .field-tools button {
@@ -376,15 +377,36 @@ textarea:focus {
 }
 
 .clear-input {
-  font-size: 15px;
+  background: transparent;
+  border: 0;
+  border-radius: 5px;
+  color: var(--hint);
+  font-size: 18px;
   font-weight: normal;
-  font-size: 0;
+  height: 28px;
   line-height: 1;
+  min-height: 28px;
+  padding: 0;
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 28px;
 }
 
-.clear-input::after {
-  content: "×";
-  font-size: 18px;
+.clear-input:hover,
+.clear-input:focus {
+  background: var(--button-hover);
+  color: var(--text);
+}
+
+.clear-input:active {
+  position: absolute;
+  top: 50%;
+}
+
+.clear-input[hidden] {
+  display: none;
 }
 
 .action-row {
@@ -658,18 +680,8 @@ input[type="range"] {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
-  .field-tools .step-input,
-  .field-tools:not(.ratio-primary-tools) {
+  .field-tools {
     display: none;
-  }
-
-  .ratio-primary-tools {
-    grid-template-columns: 32px;
-  }
-
-  .ratio-primary-tools .clear-input {
-    display: inline-flex;
-    min-height: 42px;
   }
 
   .tool-tabs {
