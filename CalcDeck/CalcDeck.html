@@ -15,16 +15,29 @@
 <body>
   <div class="calculator">
     <header class="top-bar">
-      <div></div>
+      <div class="top-spacer" aria-hidden="true"></div>
       <h1><button type="button" class="brand-button" id="brand-reset" title="Reset all">CalcDeck</button></h1>
       <div class="top-tools">
         <button type="button" class="icon-button" id="theme-toggle" aria-label="Switch to light mode">☀</button>
         <button type="button" class="icon-button text-icon" id="language-toggle" aria-label="Switch language">KR</button>
-        <button type="button" class="icon-button" id="history-toggle" aria-label="Show history">H</button>
+        <button type="button" class="icon-button" id="tab-visibility-toggle" aria-label="Choose visible tabs" aria-expanded="false">☷</button>
+        <button type="button" class="icon-button" id="history-toggle" aria-label="Show history" aria-expanded="false">H</button>
         <button type="button" class="icon-button" id="guide-toggle" aria-label="Show guide" aria-expanded="false">?</button>
+        <div id="tab-visibility-popover" class="tool-popover tab-visibility-popover is-hidden" role="dialog" aria-label="Choose visible tabs">
+          <div class="popover-title" id="tab-visibility-title">Visible tabs</div>
+          <div class="tab-visibility-list">
+            <label class="tab-visibility-option"><input type="checkbox" data-tab-visibility="ratio" checked><span data-tab-option="ratio">Ratio</span></label>
+            <label class="tab-visibility-option"><input type="checkbox" data-tab-visibility="percent" checked><span data-tab-option="percent">Percent</span></label>
+            <label class="tab-visibility-option"><input type="checkbox" data-tab-visibility="text" checked><span data-tab-option="text">Text</span></label>
+            <label class="tab-visibility-option"><input type="checkbox" data-tab-visibility="estimate" checked><span data-tab-option="estimate">Estimate</span></label>
+            <label class="tab-visibility-option"><input type="checkbox" data-tab-visibility="unit" checked><span data-tab-option="unit">Unit Price</span></label>
+            <label class="tab-visibility-option"><input type="checkbox" data-tab-visibility="fuel" checked><span data-tab-option="fuel">Fuel</span></label>
+          </div>
+          <div class="popover-note" id="tab-visibility-note">At least one tab must remain visible.</div>
+        </div>
         <div id="guide-popover" class="tool-popover is-hidden" role="dialog" aria-label="Quick guide"></div>
         <div id="history-popover" class="tool-popover history-popover is-hidden" role="dialog" aria-label="History">
-          <div class="popover-title">History</div>
+          <div class="popover-title" id="history-popover-title">History</div>
           <div id="history-list" class="history-list"></div>
           <div class="popover-actions">
             <button type="button" class="mini-button" id="history-copy">Copy</button>
@@ -164,11 +177,11 @@
         <label for="text-input">Text</label>
         <textarea id="text-input" placeholder="Paste or type your text here."></textarea>
         <div class="range-row">
-          <label for="text-speed">Text speed <span id="text-speed-label">100%</span></label>
-          <input type="range" id="text-speed" min="60" max="140" value="100" step="5">
+          <label for="text-speed">Text speed <span id="text-speed-label">120%</span></label>
+          <input type="range" id="text-speed" min="50" max="150" value="120" step="5">
           <div class="range-scale">
-            <span>Slow 60%</span>
-            <span>Fast 140%</span>
+            <span>Slow 50%</span>
+            <span>Fast 150%</span>
           </div>
         </div>
         <div class="stats-grid">

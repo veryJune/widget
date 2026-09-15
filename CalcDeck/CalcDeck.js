@@ -7,7 +7,7 @@ const HISTORY_LIMIT = 10;
 const guideMessages = {
   ratio: ["Fill any 3 values, then Calculate.", "Use presets to set Input 1:Input 2.", "Use − / + to adjust a field, or × inside it to clear.", "↔ swaps width and height."],
   percent: ["Choose the percent formula first.", "The sentence and use cases explain when to use it.", "Enter A and B values.", "The result updates instantly."],
-  text: ["Paste or type text.", "Move the Text speed slider.", "100% uses 300 Korean chars per minute.", "Stats update instantly."],
+  text: ["Paste or type text.", "Move the Text speed slider from 50% to 150%.", "The default 120% estimates 360 Korean characters per minute.", "Stats update instantly."],
   fuel: ["Enter distance, efficiency, and fuel price.", "Choose one-way or round trip.", "Fuel prices are manually entered."],
   estimate: ["Video estimate is a rough freelancer helper.", "Adjust baseline rates when needed.", "Low/Standard/High are proposal ranges."],
   unit: ["Enter two products.", "Use g/kg/ml/L/ea units.", "The cheaper unit price is highlighted."]
@@ -114,9 +114,9 @@ let currentLanguage = "en";
 const localizedGuides = {
   en: guideMessages,
   kr: {
-    ratio: ["값 3개를 입력한 뒤 Calculate를 누르세요.", "프리셋은 Input 1:Input 2 비율을 설정합니다.", "− / × / +로 각 입력값을 조정합니다.", "↔는 가로/세로를 바꿉니다."],
+    ratio: ["값 3개를 입력한 뒤 Calculate를 누르세요.", "프리셋은 Input 1:Input 2 비율을 설정합니다.", "− / +로 조정하고 입력창 안의 ×로 지웁니다.", "↔는 가로/세로를 바꿉니다."],
     percent: ["먼저 백분율 공식을 선택하세요.", "설명과 예시가 쓰임새를 알려줍니다.", "A와 B 값을 입력하세요.", "결과는 즉시 갱신됩니다."],
-    text: ["텍스트를 붙여넣거나 입력하세요.", "Text speed 슬라이더를 조정하세요.", "100%는 한국어 기준 분당 300자입니다.", "통계는 즉시 갱신됩니다."],
+    text: ["텍스트를 붙여넣거나 입력하세요.", "Text speed를 50%에서 150%까지 조정하세요.", "기본 120%는 한국어 기준 분당 360자로 계산합니다.", "통계는 즉시 갱신됩니다."],
     fuel: ["거리, 연비, 유가를 입력하세요.", "편도 또는 왕복을 선택하세요.", "유가는 직접 입력합니다."],
     estimate: ["영상 프리랜서 견적 보조 도구입니다.", "필요하면 기준 단가를 조정하세요.", "Low/Standard/High는 제안 범위입니다."],
     unit: ["두 제품을 입력하세요.", "g/kg, ml/L, 개 단위로 비교합니다.", "더 저렴한 단가를 강조합니다."]
@@ -189,8 +189,11 @@ const historyToggle = document.getElementById("history-toggle");
 const guidePopover = document.getElementById("guide-popover");
 const historyPopover = document.getElementById("history-popover");
 const historyList = document.getElementById("history-list");
+const tabVisibilityToggle = document.getElementById("tab-visibility-toggle");
+const tabVisibilityPopover = document.getElementById("tab-visibility-popover");
 const tabButtons = document.querySelectorAll("[data-tab]");
 const tabPanels = document.querySelectorAll("[data-panel]");
+const tabVisibilityCheckboxes = document.querySelectorAll("[data-tab-visibility]");
 const percentModeButtons = document.querySelectorAll("[data-percent-mode]");
 
 function byId(id) {
@@ -350,25 +353,84 @@ function recalculateTab(tabName) {
 function closePopovers() {
   guidePopover.classList.add("is-hidden");
   historyPopover.classList.add("is-hidden");
+  tabVisibilityPopover.classList.add("is-hidden");
   guideToggle.setAttribute("aria-expanded", "false");
+  historyToggle.setAttribute("aria-expanded", "false");
+  tabVisibilityToggle.setAttribute("aria-expanded", "false");
 }
 
 function updateGuide() {
   guidePopover.innerHTML = localizedGuides[currentLanguage][activeTab].map((message) => "<p>" + message + "</p>").join("");
 }
 
-function setActiveTab(tabName) {
+function setActiveTab(tabName, shouldClosePopovers = true) {
   activeTab = tabName;
   tabButtons.forEach((button) => button.classList.toggle("is-active", button.dataset.tab === tabName));
   tabPanels.forEach((panel) => panel.classList.toggle("is-active", panel.dataset.panel === tabName));
   updateGuide();
-  closePopovers();
+  if (shouldClosePopovers) closePopovers();
   if (tabName === "ratio") updatePreview();
   if (tabName === "percent") updatePercent();
   if (tabName === "text") updateText();
   if (tabName === "fuel") updateFuel();
   if (tabName === "estimate") updateEstimate();
   if (tabName === "unit") updateUnitPrice();
+}
+
+function getAllTabNames() {
+  return Array.from(tabButtons).map((button) => button.dataset.tab);
+}
+
+function updateTabVisibilityOptionState() {
+  const checked = Array.from(tabVisibilityCheckboxes).filter((checkbox) => checkbox.checked);
+  tabVisibilityCheckboxes.forEach((checkbox) => {
+    checkbox.disabled = checked.length === 1 && checkbox.checked;
+  });
+}
+
+function applyTabVisibility(visibleTabs, shouldSave = true) {
+  const allTabs = getAllTabNames();
+  const validTabs = allTabs.filter((tabName) => visibleTabs.includes(tabName));
+  const safeTabs = validTabs.length ? validTabs : [allTabs[0]];
+
+  tabButtons.forEach((button) => {
+    button.hidden = !safeTabs.includes(button.dataset.tab);
+  });
+  tabVisibilityCheckboxes.forEach((checkbox) => {
+    checkbox.checked = safeTabs.includes(checkbox.dataset.tabVisibility);
+  });
+  updateTabVisibilityOptionState();
+
+  if (!safeTabs.includes(activeTab)) setActiveTab(safeTabs[0], false);
+
+  if (shouldSave) {
+    try {
+      localStorage.setItem("calcDeckVisibleTabs", JSON.stringify(safeTabs));
+    } catch (error) {
+      return;
+    }
+  }
+}
+
+function loadTabVisibility() {
+  const allTabs = getAllTabNames();
+
+  try {
+    const storedTabs = JSON.parse(localStorage.getItem("calcDeckVisibleTabs") || "null");
+    applyTabVisibility(Array.isArray(storedTabs) ? storedTabs : allTabs, false);
+  } catch (error) {
+    applyTabVisibility(allTabs, false);
+  }
+}
+
+function toggleTabVisibility(event) {
+  event.stopPropagation();
+  guidePopover.classList.add("is-hidden");
+  historyPopover.classList.add("is-hidden");
+  guideToggle.setAttribute("aria-expanded", "false");
+  historyToggle.setAttribute("aria-expanded", "false");
+  tabVisibilityPopover.classList.toggle("is-hidden");
+  tabVisibilityToggle.setAttribute("aria-expanded", String(!tabVisibilityPopover.classList.contains("is-hidden")));
 }
 
 function setText(selector, text) {
@@ -387,12 +449,20 @@ function applyLanguage(language) {
   byId("language-toggle").setAttribute("aria-label", language === "kr" ? "영어로 전환" : "Switch to Korean");
   byId("history-toggle").setAttribute("aria-label", language === "kr" ? "기록 보기" : "Show history");
   byId("guide-toggle").setAttribute("aria-label", language === "kr" ? "가이드 보기" : "Show guide");
+  tabVisibilityToggle.setAttribute("aria-label", language === "kr" ? "표시할 탭 선택" : "Choose visible tabs");
+  tabVisibilityPopover.setAttribute("aria-label", language === "kr" ? "표시할 탭 선택" : "Choose visible tabs");
   setText("[data-tab=\"ratio\"]", language === "kr" ? "비율" : "Ratio");
   setText("[data-tab=\"percent\"]", language === "kr" ? "퍼센트" : "Percent");
   setText("[data-tab=\"text\"]", language === "kr" ? "텍스트" : "Text");
   setText("[data-tab=\"estimate\"]", language === "kr" ? "견적" : "Estimate");
   setText("[data-tab=\"unit\"]", language === "kr" ? "단가비교" : "Unit Price");
   setText("[data-tab=\"fuel\"]", language === "kr" ? "연료비" : "Fuel");
+  document.querySelectorAll("[data-tab-option]").forEach((label) => {
+    const tabButton = document.querySelector("[data-tab=\"" + label.dataset.tabOption + "\"]");
+    if (tabButton) label.textContent = tabButton.textContent;
+  });
+  setText("#tab-visibility-title", language === "kr" ? "표시할 탭" : "Visible tabs");
+  setText("#tab-visibility-note", language === "kr" ? "최소 한 개의 탭은 표시해야 합니다." : "At least one tab must remain visible.");
   setText("#calculate-btn", language === "kr" ? "계산" : "CALCULATE");
   setText("#reset-btn", language === "kr" ? "초기화" : "RESET");
   setText("[data-percent-mode=\"part\"]", language === "kr" ? "A의 B%" : "A's B%");
@@ -404,7 +474,7 @@ function applyLanguage(language) {
   setText(".rate-editor summary", language === "kr" ? "기준 단가 편집" : "Editable baseline rates");
   setText("#history-copy", language === "kr" ? "복사" : "Copy");
   setText("#history-clear", language === "kr" ? "삭제" : "Clear");
-  setText(".popover-title", language === "kr" ? "기록" : "History");
+  setText("#history-popover-title", language === "kr" ? "기록" : "History");
   ["input1", "input2", "input3", "input4"].forEach((id, index) => {
     setText("label[for=\"" + id + "\"]", language === "kr" ? "입력 " + (index + 1) : "Input " + (index + 1));
   });
@@ -561,7 +631,12 @@ function updatePreview() {
   const scale = Math.min(maxWidth / widthRatio, maxHeight / heightRatio);
   previewBox.style.width = Math.max(widthRatio * scale, 24) + "px";
   previewBox.style.height = Math.max(heightRatio * scale, 24) + "px";
-  previewLabel.textContent = formatNumber(widthRatio) + ":" + formatNumber(heightRatio);
+  const previewText = formatNumber(widthRatio) + ":" + formatNumber(heightRatio);
+  const boxWidth = Math.max(previewBox.getBoundingClientRect().width, 24);
+  const boxHeight = Math.max(previewBox.getBoundingClientRect().height, 24);
+  const fittedFontSize = Math.max(8, Math.min(96, boxHeight * 0.58, boxWidth / Math.max(previewText.length * 0.58, 1)));
+  previewLabel.textContent = previewText;
+  previewLabel.style.fontSize = fittedFontSize + "px";
   simplifiedOutput.textContent = "Simplified: " + getSimplifiedRatio(widthRatio, heightRatio);
 }
 
@@ -844,6 +919,9 @@ function toggleTheme() {
 function toggleGuide(event) {
   event.stopPropagation();
   historyPopover.classList.add("is-hidden");
+  tabVisibilityPopover.classList.add("is-hidden");
+  historyToggle.setAttribute("aria-expanded", "false");
+  tabVisibilityToggle.setAttribute("aria-expanded", "false");
   guidePopover.classList.toggle("is-hidden");
   guideToggle.setAttribute("aria-expanded", String(!guidePopover.classList.contains("is-hidden")));
 }
@@ -851,8 +929,12 @@ function toggleGuide(event) {
 function toggleHistory(event) {
   event.stopPropagation();
   guidePopover.classList.add("is-hidden");
+  tabVisibilityPopover.classList.add("is-hidden");
+  guideToggle.setAttribute("aria-expanded", "false");
+  tabVisibilityToggle.setAttribute("aria-expanded", "false");
   renderHistory();
   historyPopover.classList.toggle("is-hidden");
+  historyToggle.setAttribute("aria-expanded", String(!historyPopover.classList.contains("is-hidden")));
 }
 
 function bindLiveUpdate(selector, handler) {
@@ -909,6 +991,13 @@ byId("language-toggle").addEventListener("click", toggleLanguage);
 byId("brand-reset").addEventListener("click", resetAllInputs);
 byId("guide-toggle").addEventListener("click", toggleGuide);
 byId("history-toggle").addEventListener("click", toggleHistory);
+tabVisibilityToggle.addEventListener("click", toggleTabVisibility);
+tabVisibilityCheckboxes.forEach((checkbox) => checkbox.addEventListener("change", () => {
+  const visibleTabs = Array.from(tabVisibilityCheckboxes)
+    .filter((item) => item.checked)
+    .map((item) => item.dataset.tabVisibility);
+  applyTabVisibility(visibleTabs);
+}));
 byId("history-copy").addEventListener("click", () => {
   const text = getHistory(activeTab)
     .map((item) => typeof item === "string" ? item : item.label)
@@ -931,6 +1020,7 @@ document.querySelectorAll("[data-rate-preset]").forEach((button) => {
 byId("reset-rates").addEventListener("click", () => applyRatePreset("standard"));
 guidePopover.addEventListener("click", (event) => event.stopPropagation());
 historyPopover.addEventListener("click", (event) => event.stopPropagation());
+tabVisibilityPopover.addEventListener("click", (event) => event.stopPropagation());
 
 document.addEventListener("keydown", (event) => {
   if (event.key === "Enter" && activeTab === "ratio") calculateRatio();
@@ -950,6 +1040,8 @@ try {
 } catch (error) {
   applyLanguage("en");
 }
+
+loadTabVisibility();
 
 updatePreview();
 updatePercent();
