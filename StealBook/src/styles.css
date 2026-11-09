@@ -1,0 +1,210 @@
+@import "tailwindcss";
+
+/* ------------------------------------------------------------------
+   Steal Book 디자인 토큰
+   - 화면은 완전한 무채색 회색: 담아 둔 레퍼런스의 색이 왜곡 없이 보이도록
+     (컬러 그레이딩실의 중성 회색 원칙)
+   - 강조색은 하나, '그리스 펜슬' 표시용: 즐겨찾기 · 선택된 필터 · 영상 구간 표시
+     어두운 화면에선 노랑, 밝은 화면(라이트 테이블)에선 빨강 — 실제 편집자들이
+     네거티브와 인화지에 표시할 때 쓰던 색 그대로
+------------------------------------------------------------------- */
+
+@font-face {
+  font-family: 'SUIT';
+  font-weight: 100 900;
+  font-display: swap;
+  src: url('../node_modules/@sun-typeface/suit/fonts/variable/woff2/SUIT-Variable.woff2') format('woff2-variations');
+}
+
+:root,
+[data-theme='dark'] {
+  color-scheme: dark;
+  --bg: #1e1e1e;
+  --panel: #262626;
+  --raise: #303030;
+  --line: #3b3b3b;
+  --ink: #ececec;
+  --mute: #9d9d9d;
+  --faint: #6c6c6c;
+  --mark: #f2cf3d;
+  --on-mark: #1e1e1e;
+  --scrim: rgba(18, 18, 18, 0.78);
+}
+
+[data-theme='light'] {
+  color-scheme: light;
+  --bg: #e4e4e4;
+  --panel: #eeeeee;
+  --raise: #f8f8f8;
+  --line: #cacaca;
+  --ink: #171717;
+  --mute: #616161;
+  --faint: #8f8f8f;
+  --mark: #cf2438;
+  --on-mark: #ffffff;
+  --scrim: rgba(228, 228, 228, 0.82);
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-panel: var(--panel);
+  --color-raise: var(--raise);
+  --color-line: var(--line);
+  --color-ink: var(--ink);
+  --color-mute: var(--mute);
+  --color-faint: var(--faint);
+  --color-mark: var(--mark);
+  --color-on-mark: var(--on-mark);
+  --color-scrim: var(--scrim);
+  --font-sans: 'SUIT', system-ui, -apple-system, 'Segoe UI', 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
+}
+
+@layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--font-sans);
+    font-size: 15px;
+    line-height: 1.5;
+    letter-spacing: -0.005em;
+    -webkit-font-smoothing: antialiased;
+    -webkit-tap-highlight-color: transparent;
+  }
+}
+
+/* 숫자(시간·개수)는 폭을 고정해 흔들리지 않게 */
+.num {
+  font-variant-numeric: tabular-nums;
+}
+
+@layer base {
+  :focus-visible {
+    outline: 2px solid var(--mark);
+    outline-offset: 2px;
+  }
+}
+
+::selection {
+  background: var(--mark);
+  color: var(--on-mark);
+}
+
+@layer base {
+  input,
+  textarea,
+  select,
+  button,
+  kbd {
+    font: inherit;
+    color: inherit;
+  }
+}
+
+/* 모바일에서 입력창 확대 방지 (16px 이상) */
+@layer base {
+  @media (max-width: 899px) {
+    input,
+    textarea,
+    select {
+      font-size: 16px;
+    }
+  }
+}
+
+.scroll-thin {
+  scrollbar-width: thin;
+  scrollbar-color: var(--line) transparent;
+}
+
+.no-scrollbar {
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* 그리스 펜슬 손글씨 표시: 그려지는 한 번의 움직임 */
+.scribble path {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 0;
+}
+.scribble.draw path {
+  animation: scribble-draw 420ms cubic-bezier(0.3, 0.6, 0.2, 1) both;
+}
+@keyframes scribble-draw {
+  from {
+    stroke-dashoffset: 1;
+  }
+}
+
+/* 방금 담은 카드가 내려앉는 움직임 */
+.drop-in {
+  animation: drop-in 360ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+@keyframes drop-in {
+  from {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.985);
+  }
+}
+
+.shimmer {
+  background: linear-gradient(100deg, var(--panel) 30%, var(--raise) 50%, var(--panel) 70%);
+  background-size: 300% 100%;
+  animation: shimmer 1.4s linear infinite;
+}
+@keyframes shimmer {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: 0 0;
+  }
+}
+
+.sheet-up {
+  animation: sheet-up 240ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+@keyframes sheet-up {
+  from {
+    transform: translateY(24px);
+    opacity: 0;
+  }
+}
+
+.fade-in {
+  animation: fade-in 160ms ease-out both;
+}
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 1ms !important;
+  }
+}
+
+/* 메모 카드 본문 */
+.note-text {
+  white-space: pre-wrap;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+}
+
+.safe-bottom {
+  padding-bottom: env(safe-area-inset-bottom);
+}
