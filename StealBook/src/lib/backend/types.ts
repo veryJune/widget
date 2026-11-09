@@ -1,10 +1,12 @@
-import type { Category, Item } from '../types';
+import type { Category, Collection, Item } from '../types';
 
 export interface ChangeHandlers {
   onItem(item: Item): void;
   onItemDelete(id: string): void;
   onCategory(cat: Category): void;
   onCategoryDelete(id: string): void;
+  onCollection(c: Collection): void;
+  onCollectionDelete(id: string): void;
 }
 
 export interface Session {
@@ -26,14 +28,16 @@ export interface Backend {
   changePassword(password: string): Promise<void>;
   onAuth(cb: (s: Session | null) => void): () => void;
 
-  fetchAll(): Promise<{ categories: Category[]; items: Item[] }>;
+  fetchAll(): Promise<{ categories: Category[]; items: Item[]; collections: Collection[] }>;
   saveCategory(c: Category): Promise<void>;
   deleteCategory(id: string): Promise<void>;
+  saveCollection(c: Collection): Promise<void>;
+  deleteCollection(id: string): Promise<void>;
   saveItem(i: Item): Promise<void>;
   deleteItem(id: string): Promise<void>;
 
   /** 파일 경로 규칙: {userId}/{itemId}/{파일이름} */
-  upload(path: string, blob: Blob, contentType: string): Promise<void>;
+  upload(path: string, blob: Blob, contentType: string, onProgress?: (fraction: number) => void): Promise<void>;
   remove(paths: string[]): Promise<void>;
   /** 경로 → 볼 수 있는 주소 (cloud: 서명된 주소, local: blob 주소) */
   signUrls(paths: string[]): Promise<Record<string, string>>;

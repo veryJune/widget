@@ -215,6 +215,38 @@ export async function unfurl(raw: string): Promise<UnfurlResult> {
   return out;
 }
 
+// ---------- 이미지 사본 받기 (이미지 주소를 붙여넣었을 때) ----------
+// 브라우저는 다른 사이트 이미지를 파일로 읽을 수 없어서(CORS) 서버가 대신 받아 줍니다.
+// 응답 크기 한도 때문에 4MB 까지만 (넘으면 앱이 원본 주소로 미리보기만 함)
+const MAX_IMAGE = 4 * 1024 * 1024;
+
+export async function fetchImage(raw: string): Promise<{ type: string; data: Uint8Array }> {
+  const { res } = await safeFetch((raw || '').trim(), 'image/avif,image/webp,image/png,image/jpeg,image/*;q=0.8');
+  if (!res.ok) throw new Error(`이미지를 받지 못했습니다 (${res.status}).`);
+  const type = (res.headers.get('content-type') || '').split(';')[0].trim();
+  if (!type.startsWith('image/')) throw new Error('이미지 주소가 아닙니다.');
+  const len = Number(res.headers.get('content-length') || 0);
+  if (len > MAX_IMAGE) throw new Error('too-large');
+  if (!res.body) throw new Error('빈 응답입니다.');
+  const reader = res.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done || !value) break;
+    total += value.length;
+    if (total > MAX_IMAGE) {
+      try { await reader.cancel(); } catch { /* ignore */ }
+      throw new Error('too-large');
+    }
+    chunks.push(value);
+  }
+  const data = new Uint8Array(total);
+  let off = 0;
+  for (const c of chunks) { data.set(c, off); off += c.length; }
+  return { type, data };
+}
+
 function send(res: ServerResponse, status: number, body: unknown, cache = false) {
   res.statusCode = status;
   res.setHeader('content-type', 'application/json; charset=utf-8');
@@ -236,6 +268,21 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
       if (!r.ok) return send(res, 401, { error: '로그인이 만료되었습니다. 다시 로그인하세요.' });
     } catch {
       return send(res, 502, { error: '인증 서버에 연결하지 못했습니다.' });
+    }
+  }
+
+  const mode = new URL(req.url || '', 'http://localhost').searchParams.get('mode');
+  if (mode === 'image') {
+    try {
+      const img = await fetchImage(target);
+      res.statusCode = 200;
+      res.setHeader('content-type', img.type);
+      res.setHeader('cache-control', 'private, max-age=600');
+      res.end(Buffer.from(img.data));
+      return;
+    } catch (e) {
+      const msg = String((e as Error)?.message || e);
+      return send(res, msg === 'too-large' ? 413 : 400, { error: msg });
     }
   }
 

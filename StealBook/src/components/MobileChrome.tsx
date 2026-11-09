@@ -1,6 +1,6 @@
 // 모바일 화면: 상단 바(검색·필터·메뉴) + 범위 칩 + 오른쪽 아래 담기 버튼 + 시트들
 import { useState } from 'react';
-import { Clapperboard, ListFilter, Menu, Plus, Search, Settings, SlidersHorizontal } from 'lucide-react';
+import { Bookmark, CheckSquare, Clapperboard, ListFilter, Menu, Plus, Search, Settings, SlidersHorizontal, Trash2 } from 'lucide-react';
 import { useStore } from '../store';
 import { useCounts } from '../hooks/useVisible';
 import type { Scope } from '../lib/types';
@@ -8,10 +8,12 @@ import { Wordmark } from './Scribble';
 import { AspectFilter, ActiveTag, ColorFilter, DensitySwitch, SORTS, TypeFilter, ViewSwitch, useFilterActive } from './Controls';
 import { Button, IconButton, Modal, Swatch } from './ui';
 import { ancestors, descendants, flatten, siblingsOf } from '../lib/tree';
+import { useSelecting } from './Selection';
+import { TrashBar } from './Toolbar';
 
 function Chip({ scope, label, count, dot, partial, small }: { scope: Scope; label: string; count: number; dot?: string; partial?: boolean; small?: boolean }) {
   const { scope: cur, set } = useStore();
-  const active = cur.kind === scope.kind && (cur.kind !== 'cat' || (scope.kind === 'cat' && cur.id === scope.id));
+  const active = cur.kind === scope.kind && (!('id' in cur) || ('id' in scope && cur.id === scope.id));
   return (
     <button
       type="button"
@@ -29,7 +31,7 @@ function Chip({ scope, label, count, dot, partial, small }: { scope: Scope; labe
 }
 
 export function MobileHeader() {
-  const { query, set, categories, scope } = useStore();
+  const { query, set, categories, scope, collections } = useStore();
   const root = scope.kind === 'cat' ? ancestors(categories, scope.id)[0] : undefined;
   const inRoot = root ? descendants(categories, root.id) : null;
   const sub = root && inRoot ? flatten(categories).filter((f) => inRoot.has(f.cat.id) && f.cat.id !== root.id) : [];
@@ -53,6 +55,10 @@ export function MobileHeader() {
               className="h-full w-full rounded-full bg-panel pl-9 pr-4 outline-none placeholder:text-faint"
             />
           </label>
+          <IconButton label="필터" onClick={() => set({ panel: 'filters' })} className="relative h-10 w-10">
+            <ListFilter size={19} />
+            {filterOn && <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-mark" />}
+          </IconButton>
           <button
             type="button"
             className="px-2 text-[15px] font-semibold text-mute"
@@ -84,6 +90,9 @@ export function MobileHeader() {
         <Chip scope={{ kind: 'all' }} label="전체" count={counts.all} />
         <Chip scope={{ kind: 'inbox' }} label="인박스" count={counts.inbox} />
         <Chip scope={{ kind: 'fav' }} label="즐겨찾기" count={counts.fav} />
+        {collections.map((c) => (
+          <Chip key={c.id} scope={{ kind: 'smart', id: c.id }} label={`◇ ${c.name}`} count={counts.byCollection.get(c.id) || 0} />
+        ))}
         {siblingsOf(categories, null).map((c) => (
           <Chip key={c.id} scope={{ kind: 'cat', id: c.id }} label={c.name} count={counts.byCat.get(c.id) || 0} dot={c.color} partial={root?.id === c.id && scope.kind === 'cat' && scope.id !== c.id} />
         ))}
@@ -95,6 +104,12 @@ export function MobileHeader() {
           <Plus size={14} /> 카테고리
         </button>
       </div>
+      {scope.kind === 'trash' && (
+        <div className="border-t border-line/60 px-3 py-2">
+          <p className="px-1 text-[15px] font-bold">휴지통</p>
+          <TrashBar />
+        </div>
+      )}
       {root && sub.length > 0 && (
         <div className="no-scrollbar flex gap-1.5 overflow-x-auto border-t border-line/60 px-3 py-2">
           {sub.map(({ cat, depth }) => (
@@ -108,6 +123,8 @@ export function MobileHeader() {
 
 export function Fab() {
   const openComposer = useStore((s) => s.openComposer);
+  const selecting = useSelecting();
+  if (selecting) return null;
   return (
     <button
       type="button"
@@ -121,8 +138,9 @@ export function Fab() {
 }
 
 export function FilterSheet() {
-  const { panel, set, clearFilters } = useStore();
+  const { panel, set, clearFilters, query, scope } = useStore();
   const active = useFilterActive();
+  const canSave = active || !!query.trim() || scope.kind === 'cat';
   return (
     <Modal
       open={panel === 'filters'}
@@ -153,6 +171,16 @@ export function FilterSheet() {
           <ColorFilter size={24} />
         </section>
         <ActiveTag />
+        {canSave && scope.kind !== 'trash' && (
+          <button
+            type="button"
+            onClick={() => set({ panel: 'saveCollection' })}
+            className="flex w-full items-center gap-2 rounded-lg border border-dashed border-line px-3 py-3 text-left text-[14px] font-semibold text-mute"
+          >
+            <Bookmark size={16} /> 지금 조건을 ‘모음’으로 저장
+            <span className="ml-auto text-[12px] font-normal text-faint">조건에 맞는 새 항목이 자동으로 모입니다</span>
+          </button>
+        )}
       </div>
     </Modal>
   );
@@ -160,6 +188,7 @@ export function FilterSheet() {
 
 export function MenuSheet() {
   const { panel, set, sort, setPref, theme } = useStore();
+  const counts = useCounts();
   return (
     <Modal open={panel === 'menu'} onClose={() => set({ panel: null })} title="보기">
       <div className="space-y-6 px-5 py-5">
@@ -198,6 +227,12 @@ export function MenuSheet() {
           </div>
         </section>
         <div className="grid gap-2 border-t border-line pt-5">
+          <Button className="justify-start" onClick={() => set({ panel: null, selectMode: true })}>
+            <CheckSquare size={16} /> 여러 개 선택 <span className="ml-auto text-[12px] font-normal text-faint">카드를 길게 눌러도 됩니다</span>
+          </Button>
+          <Button className="justify-start" onClick={() => set({ panel: null, scope: { kind: 'trash' } })}>
+            <Trash2 size={16} /> 휴지통 {counts.trash > 0 && <span className="num ml-auto text-[12px] text-faint">{counts.trash}</span>}
+          </Button>
           <Button className="justify-start" onClick={() => set({ panel: null, theater: { open: true, startId: null } })}>
             <Clapperboard size={16} /> 시어터로 보기
           </Button>

@@ -1,10 +1,10 @@
 // PC 왼쪽 사이드바: 범위(전체·인박스·즐겨찾기·카테고리 트리), 담기 버튼, 설정
 // 카드를 끌어다 카테고리에 놓으면 그 카테고리로 옮겨집니다. 카테고리 이름 옆 + 로 하위 카테고리를 만듭니다.
 import { useRef, useState, type ReactNode } from 'react';
-import { ChevronRight, Cloud, HardDrive, Inbox, Layers, Plus, Settings, SlidersHorizontal } from 'lucide-react';
+import { ChevronRight, Cloud, HardDrive, Inbox, Layers, Pencil, Plus, Settings, SlidersHorizontal, Sparkles, Trash2, X } from 'lucide-react';
 import { useStore } from '../store';
 import { useCounts } from '../hooks/useVisible';
-import type { Category, Scope } from '../lib/types';
+import type { Category, Collection, Scope } from '../lib/types';
 import { CATEGORY_COLORS } from '../lib/colors';
 import { flatten } from '../lib/tree';
 import { backend } from '../lib/backend';
@@ -103,6 +103,52 @@ function NavRow({
   );
 }
 
+function CollectionRow({ c, count }: { c: Collection; count: number }) {
+  const { updateCollection, deleteCollection } = useStore();
+  const [editing, setEditing] = useState(false);
+  const [confirm, setConfirm] = useState(false);
+  if (editing) {
+    return (
+      <div className="py-1 pl-2 pr-1">
+        <input
+          autoFocus
+          defaultValue={c.name}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+            if (e.key === 'Escape') setEditing(false);
+          }}
+          onBlur={(e) => {
+            const v = e.target.value.trim();
+            if (v && v !== c.name) updateCollection(c.id, { name: v });
+            setEditing(false);
+          }}
+          className={`${inputCls} h-9 py-1.5 text-[14px]`}
+        />
+      </div>
+    );
+  }
+  return (
+    <div className="group relative">
+      <NavRow scope={{ kind: 'smart', id: c.id }} icon={<Sparkles size={13} />} label={c.name} count={count} />
+      <div className="absolute right-9 top-1 hidden items-center gap-0.5 rounded-md bg-panel group-focus-within:flex group-hover:flex">
+        <button type="button" onClick={() => setEditing(true)} aria-label={`${c.name} 이름 바꾸기`} title="이름 바꾸기" className="grid h-7 w-6 place-items-center text-faint hover:text-ink">
+          <Pencil size={12} />
+        </button>
+        <button
+          type="button"
+          onClick={() => (confirm ? deleteCollection(c.id) : setConfirm(true))}
+          onBlur={() => setConfirm(false)}
+          aria-label={confirm ? `${c.name} 모음 삭제 확인` : `${c.name} 모음 삭제`}
+          title={confirm ? '한 번 더 누르면 삭제 (항목은 그대로)' : '모음 삭제'}
+          className={`grid h-7 w-6 place-items-center ${confirm ? 'text-[#e5534b]' : 'text-faint hover:text-ink'}`}
+        >
+          <X size={13} />
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function AddInput({ depth, onDone: done }: { depth: number; onDone: (name: string | null) => void }) {
   const [name, setName] = useState('');
   const finished = useRef(false);
@@ -130,7 +176,7 @@ function AddInput({ depth, onDone: done }: { depth: number; onDone: (name: strin
 }
 
 export function Sidebar() {
-  const { categories, openComposer, updateItem, addCategory, set, toast } = useStore();
+  const { categories, collections, openComposer, updateItem, bulkUpdate, addCategory, set, toast } = useStore();
   const counts = useCounts();
   const [adding, setAdding] = useState<{ parent: string | null } | null>(null);
   const [collapsed, setCollapsed] = useState<Set<string>>(() => new Set(readLS<string[]>(COLLAPSED_KEY, [])));
@@ -143,9 +189,19 @@ export function Sidebar() {
     writeLS(COLLAPSED_KEY, [...next]);
   };
 
+  // 선택된 카드를 끌면 선택된 것 모두를 옮깁니다
+  const dragged = (id: string) => {
+    const sel = useStore.getState().selected;
+    return sel.includes(id) ? sel : [id];
+  };
   const move = (cat: Category | null) => (id: string) => {
-    updateItem(id, { category_id: cat?.id ?? null });
-    toast(cat ? `'${cat.name}' 카테고리로 옮겼습니다` : '인박스로 옮겼습니다');
+    const ids = dragged(id);
+    const where = cat ? `'${cat.name}' 카테고리로` : '인박스로';
+    if (ids.length > 1) bulkUpdate(ids, () => ({ category_id: cat?.id ?? null }), `${ids.length}개를 ${where} 옮겼습니다`);
+    else {
+      updateItem(id, { category_id: cat?.id ?? null });
+      toast(`${where} 옮겼습니다`);
+    }
   };
 
   const finishAdd = async (name: string | null) => {
@@ -187,8 +243,19 @@ export function Sidebar() {
           icon={<span className="block h-3 w-3 rounded-full border-[1.5px] border-current" />}
           label="즐겨찾기"
           count={counts.fav}
-          onDropItem={(id) => updateItem(id, { favorite: true })}
+          onDropItem={(id) => bulkUpdate(dragged(id), () => ({ favorite: true }), '즐겨찾기에 넣었습니다')}
         />
+
+        {collections.length > 0 && (
+          <>
+            <div className="mb-1 mt-6 px-3">
+              <span className="text-[12px] font-semibold text-faint">모음</span>
+            </div>
+            {collections.map((c) => (
+              <CollectionRow key={c.id} c={c} count={counts.byCollection.get(c.id) || 0} />
+            ))}
+          </>
+        )}
 
         <div className="mb-1 mt-6 flex items-center justify-between px-3">
           <span className="text-[12px] font-semibold text-faint">카테고리</span>
@@ -220,6 +287,16 @@ export function Sidebar() {
             <Plus size={15} /> 카테고리 추가
           </button>
         )}
+
+        <div className="mt-6">
+          <NavRow
+            scope={{ kind: 'trash' }}
+            icon={<Trash2 size={14} />}
+            label="휴지통"
+            count={counts.trash}
+            onDropItem={(id) => useStore.getState().trashItems(dragged(id))}
+          />
+        </div>
       </nav>
 
       <div className="flex items-center gap-2 border-t border-line px-4 py-3">

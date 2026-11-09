@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ChevronLeft, ChevronRight, Pause, Play, X } from 'lucide-react';
 import { useStore } from '../store';
+import { useBackClose } from '../hooks/useBackClose';
 import { useVisibleItems } from '../hooks/useVisible';
 import type { Item } from '../lib/types';
 import { useUrl } from '../lib/urls';
@@ -58,6 +59,8 @@ export function Theater() {
     if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
     set({ theater: { open: false, startId: null } });
   }, [set]);
+
+  useBackClose(theater.open, close);
 
   useEffect(() => {
     if (!theater.open) return;

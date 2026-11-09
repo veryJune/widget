@@ -2,7 +2,9 @@
 import { create } from 'zustand';
 import { backend, type Session } from './lib/backend';
 import { draftFromText, emptyDraft, mediaPaths, saveDraft, type Draft } from './lib/capture';
-import type { AspectBucket, Category, Item, ItemType, Scope, SortMode, ViewMode } from './lib/types';
+import type { AspectBucket, Category, Collection, Criteria, Item, ItemType, Scope, SortMode, ViewMode } from './lib/types';
+import { normalizeUrl } from './lib/filter';
+import { parseEmbed } from './lib/embed';
 import { nowIso, readLS, uid, writeLS } from './lib/util';
 import { canMoveUnder, siblingsOf } from './lib/tree';
 
@@ -38,6 +40,7 @@ interface State extends Prefs {
   loaded: boolean;
   categories: Category[];
   items: Item[];
+  collections: Collection[];
   pending: Pending[];
   toasts: Toast[];
 
@@ -52,7 +55,11 @@ interface State extends Prefs {
   openId: string | null;
   composer: { open: boolean; draft: Draft | null };
   theater: { open: boolean; startId: string | null };
-  panel: null | 'settings' | 'categories' | 'filters' | 'menu';
+  panel: null | 'settings' | 'categories' | 'filters' | 'menu' | 'saveCollection';
+  /** 여러 개 선택 */
+  selected: string[];
+  selectMode: boolean;
+  lastSelected: string | null;
 
   // 동작
   boot(): Promise<void>;
@@ -76,9 +83,25 @@ interface State extends Prefs {
   quickCapture(input: { files?: File[]; text?: string }): Promise<void>;
   updateItem(id: string, patch: Partial<Item>): Promise<void>;
   replaceItem(item: Item): Promise<void>;
+  /** 휴지통으로 (30일 뒤 자동 삭제) */
   deleteItem(id: string): Promise<void>;
+  trashItems(ids: string[]): Promise<void>;
+  restoreItems(ids: string[]): Promise<void>;
+  purgeItems(ids: string[], quiet?: boolean): Promise<void>;
+  emptyTrash(): Promise<void>;
+  bulkUpdate(ids: string[], fn: (it: Item) => Partial<Item>, done?: string): Promise<void>;
+  toggleSelect(id: string): void;
+  setSelected(ids: string[], anchor?: string | null): void;
+  clearSelection(): void;
+  findDuplicate(url: string): Item | undefined;
+
+  addCollection(name: string, criteria: Criteria): Promise<Collection>;
+  updateCollection(id: string, patch: Partial<Collection>): Promise<void>;
+  deleteCollection(id: string): Promise<void>;
   currentCategoryId(): string | null;
 }
+
+const TRASH_DAYS = 30;
 
 let unsubscribeRealtime: (() => void) | null = null;
 let lastFetch = 0;
@@ -105,8 +128,8 @@ export const useStore = create<State>((set, get) => {
 
   const snapshot = () => {
     if (backend.mode !== 'cloud') return;
-    const { categories, items } = get();
-    writeLS(SNAP_KEY, { categories, items: items.slice(0, 1500) });
+    const { categories, items, collections } = get();
+    writeLS(SNAP_KEY, { categories, collections, items: items.slice(0, 1500) });
   };
 
   function load(): Promise<void> {
@@ -119,8 +142,11 @@ export const useStore = create<State>((set, get) => {
     try {
       const data = await backend.fetchAll();
       lastFetch = Date.now();
-      set({ categories: sortCats(data.categories), items: data.items, loaded: true });
+      set({ categories: sortCats(data.categories), items: data.items, collections: data.collections, loaded: true });
       snapshot();
+      // 휴지통에서 30일 지난 항목은 조용히 영구 삭제
+      const old = data.items.filter((i) => i.deleted_at && Date.now() - Date.parse(i.deleted_at) > TRASH_DAYS * 86_400_000).map((i) => i.id);
+      if (old.length) get().purgeItems(old, true);
     } catch (e) {
       set({ loaded: true });
       fail(e, '데이터를 불러오지 못했습니다. 연결을 확인하세요.');
@@ -135,6 +161,8 @@ export const useStore = create<State>((set, get) => {
             categories: s.categories.filter((x) => x.id !== id).map((x) => (x.parent_id === id ? { ...x, parent_id: null } : x)),
             items: s.items.map((x) => (x.category_id === id ? { ...x, category_id: null } : x)),
           })),
+        onCollection: (c) => set((s) => ({ collections: upsertById(s.collections, c).sort((a, b) => a.sort - b.sort) })),
+        onCollectionDelete: (id) => set((s) => ({ collections: s.collections.filter((x) => x.id !== id) })),
       });
     }
   }
@@ -146,6 +174,7 @@ export const useStore = create<State>((set, get) => {
     loaded: false,
     categories: [],
     items: [],
+    collections: [],
     pending: [],
     toasts: [],
     scope: { kind: 'all' },
@@ -159,12 +188,15 @@ export const useStore = create<State>((set, get) => {
     composer: { open: false, draft: null },
     theater: { open: false, startId: null },
     panel: null,
+    selected: [],
+    selectMode: false,
+    lastSelected: null,
 
     async boot() {
       const s = await backend.session();
       if (s && backend.mode === 'cloud') {
-        const snap = readLS<{ categories: Category[]; items: Item[] } | null>(SNAP_KEY, null);
-        if (snap) set({ categories: sortCats(snap.categories), items: snap.items, loaded: true });
+        const snap = readLS<{ categories: Category[]; items: Item[]; collections?: Collection[] } | null>(SNAP_KEY, null);
+        if (snap) set({ categories: sortCats(snap.categories), items: snap.items, collections: snap.collections || [], loaded: true });
       }
       set({ session: s, authChecked: true });
       if (s) await load();
@@ -175,7 +207,7 @@ export const useStore = create<State>((set, get) => {
         if (!ns && prev) {
           unsubscribeRealtime?.();
           unsubscribeRealtime = null;
-          set({ categories: [], items: [], loaded: false });
+          set({ categories: [], items: [], collections: [], loaded: false });
         }
       });
       document.addEventListener('visibilitychange', () => {
@@ -194,14 +226,14 @@ export const useStore = create<State>((set, get) => {
       localStorage.removeItem(SNAP_KEY);
       unsubscribeRealtime?.();
       unsubscribeRealtime = null;
-      set({ session: null, categories: [], items: [], loaded: false, panel: null });
+      set({ session: null, categories: [], items: [], collections: [], loaded: false, panel: null, selected: [] });
     },
 
     async refresh() {
       try {
         const data = await backend.fetchAll();
         lastFetch = Date.now();
-        set({ categories: sortCats(data.categories), items: data.items });
+        set({ categories: sortCats(data.categories), items: data.items, collections: data.collections });
         snapshot();
       } catch {
         /* 다음에 다시 */
@@ -286,17 +318,13 @@ export const useStore = create<State>((set, get) => {
       const kids = categories.filter((c) => c.parent_id === id).map((c) => ({ ...c, parent_id: cat.parent_id }));
       set((s) => ({
         categories: sortCats(s.categories.filter((c) => c.id !== id).map((c) => kids.find((k) => k.id === c.id) || c)),
-        items: withItems ? s.items.filter((i) => i.category_id !== id) : s.items.map((i) => (i.category_id === id ? { ...i, category_id: null } : i)),
+        items: s.items.map((i) => (i.category_id === id ? { ...i, category_id: null, deleted_at: withItems ? nowIso() : i.deleted_at } : i)),
         scope: scope.kind === 'cat' && scope.id === id ? (cat.parent_id ? { kind: 'cat', id: cat.parent_id } : { kind: 'all' }) : scope,
       }));
       try {
         for (const k of kids) await backend.saveCategory(k);
-        if (withItems) {
-          for (const it of inCat) {
-            await backend.deleteItem(it.id);
-            await backend.remove(it.media.flatMap(mediaPaths));
-          }
-        }
+        // 항목까지 지우기를 골라도 바로 없애지 않고 휴지통으로 (30일 안에 복구 가능)
+        for (const it of inCat) await backend.saveItem({ ...it, category_id: null, deleted_at: withItems ? nowIso() : it.deleted_at ?? null });
         await backend.deleteCategory(id);
       } catch (e) {
         fail(e, '카테고리를 지우지 못했습니다.');
@@ -385,7 +413,15 @@ export const useStore = create<State>((set, get) => {
         await get().submitDraft(d);
         return;
       }
-      if (text && text.trim()) await get().submitDraft(draftFromText(text, cat));
+      if (text && text.trim()) {
+        const d = draftFromText(text, cat);
+        const dup = d.url ? get().findDuplicate(d.url) : undefined;
+        if (dup) {
+          get().toast('이미 담아 둔 링크입니다', { ms: 5000, action: { label: '열기', run: () => set({ openId: dup.id }) } });
+          return;
+        }
+        await get().submitDraft(d);
+      }
     },
 
     async updateItem(id, patch) {
@@ -406,16 +442,142 @@ export const useStore = create<State>((set, get) => {
     },
 
     async deleteItem(id) {
-      const cur = get().items.find((i) => i.id === id);
-      if (!cur) return;
-      set((s) => ({ items: s.items.filter((i) => i.id !== id), openId: s.openId === id ? null : s.openId }));
+      await get().trashItems([id]);
+    },
+
+    async trashItems(ids) {
+      const now = nowIso();
+      const set_ = new Set(ids);
+      const targets = get().items.filter((i) => set_.has(i.id) && !i.deleted_at);
+      if (!targets.length) return;
+      set((s) => ({
+        items: s.items.map((i) => (set_.has(i.id) ? { ...i, deleted_at: now } : i)),
+        openId: s.openId && set_.has(s.openId) && s.scope.kind !== 'trash' ? null : s.openId,
+        selected: s.selected.filter((x) => !set_.has(x)),
+      }));
       try {
-        await backend.deleteItem(id);
-        await backend.remove(cur.media.flatMap(mediaPaths));
-        get().toast('삭제했습니다');
+        for (const it of targets) await backend.saveItem({ ...it, deleted_at: now });
+        get().toast(targets.length > 1 ? `${targets.length}개를 휴지통으로 옮겼습니다` : '휴지통으로 옮겼습니다', {
+          ms: 6000,
+          action: { label: '되돌리기', run: () => get().restoreItems(targets.map((t) => t.id)) },
+        });
         snapshot();
       } catch (e) {
         fail(e, '삭제하지 못했습니다.');
+        get().refresh();
+      }
+    },
+
+    async restoreItems(ids) {
+      const set_ = new Set(ids);
+      const targets = get().items.filter((i) => set_.has(i.id) && i.deleted_at);
+      if (!targets.length) return;
+      set((s) => ({ items: s.items.map((i) => (set_.has(i.id) ? { ...i, deleted_at: null } : i)), selected: s.selected.filter((x) => !set_.has(x)) }));
+      try {
+        for (const it of targets) await backend.saveItem({ ...it, deleted_at: null });
+        get().toast(targets.length > 1 ? `${targets.length}개를 되돌렸습니다` : '되돌렸습니다');
+        snapshot();
+      } catch (e) {
+        fail(e, '되돌리지 못했습니다.');
+        get().refresh();
+      }
+    },
+
+    async purgeItems(ids, quiet = false) {
+      const set_ = new Set(ids);
+      const targets = get().items.filter((i) => set_.has(i.id));
+      set((s) => ({ items: s.items.filter((i) => !set_.has(i.id)), openId: s.openId && set_.has(s.openId) ? null : s.openId, selected: s.selected.filter((x) => !set_.has(x)) }));
+      try {
+        for (const it of targets) {
+          await backend.deleteItem(it.id);
+          await backend.remove(it.media.flatMap(mediaPaths));
+        }
+        if (!quiet) get().toast(targets.length > 1 ? `${targets.length}개를 영구 삭제했습니다` : '영구 삭제했습니다');
+        snapshot();
+      } catch (e) {
+        if (!quiet) fail(e, '삭제하지 못했습니다.');
+        get().refresh();
+      }
+    },
+
+    async emptyTrash() {
+      await get().purgeItems(get().items.filter((i) => i.deleted_at).map((i) => i.id));
+    },
+
+    async bulkUpdate(ids, fn, done) {
+      const set_ = new Set(ids);
+      const now = nowIso();
+      const next = get()
+        .items.filter((i) => set_.has(i.id))
+        .map((i) => ({ ...i, ...fn(i), updated_at: now }));
+      const byId = new Map(next.map((i) => [i.id, i]));
+      set((s) => ({ items: s.items.map((i) => byId.get(i.id) || i) }));
+      try {
+        for (let i = 0; i < next.length; i += 6) await Promise.all(next.slice(i, i + 6).map((it) => backend.saveItem(it)));
+        if (done) get().toast(done);
+        snapshot();
+      } catch (e) {
+        fail(e, '저장하지 못했습니다.');
+        get().refresh();
+      }
+    },
+
+    toggleSelect(id) {
+      set((s) => {
+        const has = s.selected.includes(id);
+        const selected = has ? s.selected.filter((x) => x !== id) : [...s.selected, id];
+        return { selected, lastSelected: id, selectMode: selected.length > 0 || s.selectMode };
+      });
+    },
+
+    setSelected(ids, anchor = null) {
+      set((s) => ({ selected: ids, lastSelected: anchor ?? s.lastSelected, selectMode: ids.length > 0 || s.selectMode }));
+    },
+
+    clearSelection: () => set({ selected: [], selectMode: false, lastSelected: null }),
+
+    findDuplicate(url) {
+      if (!url) return undefined;
+      const keys = new Set([normalizeUrl(url)]);
+      const canon = parseEmbed(url)?.url;
+      if (canon) keys.add(normalizeUrl(canon));
+      return get().items.find((i) => !i.deleted_at && i.url && keys.has(normalizeUrl(i.url)));
+    },
+
+    // ---------- 스마트 컬렉션 ----------
+    async addCollection(name, criteria) {
+      const list = get().collections;
+      const c: Collection = { id: uid(), name: name.trim() || '새 모음', icon: '', criteria, sort: (list[list.length - 1]?.sort ?? 0) + 1, created_at: nowIso() };
+      set({ collections: [...list, c], scope: { kind: 'smart', id: c.id }, query: '', type: null, aspect: null, color: null, tag: null });
+      try {
+        await backend.saveCollection(c);
+        get().toast(`모음 ‘${c.name}’을 만들었습니다`);
+      } catch (e) {
+        set((s) => ({ collections: s.collections.filter((x) => x.id !== c.id), scope: { kind: 'all' } }));
+        fail(e, '모음을 만들지 못했습니다.');
+      }
+      return c;
+    },
+
+    async updateCollection(id, patch) {
+      const cur = get().collections.find((c) => c.id === id);
+      if (!cur) return;
+      const next = { ...cur, ...patch };
+      set((s) => ({ collections: upsertById(s.collections, next) }));
+      try {
+        await backend.saveCollection(next);
+      } catch (e) {
+        fail(e, '모음을 바꾸지 못했습니다.');
+        get().refresh();
+      }
+    },
+
+    async deleteCollection(id) {
+      set((s) => ({ collections: s.collections.filter((c) => c.id !== id), scope: s.scope.kind === 'smart' && s.scope.id === id ? { kind: 'all' } : s.scope }));
+      try {
+        await backend.deleteCollection(id);
+      } catch (e) {
+        fail(e, '모음을 지우지 못했습니다.');
         get().refresh();
       }
     },

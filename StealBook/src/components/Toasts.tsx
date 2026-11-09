@@ -1,11 +1,18 @@
 import { Loader2, X } from 'lucide-react';
 import { useStore } from '../store';
+import { useSelecting } from './Selection';
 
 export function Toasts() {
   const { toasts, dismiss } = useStore();
+  const selecting = useSelecting();
   if (!toasts.length) return null;
   return (
-    <div className="pointer-events-none fixed inset-x-0 bottom-[calc(88px+env(safe-area-inset-bottom))] z-[70] flex flex-col items-center gap-2 px-4 md:bottom-6" aria-live="polite">
+    <div
+      className={`pointer-events-none fixed inset-x-0 z-[70] flex flex-col items-center gap-2 px-4 transition-[bottom] ${
+        selecting ? 'bottom-[calc(150px+env(safe-area-inset-bottom))] md:bottom-24' : 'bottom-[calc(88px+env(safe-area-inset-bottom))] md:bottom-6'
+      }`}
+      aria-live="polite"
+    >
       {toasts.map((t) => (
         <div
           key={t.id}
