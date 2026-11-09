@@ -1,5 +1,17 @@
 # Steal Book 설정 · 배포 가이드
 
+## 지금 연결된 상태 (2026-11-09)
+
+| 항목 | 값 |
+|---|---|
+| 앱 주소 | https://steal-book.vercel.app |
+| Vercel 프로젝트 | `steal-book` (팀 v-june, Root Directory `StealBook`, main에 푸시하면 자동 배포) |
+| Supabase 프로젝트 | `steal-book` (June's App Factory, 서울 리전) |
+| 로그인 계정 | verymore.june@gmail.com — 처음 받은 임시 비밀번호는 앱 **설정 → 비밀번호 바꾸기**로 바꾸기 |
+| 새 가입 | 데이터베이스에서 막혀 있음 (`stealbook_single_owner` 트리거, 아래 1-3 참고) |
+
+아래 내용은 처음부터 다시 만들거나 다른 곳에 하나 더 만들 때를 위한 기록입니다.
+
 개발자가 아니어도 순서대로 따라 하면 되도록 썼습니다. 전체 20~30분 정도 걸립니다.
 
 ```
@@ -64,9 +76,9 @@ Steal Book에는 회원가입 화면이 없습니다. 내 계정 하나만 만�
 1. 왼쪽 **Authentication → Users** → **Add user → Create new user**
    - 이메일, 비밀번호 입력 (이게 앱 로그인 정보입니다)
    - **Auto Confirm User** 체크
-2. **Authentication → Sign In / Providers**(또는 Settings)에서
-   **Allow new users to sign up** 을 **끄기** → Save
-   (주소를 아는 다른 사람이 계정을 만들 수 없게 막는 설정입니다)
+2. 다른 사람 가입은 `schema.sql` 6번의 트리거가 막습니다. **첫 계정이 생긴 뒤에는 어떤 경로로도 새 계정이 만들어지지 않습니다.**
+   (계정을 새로 만들어야 하면 SQL Editor에서 `drop trigger stealbook_single_owner on auth.users;` 실행 → 만든 뒤 `schema.sql` 다시 Run)
+3. (선택) **Authentication → Sign In / Providers** 에서 **Allow new users to sign up** 도 꺼 두면 이중으로 막힙니다.
 
 ### 1-4. 연결 정보 복사
 1. 왼쪽 아래 **Project Settings → API Keys** (또는 상단 **Connect** 버튼)
@@ -112,6 +124,11 @@ VITE_SUPABASE_KEY=sb_publishable_xxxxxxxxxxxx
 이후에는 GitHub에 Push할 때마다 자동으로 다시 배포됩니다.
 
 > 환경변수를 나중에 바꿨다면 **Deployments → 맨 위 배포 … → Redeploy** 를 한 번 눌러야 반영됩니다.
+
+### 배포 보호 설정
+Vercel 팀 기본값은 `*.vercel.app` 주소에도 Vercel 로그인을 요구합니다. 휴대폰에서 Vercel 로그인 없이 쓰도록
+`steal-book` 프로젝트만 **Standard Protection**(미리보기·배포별 주소만 보호, `steal-book.vercel.app`은 공개)으로 바꿔 두었습니다.
+앱 데이터는 Steal Book 로그인과 Supabase 보안 규칙으로 보호됩니다.
 
 ### 자동 깨우기 (따로 할 일 없음)
 Supabase 무료 프로젝트는 **7일 동안 요청이 없으면 일시정지**됩니다. `vercel.json` 에 하루 한 번
