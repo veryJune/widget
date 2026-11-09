@@ -2,7 +2,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { FileText, Link2, Loader2, Play, Plus, Upload, X } from 'lucide-react';
 import { useStore } from '../store';
-import { previewLink, type Draft, type LinkPreview } from '../lib/capture';
+import { previewLink, titleOf, type Draft, type LinkPreview } from '../lib/capture';
 import { parseEmbed, PROVIDER_LABEL } from '../lib/embed';
 import type { MediaFile } from '../lib/types';
 import { useUrl } from '../lib/urls';
@@ -84,7 +84,7 @@ function PreviewCard({ p, loading }: { p: LinkPreview | null; loading: boolean }
 }
 
 export function Composer() {
-  const { composer, set, submitDraft } = useStore();
+  const { composer, set, submitDraft, findDuplicate } = useStore();
   const compact = useCompact();
   const allTags = useAllTags();
   const [d, setD] = useState<Draft | null>(composer.draft);
@@ -119,6 +119,8 @@ export function Composer() {
 
   if (!composer.open || !d) return null;
   const editing = !!d.base;
+  const dupFound = d.url.trim() && isUrl(d.url.trim()) ? findDuplicate(d.url.trim()) : undefined;
+  const dup = dupFound && dupFound.id !== d.base?.id ? dupFound : undefined;
   const patch = (p: Partial<Draft>) => setD((x) => (x ? { ...x, ...p } : x));
   const close = () => set({ composer: { open: false, draft: null } });
 
@@ -252,6 +254,21 @@ export function Composer() {
             autoComplete="off"
           />
           <PreviewCard p={d.url && d.previewFor === d.url.trim() ? d.preview : null} loading={loading && !!d.url} />
+          {dup && (
+            <p className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg bg-mark/10 px-3 py-2 text-[13px]">
+              <span className="font-semibold text-mark">이미 담아 둔 링크입니다.</span>
+              <span className="min-w-0 truncate text-mute">{titleOf(dup)}</span>
+              <button
+                type="button"
+                className="ml-auto font-semibold underline underline-offset-4"
+                onClick={() => {
+                  set({ composer: { open: false, draft: null }, openId: dup.id });
+                }}
+              >
+                그 항목 열기
+              </button>
+            </p>
+          )}
         </Field>
 
         <Field label="제목">

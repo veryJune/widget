@@ -1,6 +1,6 @@
 // Supabase 저장소 (로그인 · 데이터베이스 · 파일 · 실시간 동기화)
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
-import type { Category, Item } from '../types';
+import type { Category, Collection, Item } from '../types';
 import type { Backend, ChangeHandlers, Session } from './types';
 
 const BUCKET = 'media';
@@ -27,6 +27,18 @@ function rowToItem(r: Record<string, unknown>): Item {
     markers: (r.markers as Item['markers']) || [],
     created_at: r.created_at as string,
     updated_at: r.updated_at as string,
+    deleted_at: (r.deleted_at as string) ?? null,
+  };
+}
+
+function rowToCollection(r: Record<string, unknown>): Collection {
+  return {
+    id: r.id as string,
+    name: (r.name as string) || '',
+    icon: (r.icon as string) || '',
+    criteria: (r.criteria as Collection['criteria']) || {},
+    sort: (r.sort as number) ?? 0,
+    created_at: r.created_at as string,
   };
 }
 
@@ -48,6 +60,7 @@ function check<T>(res: { data: T; error: { message: string } | null }): T {
 }
 
 export function createSupabaseBackend(url: string, key: string): Backend {
+  const base = url.replace(/\/$/, '');
   const sb: SupabaseClient = createClient(url, key, {
     auth: { persistSession: true, autoRefreshToken: true, storageKey: 'stealbook-auth' },
   });
@@ -103,7 +116,18 @@ export function createSupabaseBackend(url: string, key: string): Backend {
         items.push(...page.map(rowToItem));
         if (page.length < 1000) break;
       }
-      return { categories: categories.map(rowToCategory), items };
+      // 컬렉션 표가 아직 없으면(예전 설정) 빈 목록으로
+      const col = await sb.from('collections').select('*').order('sort', { ascending: true });
+      const collections = col.error ? [] : (col.data as Record<string, unknown>[]).map(rowToCollection);
+      return { categories: categories.map(rowToCategory), items, collections };
+    },
+
+    async saveCollection(c) {
+      check(await sb.from('collections').upsert({ id: c.id, name: c.name, icon: c.icon, criteria: c.criteria, sort: c.sort, created_at: c.created_at }));
+    },
+
+    async deleteCollection(id) {
+      check(await sb.from('collections').delete().eq('id', id));
     },
 
     async saveCategory(c) {
@@ -124,12 +148,36 @@ export function createSupabaseBackend(url: string, key: string): Backend {
       check(await sb.from('items').delete().eq('id', id));
     },
 
-    async upload(path, blob, contentType) {
-      const { error } = await sb.storage.from(BUCKET).upload(path, blob, { contentType, upsert: true, cacheControl: '31536000' });
-      if (error) {
-        if (/exceeded|too large|maximum allowed size/i.test(error.message)) throw new Error('파일이 너무 큽니다. 파일 하나는 50MB 이하만 올릴 수 있습니다.');
-        throw new Error(error.message);
-      }
+    // 진행률(%)을 보여 주려고 XMLHttpRequest 로 직접 올립니다
+    async upload(path, blob, contentType, onProgress) {
+      const { data } = await sb.auth.getSession();
+      const token = data.session?.access_token;
+      if (!token) throw new Error('로그인이 필요합니다.');
+      const encoded = path.split('/').map(encodeURIComponent).join('/');
+      await new Promise<void>((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', `${base}/storage/v1/object/${BUCKET}/${encoded}`);
+        xhr.setRequestHeader('authorization', `Bearer ${token}`);
+        xhr.setRequestHeader('apikey', key);
+        xhr.setRequestHeader('x-upsert', 'true');
+        xhr.setRequestHeader('cache-control', 'max-age=31536000');
+        xhr.setRequestHeader('content-type', contentType || 'application/octet-stream');
+        if (onProgress) xhr.upload.onprogress = (e) => e.lengthComputable && onProgress(e.loaded / e.total);
+        xhr.onload = () => {
+          if (xhr.status >= 200 && xhr.status < 300) return resolve();
+          const msg = (() => {
+            try {
+              return (JSON.parse(xhr.responseText) as { message?: string; error?: string }).message || xhr.responseText;
+            } catch {
+              return xhr.responseText;
+            }
+          })();
+          if (xhr.status === 413 || /exceeded|too large|maximum allowed size/i.test(msg)) reject(new Error('파일이 너무 큽니다. 파일 하나는 50MB 이하만 올릴 수 있습니다.'));
+          else reject(new Error(msg || `업로드 실패 (${xhr.status})`));
+        };
+        xhr.onerror = () => reject(new Error('업로드 중 연결이 끊겼습니다. 다시 시도해 주세요.'));
+        xhr.send(blob);
+      });
     },
 
     async remove(paths) {
@@ -158,6 +206,10 @@ export function createSupabaseBackend(url: string, key: string): Backend {
         .on('postgres_changes', { event: '*', schema: 'public', table: 'categories' }, (p) => {
           if (p.eventType === 'DELETE') h.onCategoryDelete((p.old as { id: string }).id);
           else h.onCategory(rowToCategory(p.new as Record<string, unknown>));
+        })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'collections' }, (p) => {
+          if (p.eventType === 'DELETE') h.onCollectionDelete((p.old as { id: string }).id);
+          else h.onCollection(rowToCollection(p.new as Record<string, unknown>));
         })
         .subscribe();
       return () => {

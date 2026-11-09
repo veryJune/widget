@@ -2,6 +2,7 @@
 import { useEffect, useRef, type ButtonHTMLAttributes, type ReactNode } from 'react';
 import { X } from 'lucide-react';
 import { useCompact } from '../hooks/useMedia';
+import { useBackClose } from '../hooks/useBackClose';
 
 export function IconButton({ label, active, className = '', children, ...rest }: ButtonHTMLAttributes<HTMLButtonElement> & { label: string; active?: boolean }) {
   return (
@@ -61,6 +62,7 @@ export function Modal({
   // (의존성에 넣으면 글자를 칠 때마다 포커스가 창 맨 위로 튀는 문제가 생김)
   const closeRef = useRef(onClose);
   closeRef.current = onClose;
+  useBackClose(open, onClose);
   useEffect(() => {
     if (!open) return;
     const prev = document.activeElement as HTMLElement | null;

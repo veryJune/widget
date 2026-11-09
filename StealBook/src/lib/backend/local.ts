@@ -1,6 +1,6 @@
 // 체험 모드 저장소: 이 기기 브라우저(IndexedDB)에만 저장합니다. 로그인 없음, 동기화 없음.
 import { openDB, type IDBPDatabase } from 'idb';
-import type { Category, Item } from '../types';
+import type { Category, Collection, Item } from '../types';
 import type { Backend } from './types';
 
 const LOCAL_USER = 'local';
@@ -8,11 +8,14 @@ let dbp: Promise<IDBPDatabase> | null = null;
 
 export function localDb() {
   if (!dbp) {
-    dbp = openDB('stealbook', 1, {
-      upgrade(db) {
-        db.createObjectStore('categories', { keyPath: 'id' });
-        db.createObjectStore('items', { keyPath: 'id' });
-        db.createObjectStore('files');
+    dbp = openDB('stealbook', 2, {
+      upgrade(db, oldVersion) {
+        if (oldVersion < 1) {
+          db.createObjectStore('categories', { keyPath: 'id' });
+          db.createObjectStore('items', { keyPath: 'id' });
+          db.createObjectStore('files');
+        }
+        if (oldVersion < 2) db.createObjectStore('collections', { keyPath: 'id' });
       },
     });
   }
@@ -44,7 +47,16 @@ export function createLocalBackend(): Backend {
       const db = await localDb();
       const categories = ((await db.getAll('categories')) as Category[]).sort((a, b) => a.sort - b.sort);
       const items = ((await db.getAll('items')) as Item[]).sort((a, b) => b.created_at.localeCompare(a.created_at));
-      return { categories, items };
+      const collections = ((await db.getAll('collections')) as Collection[]).sort((a, b) => a.sort - b.sort);
+      return { categories, items, collections };
+    },
+
+    async saveCollection(c) {
+      await (await localDb()).put('collections', c);
+    },
+
+    async deleteCollection(id) {
+      await (await localDb()).delete('collections', id);
     },
 
     async saveCategory(c) {
@@ -69,8 +81,9 @@ export function createLocalBackend(): Backend {
       await (await localDb()).delete('items', id);
     },
 
-    async upload(path, blob) {
+    async upload(path, blob, _type, onProgress) {
       await (await localDb()).put('files', blob, path);
+      onProgress?.(1);
     },
 
     async remove(paths) {

@@ -41,6 +41,21 @@ create table if not exists public.items (
 alter table public.categories add column if not exists parent_id uuid references public.categories(id) on delete set null;
 create index if not exists categories_parent_idx on public.categories (parent_id);
 
+-- 휴지통: 지운 시각 (30일 뒤 앱이 영구 삭제)
+alter table public.items add column if not exists deleted_at timestamptz;
+
+-- 모음(스마트 컬렉션): 저장해 둔 검색·필터 조건
+create table if not exists public.collections (
+  id          uuid primary key default gen_random_uuid(),
+  user_id     uuid not null default auth.uid() references auth.users(id) on delete cascade,
+  name        text not null,
+  icon        text not null default '',
+  criteria    jsonb not null default '{}',
+  sort        double precision not null default 0,
+  created_at  timestamptz not null default now()
+);
+create index if not exists collections_user_sort_idx on public.collections (user_id, sort);
+
 create index if not exists items_user_created_idx on public.items (user_id, created_at desc);
 create index if not exists categories_user_sort_idx on public.categories (user_id, sort);
 
@@ -60,6 +75,7 @@ create trigger items_touch_updated_at
 -- 3) 보안 규칙(RLS): 로그인한 본인 데이터만 읽고 쓸 수 있음 ------------------
 alter table public.categories enable row level security;
 alter table public.items enable row level security;
+alter table public.collections enable row level security;
 
 drop policy if exists "own categories" on public.categories;
 create policy "own categories" on public.categories
@@ -73,9 +89,15 @@ create policy "own items" on public.items
   using (user_id = auth.uid())
   with check (user_id = auth.uid());
 
+drop policy if exists "own collections" on public.collections;
+create policy "own collections" on public.collections
+  for all to authenticated
+  using (user_id = auth.uid())
+  with check (user_id = auth.uid());
+
 -- 권한: 로그인한 사용자 역할이 두 표를 쓸 수 있게 (실제 접근 범위는 위 보안 규칙이 결정)
 grant usage on schema public to authenticated;
-grant select, insert, update, delete on public.categories, public.items to authenticated;
+grant select, insert, update, delete on public.categories, public.items, public.collections to authenticated;
 
 -- 4) 실시간 동기화: 다른 기기에서 바꾼 내용이 바로 반영되도록 --------------
 do $$
@@ -85,6 +107,9 @@ begin
   end if;
   if not exists (select 1 from pg_publication_tables where pubname = 'supabase_realtime' and tablename = 'categories') then
     alter publication supabase_realtime add table public.categories;
+  end if;
+  if not exists (select 1 from pg_publication_tables where pubname = 'supabase_realtime' and tablename = 'collections') then
+    alter publication supabase_realtime add table public.collections;
   end if;
 end $$;
 

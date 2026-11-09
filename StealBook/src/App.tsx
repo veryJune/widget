@@ -17,6 +17,8 @@ import { Login } from './components/Login';
 import { Toasts } from './components/Toasts';
 import { Wordmark } from './components/Scribble';
 import { useFilterActive } from './components/Controls';
+import { SelectionBar, visibleOrder } from './components/Selection';
+import { SaveCollectionDialog } from './components/Collections';
 
 const isTyping = (t: EventTarget | null) => {
   const el = t as HTMLElement | null;
@@ -49,6 +51,12 @@ function Main() {
   const { scope, query, type, aspect, color, tag, sort, loaded } = useStore();
   const filtered = useFilterActive() || !!query.trim();
   const galleryKey = JSON.stringify([scope, query, type, aspect, color, tag, sort]);
+  const scopeKey = JSON.stringify(scope);
+  // 다른 곳으로 이동하면 선택은 풉니다
+  useEffect(() => {
+    const st = useStore.getState();
+    if (st.selected.length || st.selectMode) st.clearSelection();
+  }, [scopeKey]);
 
   const body = !loaded ? (
     <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
@@ -149,7 +157,18 @@ export default function App() {
     };
     const onKey = (e: KeyboardEvent) => {
       const st = useStore.getState();
-      if (e.ctrlKey || e.metaKey || e.altKey || isTyping(e.target) || busy() || st.openId) return;
+      if (isTyping(e.target) || busy() || st.openId) return;
+      // 선택: Esc 로 끝내기, Ctrl+A 로 보이는 것 모두
+      if (e.key === 'Escape' && (st.selectMode || st.selected.length)) {
+        st.clearSelection();
+        return;
+      }
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'a' || e.key === 'A')) {
+        e.preventDefault();
+        st.setSelected(visibleOrder.current);
+        return;
+      }
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
       if (e.key === 'n' || e.key === 'N') {
         e.preventDefault();
         st.openComposer();
@@ -192,6 +211,8 @@ export default function App() {
       <Theater />
       <CategoryManager />
       <Settings />
+      <SaveCollectionDialog />
+      <SelectionBar />
       <Toasts />
       {dragging && <DropOverlay />}
     </>

@@ -70,6 +70,8 @@ export interface Item {
   markers: Marker[];
   created_at: string;
   updated_at: string;
+  /** 휴지통에 넣은 시각 (없으면 정상 항목) */
+  deleted_at?: string | null;
 }
 
 export interface Category {
@@ -83,11 +85,34 @@ export interface Category {
   created_at: string;
 }
 
+/** 스마트 컬렉션 조건 (저장된 검색·필터) */
+export interface Criteria {
+  categoryId?: string | null;
+  inbox?: boolean;
+  favorite?: boolean;
+  query?: string;
+  type?: ItemType | null;
+  aspect?: AspectBucket | null;
+  color?: string | null;
+  tag?: string | null;
+}
+
+export interface Collection {
+  id: string;
+  name: string;
+  icon: string;
+  criteria: Criteria;
+  sort: number;
+  created_at: string;
+}
+
 export type Scope =
   | { kind: 'all' }
   | { kind: 'inbox' }
   | { kind: 'fav' }
-  | { kind: 'cat'; id: string };
+  | { kind: 'cat'; id: string }
+  | { kind: 'smart'; id: string }
+  | { kind: 'trash' };
 
 export type ViewMode = 'masonry' | 'grid' | 'list';
 export type SortMode = 'new' | 'old' | 'title' | 'shuffle';

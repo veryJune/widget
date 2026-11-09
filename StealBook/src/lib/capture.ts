@@ -6,6 +6,7 @@ import { fileKind, imageSize, processImage, processVideo } from './media';
 import type { EmbedInfo, Item, LinkMeta, MediaFile } from './types';
 import { primeUrl } from './urls';
 import { baseName, extOf, nowIso, splitUrl, uid } from './util';
+import { looksLikeImageUrl } from './filter';
 
 export const MAX_FILE_BYTES = backend.mode === 'cloud' ? 50 * 1024 * 1024 : 200 * 1024 * 1024;
 
@@ -15,6 +16,8 @@ export interface LinkPreview {
   link: LinkMeta | null;
   /** 카드 비율 (가로/세로) */
   ratio: number | null;
+  /** 주소 자체가 이미지 파일 (붙여넣으면 사본을 저장) */
+  isImage?: boolean;
 }
 
 interface UnfurlResponse {
@@ -55,8 +58,20 @@ export async function previewLink(input: string): Promise<LinkPreview> {
   let parsed = parseEmbed(text);
   if (parsed?.embed.provider === 'iframe') return { url: parsed.url, embed: parsed.embed, link: null, ratio: parsed.embed.aspect };
 
+  // 이미지 주소(…/poster.png 등): 바로 이미지로 다룹니다
+  if (!parsed && looksLikeImageUrl(text)) {
+    const s = await imageSize(text);
+    return { url: text, embed: null, link: { image: text, site: hostOf(text) }, ratio: s ? s.w / s.h : null, isImage: true };
+  }
+
   const meta = await unfurl(parsed?.url || text);
   if (!parsed && meta?.url && meta.url !== text) parsed = parseEmbed(meta.url); // 짧은 주소 풀기
+
+  // 확장자는 없지만 실제로는 이미지인 주소 (서버가 이미지로 응답했거나, 서버 확인이 실패했는데 브라우저에선 이미지로 열림)
+  if (!parsed && ((meta && meta.image === meta.url && !meta.title) || !meta)) {
+    const s = await imageSize(meta?.url || text, 5000);
+    if (s) return { url: meta?.url || text, embed: null, link: { image: meta?.url || text, site: hostOf(text) }, ratio: s.w / s.h, isImage: true };
+  }
 
   let embed = parsed?.embed ?? null;
   if (embed) {
@@ -88,6 +103,26 @@ function hostOf(u: string) {
   }
 }
 
+/** 이미지 주소 → 파일 (서버가 대신 받아 줌, 4MB 넘거나 막히면 null) */
+export async function fetchRemoteImage(url: string): Promise<File | null> {
+  try {
+    const token = await backend.accessToken();
+    const r = await fetch(`/api/unfurl?mode=image&url=${encodeURIComponent(url)}`, { headers: token ? { authorization: `Bearer ${token}` } : {} });
+    if (!r.ok) return null;
+    const blob = await r.blob();
+    if (!blob.type.startsWith('image/')) return null;
+    let name = 'image';
+    try {
+      name = decodeURIComponent(new URL(url).pathname.split('/').pop() || 'image') || 'image';
+    } catch {
+      /* 기본 이름 */
+    }
+    return new File([blob], name, { type: blob.type });
+  } catch {
+    return null;
+  }
+}
+
 async function userPrefix(itemId: string) {
   const s = await backend.session();
   if (!s) throw new Error('로그인이 필요합니다.');
@@ -95,7 +130,7 @@ async function userPrefix(itemId: string) {
 }
 
 /** 파일 하나를 압축·썸네일 처리 후 올립니다. */
-export async function uploadFile(itemId: string, file: File): Promise<MediaFile> {
+export async function uploadFile(itemId: string, file: File, onProgress?: (fraction: number) => void): Promise<MediaFile> {
   if (file.size > MAX_FILE_BYTES) {
     throw new Error(`"${file.name}" 파일이 너무 큽니다. ${Math.round(MAX_FILE_BYTES / 1024 / 1024)}MB 이하로 줄여 주세요. (영상은 720p로 내보내면 대부분 줄어듭니다)`);
   }
@@ -107,7 +142,7 @@ export async function uploadFile(itemId: string, file: File): Promise<MediaFile>
     const r = await processImage(file);
     const path = `${prefix}${key}.${r.main.ext}`;
     const thumb = `${prefix}${key}_t.${r.thumb.ext}`;
-    await backend.upload(path, r.main.blob, r.main.mime);
+    await backend.upload(path, r.main.blob, r.main.mime, onProgress);
     await backend.upload(thumb, r.thumb.blob, r.thumb.mime);
     primeUrl(thumb, URL.createObjectURL(r.thumb.blob));
     return { path, kind, mime: r.main.mime, name: file.name, size: r.main.blob.size, w: r.w, h: r.h, thumb, thumbSize: r.thumb.blob.size, colors: r.colors };
@@ -121,7 +156,7 @@ export async function uploadFile(itemId: string, file: File): Promise<MediaFile>
       r = null; // 미리보기를 못 만들어도 원본은 저장
     }
     const path = `${prefix}${key}.${extOf(file.name, file.type)}`;
-    await backend.upload(path, file, file.type || 'video/mp4');
+    await backend.upload(path, file, file.type || 'video/mp4', onProgress);
     const mf: MediaFile = { path, kind, mime: file.type || 'video/mp4', name: file.name, size: file.size, w: r?.w, h: r?.h, duration: r?.duration, colors: r?.colors };
     if (r?.thumb) {
       mf.thumb = `${prefix}${key}_t.${r.thumb.ext}`;
@@ -140,7 +175,7 @@ export async function uploadFile(itemId: string, file: File): Promise<MediaFile>
   }
 
   const path = `${prefix}${key}.${extOf(file.name, file.type)}`;
-  await backend.upload(path, file, file.type || 'application/octet-stream');
+  await backend.upload(path, file, file.type || 'application/octet-stream', onProgress);
   return { path, kind: 'file', mime: file.type || 'application/octet-stream', name: file.name, size: file.size };
 }
 
@@ -189,10 +224,6 @@ export function mediaPaths(m: MediaFile): string[] {
 export async function saveDraft(d: Draft, onStep?: (msg: string) => void): Promise<Item> {
   const id = d.base?.id ?? uid();
   const media: MediaFile[] = [...d.keepMedia];
-  for (let i = 0; i < d.files.length; i++) {
-    onStep?.(d.files.length > 1 ? `파일 올리는 중 ${i + 1}/${d.files.length}` : '파일 올리는 중');
-    media.push(await uploadFile(id, d.files[i]));
-  }
 
   // 주소만 있고 미리보기가 아직이면 지금 만듭니다
   let preview = d.url ? d.preview : null;
@@ -201,10 +232,35 @@ export async function saveDraft(d: Draft, onStep?: (msg: string) => void): Promi
     preview = await previewLink(d.url);
   }
 
+  // 이미지 주소를 담으면 사본을 받아 일반 이미지처럼 저장 (원본이 사라져도 남도록)
+  const files = [...d.files];
+  if (preview?.isImage && !files.length && !media.length) {
+    onStep?.('이미지 받는 중');
+    const f = await fetchRemoteImage(preview.url);
+    if (f) files.push(f);
+  }
+
+  for (let i = 0; i < files.length; i++) {
+    const f = files[i];
+    const head = files.length > 1 ? `올리는 중 ${i + 1}/${files.length}` : '올리는 중';
+    onStep?.(head);
+    let last = -1;
+    media.push(
+      await uploadFile(id, f, (p) => {
+        const pct = Math.round(p * 100);
+        if (f.size > 400_000 && pct !== last && (pct - last >= 2 || pct === 100)) {
+          last = pct;
+          onStep?.(`${head} ${pct}% · ${(f.size / 1024 / 1024).toFixed(1)}MB`);
+        }
+      }),
+    );
+  }
+
   const first = media[0];
   const embed = preview?.embed ?? null;
   const link = preview?.link ?? null;
   const type: Item['type'] = embed ? 'embed' : first ? first.kind : d.url ? 'link' : 'note';
+  // 사본을 못 받은 이미지 주소는 원본 주소로 미리보기 (링크 카드)
   const cover = first?.thumb ?? (first?.kind === 'image' ? first.path : null) ?? embed?.thumb ?? link?.image ?? null;
   const ratio = first?.w && first?.h ? first.w / first.h : (preview?.ratio ?? null);
   const now = nowIso();
@@ -271,4 +327,9 @@ function prettyUrl(u: string): string {
 
 export function titleOf(item: Item): string {
   return item.title || item.link?.title || (item.media[0] ? baseName(item.media[0].name) : '') || item.body.split('\n')[0].slice(0, 80) || (item.url ? prettyUrl(item.url) : '') || '제목 없음';
+}
+
+/** 카드에 쓸 이미지: 저장된 표지, 없으면 이미지 주소 자체 (예전에 링크로 담긴 이미지 주소도 보이게) */
+export function coverOf(item: Item): string | null {
+  return item.cover || (item.type === 'link' && looksLikeImageUrl(item.url) ? item.url : null);
 }

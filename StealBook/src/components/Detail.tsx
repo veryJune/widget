@@ -1,11 +1,13 @@
 // 상세 보기: 크게 보기 + 정보 + 영상 구간 북마크
 // PC: 왼쪽 미디어, 오른쪽 정보 / 모바일: 전체 화면, 좌우로 밀어서 이전·다음
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ChevronLeft, ChevronRight, Clapperboard, Download, ExternalLink, ImageDown, Pencil, Repeat, Trash2, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Clapperboard, Download, ExternalLink, ImageDown, Pencil, Plus, Repeat, RotateCcw, Trash2, X } from 'lucide-react';
 import { useStore } from '../store';
-import { useVisibleItems } from '../hooks/useVisible';
+import { useAllTags, useVisibleItems } from '../hooks/useVisible';
+import { useBackClose } from '../hooks/useBackClose';
 import { useCompact } from '../hooks/useMedia';
-import { draftFromItem, titleOf } from '../lib/capture';
+import { coverOf, draftFromItem, fetchRemoteImage, titleOf, uploadFile } from '../lib/capture';
+import { looksLikeImageUrl } from '../lib/filter';
 import { embedAt, PROVIDER_LABEL } from '../lib/embed';
 import type { Item, Marker, MediaFile } from '../lib/types';
 import { useUrl } from '../lib/urls';
@@ -237,7 +239,7 @@ function EmbedFrame({ item, src }: { item: Item; src: string }) {
 }
 
 function LinkView({ item }: { item: Item }) {
-  const cover = useUrl(item.cover);
+  const cover = useUrl(coverOf(item));
   return (
     <div className="flex max-h-full max-w-3xl flex-col items-start gap-4">
       {cover && <img src={cover} alt="" referrerPolicy="no-referrer" className="max-h-[60dvh] max-w-full rounded-lg object-contain" />}
@@ -250,16 +252,147 @@ function LinkView({ item }: { item: Item }) {
 
 // ---------------- 상세 보기 ----------------
 
+// ---------------- 바로 고치기 ----------------
+
+function InlineEdit({
+  value,
+  placeholder,
+  multiline = false,
+  onSave,
+  className = '',
+  display,
+  label,
+}: {
+  value: string;
+  placeholder: string;
+  multiline?: boolean;
+  onSave: (v: string) => void;
+  className?: string;
+  display?: React.ReactNode;
+  label: string;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [v, setV] = useState(value);
+  useEffect(() => setV(value), [value]);
+  const commit = () => {
+    setEditing(false);
+    if (v.trim() !== value.trim()) onSave(v.trim());
+  };
+  if (!editing) {
+    return (
+      <button type="button" onClick={() => setEditing(true)} aria-label={`${label} 고치기`} className={`group/edit relative block w-full rounded-md text-left transition hover:bg-raise/60 ${className}`}>
+        {value ? display ?? value : <span className="text-faint">{placeholder}</span>}
+        <Pencil size={12} className="absolute right-1 top-1 text-faint opacity-0 transition group-hover/edit:opacity-100" />
+      </button>
+    );
+  }
+  const common = {
+    autoFocus: true,
+    value: v,
+    'aria-label': label,
+    onChange: (e: React.ChangeEvent<HTMLInputElement & HTMLTextAreaElement>) => setV(e.target.value),
+    onBlur: commit,
+    onKeyDown: (e: React.KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        setV(value);
+        setEditing(false);
+      }
+      if (e.key === 'Enter' && (!multiline || e.ctrlKey || e.metaKey)) {
+        e.preventDefault();
+        commit();
+      }
+    },
+  };
+  return multiline ? (
+    <textarea {...common} rows={Math.min(10, Math.max(3, v.split('\n').length + 1))} className={`${inputCls} resize-y text-[14px] leading-relaxed`} />
+  ) : (
+    <input {...common} className={`${inputCls} ${className}`} />
+  );
+}
+
+function TagEditor({ item }: { item: Item }) {
+  const { updateItem, set } = useStore();
+  const all = useAllTags();
+  const [adding, setAdding] = useState(false);
+  const [v, setV] = useState('');
+  const add = (raw: string) => {
+    const tags = raw.split(/[,\s]+/).map((t) => t.replace(/^#/, '').trim()).filter(Boolean);
+    if (tags.length) updateItem(item.id, { tags: [...new Set([...item.tags, ...tags])] });
+    setV('');
+  };
+  const sugg = v ? all.filter((t) => t.toLowerCase().startsWith(v.toLowerCase()) && !item.tags.includes(t)).slice(0, 5) : [];
+  return (
+    <div className="flex flex-wrap items-center gap-1.5">
+      {item.tags.map((t) => (
+        <span key={t} className="group/tag inline-flex h-7 items-center rounded-full bg-raise pl-2.5 pr-1 text-[13px] font-semibold text-mute">
+          <button type="button" onClick={() => set({ tag: t, openId: null })} className="hover:text-ink" title={`#${t} 모아 보기`}>
+            #{t}
+          </button>
+          <button type="button" aria-label={`${t} 태그 빼기`} onClick={() => updateItem(item.id, { tags: item.tags.filter((x) => x !== t) })} className="ml-0.5 grid h-5 w-5 place-items-center rounded-full opacity-50 hover:opacity-100">
+            <X size={11} />
+          </button>
+        </span>
+      ))}
+      {adding ? (
+        <span className="relative">
+          <input
+            autoFocus
+            value={v}
+            onChange={(e) => setV(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ',') {
+                e.preventDefault();
+                add(v);
+              }
+              if (e.key === 'Escape') {
+                e.preventDefault();
+                setAdding(false);
+                setV('');
+              }
+            }}
+            onBlur={() => {
+              if (v.trim()) add(v);
+              setAdding(false);
+            }}
+            placeholder="태그 입력 후 Enter"
+            className="h-7 w-36 rounded-full border border-line bg-bg px-2.5 text-[13px] outline-none"
+          />
+          {sugg.length > 0 && (
+            <span className="absolute left-0 top-8 z-10 flex flex-col rounded-lg border border-line bg-panel p-1 shadow-lg">
+              {sugg.map((t) => (
+                <button key={t} type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => add(t)} className="rounded px-2 py-1 text-left text-[13px] hover:bg-raise">
+                  #{t}
+                </button>
+              ))}
+            </span>
+          )}
+        </span>
+      ) : (
+        <button type="button" onClick={() => setAdding(true)} className="inline-flex h-7 items-center gap-1 rounded-full border border-dashed border-line px-2.5 text-[13px] font-semibold text-faint hover:text-ink">
+          <Plus size={12} /> 태그
+        </button>
+      )}
+    </div>
+  );
+}
+
+// ---------------- 상세 보기 ----------------
+
 export function Detail() {
-  const { openId, items, categories, set, updateItem, deleteItem } = useStore();
+  const { openId, items, categories, set, updateItem, deleteItem, restoreItems, purgeItems, replaceItem, toast } = useStore();
   const list = useVisibleItems();
   const compact = useCompact();
   const item = items.find((i) => i.id === openId);
   const [mi, setMi] = useState(0);
   const [confirmDel, setConfirmDel] = useState(false);
   const [embedSrc, setEmbedSrc] = useState<string | null>(null);
+  const [copying, setCopying] = useState(false);
   const touch = useRef<{ x: number; y: number } | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  const close = () => set({ openId: null });
+
+  useBackClose(!!item, close);
 
   useEffect(() => {
     setMi(0);
@@ -279,9 +412,10 @@ export function Detail() {
     const onKey = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement;
       if (/INPUT|TEXTAREA|SELECT/.test(t.tagName) || useStore.getState().composer.open) return;
-      if (e.key === 'Escape') set({ openId: null });
+      if (e.key === 'Escape') close();
       if (e.key === 'ArrowRight') go(1);
       if (e.key === 'ArrowLeft') go(-1);
+      if (item.deleted_at) return;
       if (e.key === 'f' || e.key === 'F') updateItem(item.id, { favorite: !item.favorite });
       if (e.key === 'e' || e.key === 'E') set({ composer: { open: true, draft: draftFromItem(item) } });
     };
@@ -289,7 +423,7 @@ export function Detail() {
     return () => window.removeEventListener('keydown', onKey);
   });
 
-  // 어떤 부분이 화면 위에 열려 있으면 뒤 스크롤 막기
+  // 상세가 열려 있으면 뒤 스크롤 막기
   useEffect(() => {
     if (!item) return;
     const prev = document.body.style.overflow;
@@ -301,9 +435,10 @@ export function Detail() {
 
   if (!item) return null;
   const m: MediaFile | undefined = item.media[Math.min(mi, Math.max(0, item.media.length - 1))];
-
   const cat = categories.find((c) => c.id === item.category_id);
   const title = titleOf(item);
+  const trashed = !!item.deleted_at;
+  const daysLeft = trashed ? Math.max(0, 30 - Math.floor((Date.now() - Date.parse(item.deleted_at!)) / 86_400_000)) : 0;
 
   let stage: React.ReactNode;
   if (m?.kind === 'video') stage = <VideoPlayer m={m} videoRef={videoRef} />;
@@ -311,29 +446,79 @@ export function Detail() {
   else if (m?.kind === 'file') stage = <FileView m={m} />;
   else if (item.embed) stage = <EmbedFrame item={item} src={embedSrc || item.embed.embedUrl} />;
   else if (item.type === 'link') stage = <LinkView item={item} />;
-  else stage = <p className="note-text max-w-[62ch] text-[19px] leading-[1.75]">{item.body || item.title}</p>;
+  else stage = <p className="note-text max-w-[62ch] cursor-auto text-[19px] leading-[1.75]">{item.body || item.title}</p>;
+
+  /** 휴지통에서 되돌리거나 지운 뒤: 다음 항목으로, 없으면 닫기 */
+  const stepAway = () => {
+    const next = idx >= 0 ? list[idx + 1] || list[idx - 1] : undefined;
+    set({ openId: next && next.id !== item.id ? next.id : null });
+  };
+
+  /** 링크로 담긴 이미지 주소 → 사본을 받아 일반 이미지로 */
+  const copyImage = async () => {
+    setCopying(true);
+    try {
+      const f = await fetchRemoteImage(item.url);
+      if (!f) throw new Error('이 사이트는 이미지 사본을 받을 수 없습니다. (4MB 초과 또는 접근 차단) 원본 주소로 계속 미리보기합니다.');
+      const mf = await uploadFile(item.id, f);
+      await replaceItem({ ...item, type: 'image', media: [mf], cover: mf.thumb ?? mf.path, ratio: mf.w && mf.h ? mf.w / mf.h : item.ratio, colors: mf.colors ?? item.colors });
+      toast('이미지 사본을 저장했습니다');
+    } catch (e) {
+      toast((e as Error).message || '사본을 저장하지 못했습니다.', { kind: 'error', ms: 6000 });
+    } finally {
+      setCopying(false);
+    }
+  };
 
   const info = (
-    <div className="space-y-6">
+    <div className="space-y-5">
+      {trashed && (
+        <div className="space-y-2.5 rounded-lg border border-line bg-panel p-3 text-[13px]">
+          <p>휴지통에 있는 항목입니다. {daysLeft}일 뒤 영구 삭제됩니다.</p>
+          <div className="flex flex-wrap gap-2">
+            <Button className="h-8 px-3 text-[13px]" onClick={() => (stepAway(), restoreItems([item.id]))}>
+              <RotateCcw size={14} /> 되돌리기
+            </Button>
+            <Button variant="danger" className="h-8 px-3 text-[13px]" onClick={() => (confirmDel ? (stepAway(), purgeItems([item.id])) : setConfirmDel(true))} onBlur={() => setConfirmDel(false)}>
+              <Trash2 size={14} /> {confirmDel ? '한 번 더 누르면 영구 삭제' : '영구 삭제'}
+            </Button>
+          </div>
+        </div>
+      )}
+
       <div>
-        <div className="mb-2 flex items-start gap-2">
-          <h2 className="flex-1 text-[20px] font-extrabold leading-snug tracking-tight">{title}</h2>
-          <button
-            type="button"
-            onClick={() => updateItem(item.id, { favorite: !item.favorite })}
-            aria-pressed={item.favorite}
-            aria-label="즐겨찾기 (F)"
-            title="즐겨찾기 (F)"
-            className="grid h-9 w-9 shrink-0 place-items-center rounded-lg text-mute hover:bg-raise hover:text-ink"
-          >
-            {item.favorite ? <OkMark on size={24} /> : <span className="block h-[18px] w-[18px] rounded-full border-2 border-current" />}
-          </button>
+        <div className="mb-2 flex items-start gap-1">
+          {trashed ? (
+            <h2 className="flex-1 text-[20px] font-extrabold leading-snug tracking-tight">{title}</h2>
+          ) : (
+            <InlineEdit
+              label="제목"
+              value={item.title}
+              placeholder={title}
+              display={<span className="text-[20px] font-extrabold leading-snug tracking-tight">{item.title}</span>}
+              className="flex-1 px-1 py-0.5 text-[20px] font-extrabold leading-snug tracking-tight"
+              onSave={(v) => updateItem(item.id, { title: v })}
+            />
+          )}
+          {!trashed && (
+            <button
+              type="button"
+              onClick={() => updateItem(item.id, { favorite: !item.favorite })}
+              aria-pressed={item.favorite}
+              aria-label="즐겨찾기 (F)"
+              title="즐겨찾기 (F)"
+              className="grid h-9 w-9 shrink-0 place-items-center rounded-lg text-mute hover:bg-raise hover:text-ink"
+            >
+              {item.favorite ? <OkMark on size={24} /> : <span className="block h-[18px] w-[18px] rounded-full border-2 border-current" />}
+            </button>
+          )}
         </div>
         <select
           aria-label="카테고리"
           value={item.category_id || ''}
+          disabled={trashed}
           onChange={(e) => updateItem(item.id, { category_id: e.target.value || null })}
-          className="h-8 cursor-pointer rounded-full border-0 bg-raise px-3 text-[13px] font-semibold outline-none"
+          className="h-8 cursor-pointer rounded-full border-0 bg-raise px-3 text-[13px] font-semibold outline-none disabled:opacity-50"
           style={cat ? { boxShadow: `inset 3px 0 0 ${cat.color}` } : undefined}
         >
           <option value="">인박스</option>
@@ -345,9 +530,33 @@ export function Detail() {
         </select>
       </div>
 
-      {item.why && <p className="border-l-2 border-mark pl-3 text-[15px] leading-relaxed">{item.why}</p>}
-      {item.body && (item.media.length > 0 || item.embed || item.type === 'link') && <p className="note-text text-[14px] leading-relaxed text-ink/85">{item.body}</p>}
-      {!item.body && item.link?.description && <p className="text-[14px] leading-relaxed text-mute">{item.link.description}</p>}
+      {trashed ? (
+        item.why && <p className="border-l-2 border-mark pl-3 text-[15px] leading-relaxed">{item.why}</p>
+      ) : (
+        <InlineEdit
+          label="왜 담았나"
+          value={item.why}
+          placeholder="왜 담았는지 한 줄 남기기"
+          display={<span className="block border-l-2 border-mark pl-3 text-[15px] leading-relaxed">{item.why}</span>}
+          className="px-1 py-1 text-[15px]"
+          onSave={(v) => updateItem(item.id, { why: v })}
+        />
+      )}
+
+      {trashed ? (
+        item.body && <p className="note-text text-[14px] leading-relaxed text-ink/85">{item.body}</p>
+      ) : (
+        <InlineEdit
+          label="메모"
+          multiline
+          value={item.body}
+          placeholder="메모 추가"
+          display={<span className="note-text block text-[14px] leading-relaxed text-ink/85">{item.body}</span>}
+          className="px-1 py-1 text-[14px]"
+          onSave={(v) => updateItem(item.id, { body: v })}
+        />
+      )}
+      {!item.body && item.link?.description && <p className="px-1 text-[14px] leading-relaxed text-mute">{item.link.description}</p>}
 
       {item.url && (
         <a href={item.url} target="_blank" rel="noreferrer" className="flex items-center gap-2 text-[14px] font-semibold text-ink underline-offset-4 hover:underline">
@@ -356,18 +565,16 @@ export function Detail() {
         </a>
       )}
 
-      {item.tags.length > 0 && (
-        <div className="flex flex-wrap gap-1.5">
-          {item.tags.map((t) => (
-            <button key={t} type="button" onClick={() => set({ tag: t, openId: null })} className="h-7 rounded-full bg-raise px-2.5 text-[13px] font-semibold text-mute hover:text-ink" title={`#${t} 모아 보기`}>
-              #{t}
-            </button>
-          ))}
-        </div>
+      {trashed ? null : <TagEditor item={item} />}
+
+      {!trashed && item.type === 'link' && !item.media.length && looksLikeImageUrl(item.url) && (
+        <Button className="h-8 px-3 text-[13px]" disabled={copying} onClick={copyImage}>
+          <ImageDown size={14} /> {copying ? '받는 중…' : '이미지 사본 저장 (원본이 사라져도 남게)'}
+        </Button>
       )}
 
-      {m?.kind === 'video' && <VideoMarkers key={m.path} item={item} m={m} videoRef={videoRef} />}
-      {item.embed?.seekable && !m && <EmbedMarkers item={item} onSeek={(sec) => setEmbedSrc(embedAt(item.embed!, sec))} />}
+      {!trashed && m?.kind === 'video' && <VideoMarkers key={m.path} item={item} m={m} videoRef={videoRef} />}
+      {!trashed && item.embed?.seekable && !m && <EmbedMarkers item={item} onSeek={(sec) => setEmbedSrc(embedAt(item.embed!, sec))} />}
 
       <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 text-[13px]">
         <dt className="text-faint">담은 날</dt>
@@ -395,17 +602,19 @@ export function Detail() {
         )}
       </dl>
 
-      <div className="flex flex-wrap gap-2 border-t border-line pt-5">
-        <Button onClick={() => set({ composer: { open: true, draft: draftFromItem(item) } })}>
-          <Pencil size={15} /> 수정
-        </Button>
-        <Button onClick={() => set({ theater: { open: true, startId: item.id } })}>
-          <Clapperboard size={15} /> 시어터
-        </Button>
-        <Button variant="danger" onClick={() => (confirmDel ? deleteItem(item.id) : setConfirmDel(true))} onBlur={() => setConfirmDel(false)}>
-          <Trash2 size={15} /> {confirmDel ? '한 번 더 누르면 삭제' : '삭제'}
-        </Button>
-      </div>
+      {!trashed && (
+        <div className="flex flex-wrap gap-2 border-t border-line pt-5">
+          <Button onClick={() => set({ composer: { open: true, draft: draftFromItem(item) } })} title="파일·링크까지 고치기 (E)">
+            <Pencil size={15} /> 전체 수정
+          </Button>
+          <Button onClick={() => set({ theater: { open: true, startId: item.id } })}>
+            <Clapperboard size={15} /> 시어터
+          </Button>
+          <Button variant="danger" onClick={() => deleteItem(item.id)}>
+            <Trash2 size={15} /> 휴지통
+          </Button>
+        </div>
+      )}
     </div>
   );
 
@@ -429,6 +638,11 @@ export function Detail() {
     </>
   );
 
+  // 빈 곳을 누르면 닫기 (이미지·영상·버튼 위를 누른 경우는 제외)
+  const onBackdrop = (e: React.MouseEvent) => {
+    if (e.target === e.currentTarget) close();
+  };
+
   const onTouchStart = (e: React.TouchEvent) => {
     const t = e.touches[0];
     touch.current = { x: t.clientX, y: t.clientY };
@@ -439,21 +653,28 @@ export function Detail() {
     if (!s || (e.target as HTMLElement).tagName === 'VIDEO') return;
     const t = e.changedTouches[0];
     const dx = t.clientX - s.x;
-    if (Math.abs(dx) > 70 && Math.abs(dx) > Math.abs(t.clientY - s.y) * 1.5) go(dx < 0 ? 1 : -1);
+    const dy = t.clientY - s.y;
+    if (Math.abs(dx) > 70 && Math.abs(dx) > Math.abs(dy) * 1.5) go(dx < 0 ? 1 : -1);
+    else if (dy > 110 && dy > Math.abs(dx) * 1.5) close(); // 아래로 쓸어내리면 닫기
   };
 
   if (compact) {
     return (
       <div className="fixed inset-0 z-40 flex flex-col bg-bg fade-in" role="dialog" aria-modal="true" aria-label={title}>
         <div className="flex h-14 shrink-0 items-center gap-1 px-2 pt-[env(safe-area-inset-top)]">
-          <IconButton label="닫기" onClick={() => set({ openId: null })} className="h-10 w-10">
+          <IconButton label="닫기" onClick={close} className="h-10 w-10">
             <X size={20} />
           </IconButton>
           <span className="num flex-1 text-center text-[13px] text-faint">{idx >= 0 ? `${idx + 1} / ${list.length}` : ''}</span>
           {nav}
         </div>
         <div className="scroll-thin min-h-0 flex-1 overflow-y-auto">
-          <div className="flex min-h-[46dvh] items-center justify-center bg-black/30 px-2 py-2 [&>img]:max-h-[70dvh] [&>video]:max-h-[70dvh]" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
+          <div
+            className="flex min-h-[46dvh] items-center justify-center bg-black/30 px-2 py-2 [&>img]:max-h-[70dvh] [&>video]:max-h-[70dvh]"
+            onTouchStart={onTouchStart}
+            onTouchEnd={onTouchEnd}
+            onClick={onBackdrop}
+          >
             {stage}
           </div>
           {thumbs}
@@ -465,15 +686,21 @@ export function Detail() {
 
   return (
     <div className="fixed inset-0 z-40 flex bg-bg fade-in" role="dialog" aria-modal="true" aria-label={title}>
-      <div className="relative flex min-w-0 flex-1 flex-col">
-        <div className="absolute left-4 top-4 z-10 flex gap-2">{nav}</div>
-        <div className="flex min-h-0 flex-1 items-center justify-center p-8 [&>img]:max-h-full [&>video]:max-h-full">{stage}</div>
-        {thumbs}
+      <div className="relative flex min-w-0 flex-1 cursor-zoom-out flex-col" onClick={onBackdrop} title="빈 곳을 누르면 닫힙니다">
+        <div className="absolute left-4 top-4 z-10 flex cursor-auto gap-2">{nav}</div>
+        <div className="flex min-h-0 flex-1 items-center justify-center p-8 [&>*]:cursor-auto [&>img]:max-h-full [&>video]:max-h-full" onClick={onBackdrop}>
+          {stage}
+        </div>
+        {thumbs && (
+          <div className="cursor-auto" onClick={onBackdrop}>
+            {thumbs}
+          </div>
+        )}
       </div>
       <aside className="scroll-thin flex w-[380px] shrink-0 flex-col overflow-y-auto border-l border-line bg-bg">
         <div className="flex items-center justify-between px-5 pt-4">
           <span className="num text-[13px] text-faint">{idx >= 0 ? `${idx + 1} / ${list.length}` : ''}</span>
-          <IconButton label="닫기 (Esc)" onClick={() => set({ openId: null })}>
+          <IconButton label="닫기 (Esc)" onClick={close}>
             <X size={18} />
           </IconButton>
         </div>

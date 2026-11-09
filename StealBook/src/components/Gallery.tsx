@@ -1,16 +1,17 @@
 // 갤러리: 메이슨리(벽돌) · 균일 그리드 · 목록 보기
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ClipboardPaste, FileText, Image as ImageIcon, Link2, Play, Video } from 'lucide-react';
+import { Check, ClipboardPaste, FileText, Image as ImageIcon, Link2, Play, Video } from 'lucide-react';
 import type { Item } from '../lib/types';
 import { useStore, type Pending } from '../store';
 import { useCompact, useElementWidth } from '../hooks/useMedia';
 import { ItemCard, clampRatio, noteHeight } from './ItemCard';
 import { useUrl } from '../lib/urls';
 import { domainOf, fmtDate, fmtTime } from '../lib/util';
-import { titleOf } from '../lib/capture';
+import { coverOf, titleOf } from '../lib/capture';
 import { OkMark } from './Scribble';
 import { pathLabel } from '../lib/tree';
 import { Button, Swatch } from './ui';
+import { useItemPress, useSelecting, visibleOrder } from './Selection';
 
 const PAGE = 90;
 const COL_TARGET = [190, 250, 330];
@@ -57,7 +58,7 @@ function Masonry({ items, pending }: { items: Item[]; pending: Pending[] }) {
     for (const it of all) {
       let h: number;
       if ('label' in it) h = colW * 1.25;
-      else if (!it.cover && (it.type === 'note' || it.type === 'link' || it.type === 'embed')) h = noteHeight(it, colW);
+      else if (!coverOf(it) && (it.type === 'note' || it.type === 'link' || it.type === 'embed')) h = noteHeight(it, colW);
       else h = it.ratio ? colW / clampRatio(it.ratio) : colW * (it.type === 'file' ? 0.75 : 1.25);
       const idx = heights.indexOf(Math.min(...heights));
       out[idx].push(it);
@@ -107,19 +108,27 @@ function Grid({ items, pending }: { items: Item[]; pending: Pending[] }) {
 const TYPE_ICON = { note: FileText, image: ImageIcon, video: Video, link: Link2, embed: Play, file: FileText };
 
 function Row({ item }: { item: Item }) {
-  const open = useStore((s) => s.set);
+  const press = useItemPress(item.id);
+  const selecting = useSelecting();
+  const on = useStore((s) => s.selected.includes(item.id));
   const categories = useStore((s) => s.categories);
   const cat = categories.find((c) => c.id === item.category_id);
-  const cover = useUrl(item.cover);
+  const cover = useUrl(coverOf(item));
   const [broken, setBroken] = useState(false);
   const Icon = TYPE_ICON[item.type];
   const sub = item.why || item.link?.site || (item.url ? domainOf(item.url) : '') || item.body.split('\n')[0];
   return (
     <button
       type="button"
-      onClick={() => open({ openId: item.id })}
-      className="flex w-full items-center gap-3 border-b border-line/70 px-2 py-2 text-left transition hover:bg-panel md:gap-4 md:px-3"
+      {...press}
+      aria-pressed={selecting ? on : undefined}
+      className={`flex w-full select-none items-center gap-3 border-b border-line/70 px-2 py-2 text-left transition [-webkit-touch-callout:none] md:gap-4 md:px-3 ${on ? 'bg-mark/10' : 'hover:bg-panel'}`}
     >
+      {selecting && (
+        <span className={`grid h-5 w-5 shrink-0 place-items-center rounded-full border-2 ${on ? 'border-mark bg-mark text-bg' : 'border-faint'}`}>
+          {on && <Check size={12} strokeWidth={3} />}
+        </span>
+      )}
       <span className="relative h-12 w-12 shrink-0 overflow-hidden rounded-[5px] bg-panel md:h-14 md:w-14">
         {cover && !broken ? (
           <img src={cover} alt="" loading="lazy" referrerPolicy="no-referrer" onError={() => setBroken(true)} className="h-full w-full object-cover" />
@@ -198,6 +207,7 @@ function Empty({ filtered }: { filtered: boolean }) {
 
 export function Gallery({ items, filtered }: { items: Item[]; filtered: boolean }) {
   const view = useStore((s) => s.view);
+  visibleOrder.current = items.map((i) => i.id);
   const pending = useStore((s) => s.pending);
   if (!items.length && !pending.length) return <Empty filtered={filtered} />;
   if (view === 'list') return <List items={items} />;

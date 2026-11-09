@@ -5,10 +5,11 @@ import type { Item } from '../lib/types';
 import { useUrl } from '../lib/urls';
 import { domainOf, fmtBytes, fmtTime } from '../lib/util';
 import { PROVIDER_LABEL } from '../lib/embed';
-import { titleOf } from '../lib/capture';
+import { coverOf, titleOf } from '../lib/capture';
 import { OkMark } from './Scribble';
 import { useStore } from '../store';
 import { useHover } from '../hooks/useMedia';
+import { SelectDot, useItemPress, useSelecting } from './Selection';
 
 export const clampRatio = (r: number) => Math.min(2.6, Math.max(0.42, r));
 
@@ -42,8 +43,9 @@ function Scrub({ item, x }: { item: Item; x: number }) {
   );
 }
 
-function CardInner({ item, fill, fresh }: { item: Item; fill: boolean; fresh?: boolean }) {
-  const cover = useUrl(item.cover);
+function CardInner({ item, fill, fresh, selecting }: { item: Item; fill: boolean; fresh?: boolean; selecting?: boolean }) {
+  const coverPath = coverOf(item);
+  const cover = useUrl(coverPath);
   const [broken, setBroken] = useState(false);
   const [scrubX, setScrubX] = useState<number | null>(null);
   const hover = useHover();
@@ -52,7 +54,7 @@ function CardInner({ item, fill, fresh }: { item: Item; fill: boolean; fresh?: b
   const m = item.media[0];
   const ratio = fill ? 1 : item.ratio ? clampRatio(item.ratio) : null;
   const title = titleOf(item);
-  const hasCover = !!item.cover && !broken;
+  const hasCover = !!coverPath && !broken;
 
   const onMove = (e: React.PointerEvent) => {
     if (!hover || !m?.strip || e.pointerType !== 'mouse') return;
@@ -64,7 +66,7 @@ function CardInner({ item, fill, fresh }: { item: Item; fill: boolean; fresh?: b
   if (!hasCover && (item.type === 'note' || item.type === 'link' || item.type === 'embed')) {
     const isNote = item.type === 'note';
     return (
-      <div ref={ref} className={`relative flex flex-col bg-panel p-4 ${fill ? 'aspect-square' : ''}`}>
+      <div ref={ref} className={`relative flex flex-col bg-panel p-4 transition-[padding] ${selecting ? 'pt-10' : ''} ${fill ? 'aspect-square' : ''}`}>
         {!isNote && (
           <span className="mb-2 inline-flex items-center gap-1.5 text-[12px] font-semibold text-mute">
             {item.embed ? <Play size={12} /> : <Link2 size={12} />}
@@ -152,28 +154,27 @@ function CardInner({ item, fill, fresh }: { item: Item; fill: boolean; fresh?: b
 }
 
 export const ItemCard = memo(function ItemCard({ item, fill = false, fresh = false }: { item: Item; fill?: boolean; fresh?: boolean }) {
-  const open = useStore((s) => s.set);
   const hover = useHover();
+  const press = useItemPress(item.id);
+  const selecting = useSelecting();
+  const on = useStore((s) => s.selected.includes(item.id));
   return (
     <article
       role="button"
       tabIndex={0}
       aria-label={titleOf(item)}
+      aria-pressed={selecting ? on : undefined}
       draggable={hover}
       onDragStart={(e) => {
         e.dataTransfer.setData('application/x-stealbook-item', item.id);
         e.dataTransfer.effectAllowed = 'move';
       }}
-      onClick={() => open({ openId: item.id })}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault();
-          open({ openId: item.id });
-        }
-      }}
-      className={`group relative cursor-pointer overflow-hidden rounded-md outline-offset-2 ${fresh ? 'drop-in' : ''}`}
+      {...press}
+      className={`group relative cursor-pointer select-none overflow-hidden rounded-md outline-offset-2 [-webkit-touch-callout:none] ${fresh ? 'drop-in' : ''}`}
     >
-      <CardInner item={item} fill={fill} fresh={fresh} />
+      <CardInner item={item} fill={fill} fresh={fresh} selecting={selecting} />
+      {on && <span aria-hidden className="pointer-events-none absolute inset-0 rounded-md bg-mark/10 ring-[3px] ring-inset ring-mark" />}
+      <SelectDot on={on} show={selecting} />
     </article>
   );
 });

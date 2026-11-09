@@ -9,6 +9,7 @@
 | Supabase 프로젝트 | `steal-book` (June's App Factory, 서울 리전) |
 | 로그인 계정 | verymore.june@gmail.com — 처음 받은 임시 비밀번호는 앱 **설정 → 비밀번호 바꾸기**로 바꾸기 |
 | 새 가입 | 데이터베이스에서 막혀 있음 (`stealbook_single_owner` 트리거, 아래 1-3 참고) |
+| 데이터베이스 구조 | `schema.sql` 최신본 적용됨 (하위 카테고리 · 휴지통 `deleted_at` · 모음 `collections` 포함) |
 
 아래 내용은 처음부터 다시 만들거나 다른 곳에 하나 더 만들 때를 위한 기록입니다.
 
@@ -63,9 +64,10 @@ cd C:\Users\one\Documents\GitHub\widget\StealBook
 2. 이 폴더의 `supabase/schema.sql` 파일을 메모장으로 열어 **전체 복사** → 붙여넣기
 3. 오른쪽 아래 **Run**
 4. `Success. No rows returned` 가 나오면 끝
+   (앱을 업데이트한 뒤에도 이 파일을 다시 Run 하면 새 칸·표만 덧붙고 기존 데이터는 그대로입니다)
 
 이것으로 아래가 한 번에 만들어집니다.
-- 카테고리 · 항목 표
+- 카테고리 · 항목 · 모음 표 (휴지통 칸 포함)
 - 본인만 읽고 쓸 수 있는 보안 규칙
 - 다른 기기 변경이 바로 반영되는 실시간 동기화
 - 사진·영상 저장 공간 `media` (비공개, 파일 하나 최대 50MB)
