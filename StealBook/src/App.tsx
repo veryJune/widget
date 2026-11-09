@@ -1,0 +1,199 @@
+import { useEffect, useState } from 'react';
+import { useStore } from './store';
+import { useVisibleItems } from './hooks/useVisible';
+import { useCompact } from './hooks/useMedia';
+import { draftFromText } from './lib/capture';
+import { backend } from './lib/backend';
+import { Sidebar } from './components/Sidebar';
+import { Toolbar, useScopeLabel } from './components/Toolbar';
+import { Fab, FilterSheet, MenuSheet, MobileHeader } from './components/MobileChrome';
+import { Gallery } from './components/Gallery';
+import { Composer } from './components/Composer';
+import { Detail } from './components/Detail';
+import { Theater } from './components/Theater';
+import { CategoryManager } from './components/CategoryManager';
+import { Settings } from './components/Settings';
+import { Login } from './components/Login';
+import { Toasts } from './components/Toasts';
+import { Wordmark } from './components/Scribble';
+import { useFilterActive } from './components/Controls';
+
+const isTyping = (t: EventTarget | null) => {
+  const el = t as HTMLElement | null;
+  return !!el && (/INPUT|TEXTAREA|SELECT/.test(el.tagName) || el.isContentEditable);
+};
+
+/** 안드로이드 '공유 → Steal Book' 으로 들어온 내용 */
+function readShare(): string | null {
+  const p = new URLSearchParams(location.search);
+  const parts = [p.get('title'), p.get('text'), p.get('url')].filter(Boolean) as string[];
+  if (!parts.length) return null;
+  history.replaceState(null, '', location.pathname);
+  return [...new Set(parts)].join(' ');
+}
+
+function DropOverlay() {
+  const label = useScopeLabel();
+  const scope = useStore((s) => s.scope);
+  const where = scope.kind === 'cat' ? label : '인박스';
+  return (
+    <div className="pointer-events-none fixed inset-3 z-[80] grid place-items-center rounded-2xl border-2 border-dashed border-mark bg-scrim fade-in">
+      <p className="text-[20px] font-extrabold">놓으면 {where}에 담깁니다</p>
+    </div>
+  );
+}
+
+function Main() {
+  const compact = useCompact();
+  const items = useVisibleItems();
+  const { scope, query, type, aspect, color, tag, sort, loaded } = useStore();
+  const filtered = useFilterActive() || !!query.trim();
+  const galleryKey = JSON.stringify([scope, query, type, aspect, color, tag, sort]);
+
+  const body = !loaded ? (
+    <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
+      {Array.from({ length: 8 }, (_, i) => (
+        <div key={i} className="shimmer rounded-md" style={{ aspectRatio: i % 3 ? '4 / 5' : '1 / 1' }} />
+      ))}
+    </div>
+  ) : (
+    <Gallery key={galleryKey} items={items} filtered={filtered} />
+  );
+
+  if (compact) {
+    return (
+      <div className="min-h-full">
+        <MobileHeader />
+        <main className="px-[6px] pb-28">{body}</main>
+        <Fab />
+        <FilterSheet />
+        <MenuSheet />
+      </div>
+    );
+  }
+  return (
+    <div className="flex h-full">
+      <Sidebar />
+      <div className="scroll-thin min-w-0 flex-1 overflow-y-auto" id="scroller">
+        <Toolbar count={items.length} />
+        <main className="px-6 pb-16 pt-4">{body}</main>
+      </div>
+    </div>
+  );
+}
+
+export default function App() {
+  const s = useStore();
+  const { theme, authChecked, session } = s;
+  const [dragging, setDragging] = useState(false);
+  const [shared, setShared] = useState<string | null>(() => readShare());
+
+  useEffect(() => {
+    useStore.getState().boot();
+  }, []);
+
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme;
+    document.querySelector('meta[name="theme-color"]')?.setAttribute('content', theme === 'dark' ? '#1e1e1e' : '#e4e4e4');
+  }, [theme]);
+
+  // 공유로 들어온 내용은 로그인 확인 후 작성 창으로
+  useEffect(() => {
+    if (shared && session) {
+      useStore.getState().openComposer(draftFromText(shared, null));
+      setShared(null);
+    }
+  }, [shared, session]);
+
+  // 어디서든 붙여넣기 · 끌어다 놓기 · 단축키
+  useEffect(() => {
+    const busy = () => {
+      const st = useStore.getState();
+      return !st.session || st.composer.open || st.theater.open || !!st.panel;
+    };
+    const onPaste = (e: ClipboardEvent) => {
+      if (busy() || isTyping(e.target) || !e.clipboardData) return;
+      const files = [...e.clipboardData.files];
+      const text = e.clipboardData.getData('text');
+      if (!files.length && !text.trim()) return;
+      e.preventDefault();
+      useStore.getState().set({ openId: null });
+      useStore.getState().quickCapture(files.length ? { files } : { text });
+    };
+    let depth = 0;
+    const hasPayload = (e: DragEvent) => {
+      const t = e.dataTransfer?.types || [];
+      return t.includes('Files') || t.includes('text/uri-list');
+    };
+    const onDragEnter = (e: DragEvent) => {
+      if (busy() || !hasPayload(e) || e.dataTransfer?.types.includes('application/x-stealbook-item')) return;
+      depth++;
+      setDragging(true);
+    };
+    const onDragLeave = () => {
+      depth = Math.max(0, depth - 1);
+      if (!depth) setDragging(false);
+    };
+    const onDragOver = (e: DragEvent) => {
+      if (!busy() && hasPayload(e)) e.preventDefault();
+    };
+    const onDrop = (e: DragEvent) => {
+      depth = 0;
+      setDragging(false);
+      if (busy() || !e.dataTransfer || e.dataTransfer.types.includes('application/x-stealbook-item')) return;
+      const files = [...e.dataTransfer.files];
+      const text = e.dataTransfer.getData('text/uri-list').split('\n').find((l) => l && !l.startsWith('#')) || e.dataTransfer.getData('text/plain');
+      if (!files.length && !text) return;
+      e.preventDefault();
+      useStore.getState().quickCapture(files.length ? { files } : { text });
+    };
+    const onKey = (e: KeyboardEvent) => {
+      const st = useStore.getState();
+      if (e.ctrlKey || e.metaKey || e.altKey || isTyping(e.target) || busy() || st.openId) return;
+      if (e.key === 'n' || e.key === 'N') {
+        e.preventDefault();
+        st.openComposer();
+      }
+      if (e.key === '1') st.setPref('view', 'masonry');
+      if (e.key === '2') st.setPref('view', 'grid');
+      if (e.key === '3') st.setPref('view', 'list');
+      if (e.key === 't' || e.key === 'T') st.set({ theater: { open: true, startId: null } });
+    };
+    window.addEventListener('paste', onPaste);
+    window.addEventListener('dragenter', onDragEnter);
+    window.addEventListener('dragleave', onDragLeave);
+    window.addEventListener('dragover', onDragOver);
+    window.addEventListener('drop', onDrop);
+    window.addEventListener('keydown', onKey);
+    return () => {
+      window.removeEventListener('paste', onPaste);
+      window.removeEventListener('dragenter', onDragEnter);
+      window.removeEventListener('dragleave', onDragLeave);
+      window.removeEventListener('dragover', onDragOver);
+      window.removeEventListener('drop', onDrop);
+      window.removeEventListener('keydown', onKey);
+    };
+  }, []);
+
+  if (!authChecked) {
+    return (
+      <div className="grid h-full place-items-center">
+        <Wordmark size={28} />
+      </div>
+    );
+  }
+  if (backend.mode === 'cloud' && !session) return <Login />;
+
+  return (
+    <>
+      <Main />
+      <Composer />
+      <Detail />
+      <Theater />
+      <CategoryManager />
+      <Settings />
+      <Toasts />
+      {dragging && <DropOverlay />}
+    </>
+  );
+}

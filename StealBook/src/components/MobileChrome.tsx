@@ -1,0 +1,202 @@
+// 모바일 화면: 상단 바(검색·필터·메뉴) + 범위 칩 + 오른쪽 아래 담기 버튼 + 시트들
+import { useState } from 'react';
+import { Clapperboard, ListFilter, Menu, Plus, Search, Settings, SlidersHorizontal } from 'lucide-react';
+import { useStore } from '../store';
+import { useCounts } from '../hooks/useVisible';
+import type { Scope } from '../lib/types';
+import { Wordmark } from './Scribble';
+import { AspectFilter, ActiveTag, ColorFilter, DensitySwitch, SORTS, TypeFilter, ViewSwitch, useFilterActive } from './Controls';
+import { Button, IconButton, Modal, Swatch } from './ui';
+
+function Chip({ scope, label, count, dot }: { scope: Scope; label: string; count: number; dot?: string }) {
+  const { scope: cur, set } = useStore();
+  const active = cur.kind === scope.kind && (cur.kind !== 'cat' || (scope.kind === 'cat' && cur.id === scope.id));
+  return (
+    <button
+      type="button"
+      onClick={() => set({ scope })}
+      aria-current={active ? 'page' : undefined}
+      className={`inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full px-3.5 text-[14px] font-semibold transition ${active ? 'bg-ink text-bg' : 'bg-panel text-mute'}`}
+    >
+      {dot && <Swatch color={dot} size={8} />}
+      {label}
+      {count > 0 && <span className={`num text-[12px] ${active ? 'opacity-60' : 'text-faint'}`}>{count}</span>}
+    </button>
+  );
+}
+
+export function MobileHeader() {
+  const { query, set, categories } = useStore();
+  const counts = useCounts();
+  const [searching, setSearching] = useState(!!query);
+  const filterOn = useFilterActive();
+
+  return (
+    <header className="sticky top-0 z-20 bg-bg/94 pt-[env(safe-area-inset-top)] backdrop-blur-md">
+      {searching ? (
+        <div className="flex h-14 items-center gap-2 px-3">
+          <label className="relative flex h-10 flex-1 items-center">
+            <Search size={16} className="pointer-events-none absolute left-3 text-faint" />
+            <input
+              autoFocus
+              type="search"
+              value={query}
+              onChange={(e) => set({ query: e.target.value })}
+              placeholder="제목·메모·태그 검색"
+              aria-label="검색"
+              className="h-full w-full rounded-full bg-panel pl-9 pr-4 outline-none placeholder:text-faint"
+            />
+          </label>
+          <button
+            type="button"
+            className="px-2 text-[15px] font-semibold text-mute"
+            onClick={() => {
+              set({ query: '' });
+              setSearching(false);
+            }}
+          >
+            취소
+          </button>
+        </div>
+      ) : (
+        <div className="flex h-14 items-center gap-1 pl-4 pr-2">
+          <Wordmark size={19} />
+          <div className="flex-1" />
+          <IconButton label="검색" onClick={() => setSearching(true)} className="h-10 w-10">
+            <Search size={19} />
+          </IconButton>
+          <IconButton label="필터" onClick={() => set({ panel: 'filters' })} className="relative h-10 w-10">
+            <ListFilter size={19} />
+            {filterOn && <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-mark" />}
+          </IconButton>
+          <IconButton label="메뉴" onClick={() => set({ panel: 'menu' })} className="h-10 w-10">
+            <Menu size={19} />
+          </IconButton>
+        </div>
+      )}
+      <div className="no-scrollbar flex gap-1.5 overflow-x-auto px-3 pb-2.5">
+        <Chip scope={{ kind: 'all' }} label="전체" count={counts.all} />
+        <Chip scope={{ kind: 'inbox' }} label="인박스" count={counts.inbox} />
+        <Chip scope={{ kind: 'fav' }} label="즐겨찾기" count={counts.fav} />
+        {categories.map((c) => (
+          <Chip key={c.id} scope={{ kind: 'cat', id: c.id }} label={c.name} count={counts.byCat.get(c.id) || 0} dot={c.color} />
+        ))}
+        <button
+          type="button"
+          onClick={() => set({ panel: 'categories' })}
+          className="inline-flex h-9 shrink-0 items-center gap-1 rounded-full border border-dashed border-line px-3.5 text-[14px] font-semibold text-faint"
+        >
+          <Plus size={14} /> 카테고리
+        </button>
+      </div>
+    </header>
+  );
+}
+
+export function Fab() {
+  const openComposer = useStore((s) => s.openComposer);
+  return (
+    <button
+      type="button"
+      aria-label="담기"
+      onClick={() => openComposer()}
+      className="fixed bottom-[calc(18px+env(safe-area-inset-bottom))] right-[18px] z-30 grid h-14 w-14 place-items-center rounded-full bg-ink text-bg shadow-[0_10px_30px_rgba(0,0,0,0.45)] active:scale-95"
+    >
+      <Plus size={26} strokeWidth={2.4} />
+    </button>
+  );
+}
+
+export function FilterSheet() {
+  const { panel, set, clearFilters } = useStore();
+  const active = useFilterActive();
+  return (
+    <Modal
+      open={panel === 'filters'}
+      onClose={() => set({ panel: null })}
+      title="필터"
+      footer={
+        <div className="flex gap-2">
+          <Button className="flex-1" disabled={!active} onClick={clearFilters}>
+            지우기
+          </Button>
+          <Button variant="primary" className="flex-1" onClick={() => set({ panel: null })}>
+            보기
+          </Button>
+        </div>
+      }
+    >
+      <div className="space-y-6 px-5 py-5">
+        <section>
+          <h3 className="mb-2 text-[13px] font-semibold text-mute">종류</h3>
+          <TypeFilter wrap />
+        </section>
+        <section>
+          <h3 className="mb-2 text-[13px] font-semibold text-mute">화면 비율</h3>
+          <AspectFilter />
+        </section>
+        <section>
+          <h3 className="mb-2 text-[13px] font-semibold text-mute">색</h3>
+          <ColorFilter size={24} />
+        </section>
+        <ActiveTag />
+      </div>
+    </Modal>
+  );
+}
+
+export function MenuSheet() {
+  const { panel, set, sort, setPref, theme } = useStore();
+  return (
+    <Modal open={panel === 'menu'} onClose={() => set({ panel: null })} title="보기">
+      <div className="space-y-6 px-5 py-5">
+        <section className="flex items-center justify-between gap-3">
+          <h3 className="text-[14px] font-semibold">보기 방식</h3>
+          <ViewSwitch />
+        </section>
+        <section className="flex items-center justify-between gap-3">
+          <h3 className="text-[14px] font-semibold">한 줄 개수</h3>
+          <DensitySwitch labels={['적게', '보통', '많이']} />
+        </section>
+        <section>
+          <h3 className="mb-2 text-[14px] font-semibold">정렬</h3>
+          <div className="flex flex-wrap gap-1.5">
+            {SORTS.map((s) => (
+              <button
+                key={s.id}
+                type="button"
+                aria-pressed={sort === s.id}
+                onClick={() => setPref('sort', s.id)}
+                className={`h-9 rounded-full px-3.5 text-[14px] font-semibold ${sort === s.id ? 'bg-ink text-bg' : 'bg-raise text-mute'}`}
+              >
+                {s.label}
+              </button>
+            ))}
+          </div>
+        </section>
+        <section className="flex items-center justify-between gap-3">
+          <h3 className="text-[14px] font-semibold">화면</h3>
+          <div className="flex rounded-lg bg-bg p-0.5">
+            {(['dark', 'light'] as const).map((t) => (
+              <button key={t} type="button" aria-pressed={theme === t} onClick={() => setPref('theme', t)} className={`h-8 rounded-md px-3 text-[13px] font-semibold ${theme === t ? 'bg-raise text-ink' : 'text-mute'}`}>
+                {t === 'dark' ? '어둡게' : '밝게'}
+              </button>
+            ))}
+          </div>
+        </section>
+        <div className="grid gap-2 border-t border-line pt-5">
+          <Button className="justify-start" onClick={() => set({ panel: null, theater: { open: true, startId: null } })}>
+            <Clapperboard size={16} /> 시어터로 보기
+          </Button>
+          <Button className="justify-start" onClick={() => set({ panel: 'categories' })}>
+            <SlidersHorizontal size={16} /> 카테고리 관리
+          </Button>
+          <Button className="justify-start" onClick={() => set({ panel: 'settings' })}>
+            <Settings size={16} /> 설정 · 백업
+          </Button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
