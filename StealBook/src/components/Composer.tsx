@@ -6,12 +6,12 @@ import { previewLink, type Draft, type LinkPreview } from '../lib/capture';
 import { parseEmbed, PROVIDER_LABEL } from '../lib/embed';
 import type { MediaFile } from '../lib/types';
 import { useUrl } from '../lib/urls';
-import { CATEGORY_COLORS } from '../lib/colors';
 import { fmtBytes, isUrl, splitUrl } from '../lib/util';
 import { useAllTags } from '../hooks/useVisible';
 import { useCompact } from '../hooks/useMedia';
-import { Button, Field, Modal, Swatch, inputCls } from './ui';
+import { Button, Field, Modal, inputCls } from './ui';
 import { OkMark } from './Scribble';
+import { CategoryPicker } from './CategoryPicker';
 
 function NewFileThumb({ file, onRemove }: { file: File; onRemove: () => void }) {
   const url = useMemo(() => (file.type.startsWith('image/') || file.type.startsWith('video/') ? URL.createObjectURL(file) : ''), [file]);
@@ -84,13 +84,12 @@ function PreviewCard({ p, loading }: { p: LinkPreview | null; loading: boolean }
 }
 
 export function Composer() {
-  const { composer, set, submitDraft, categories, addCategory } = useStore();
+  const { composer, set, submitDraft } = useStore();
   const compact = useCompact();
   const allTags = useAllTags();
   const [d, setD] = useState<Draft | null>(composer.draft);
   const [loading, setLoading] = useState(false);
   const [tagText, setTagText] = useState('');
-  const [newCat, setNewCat] = useState<string | null>(null);
   const [dragOver, setDragOver] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const reqId = useRef(0);
@@ -269,55 +268,7 @@ export function Composer() {
 
         <div>
           <span className="mb-1.5 block text-[13px] font-semibold text-mute">카테고리</span>
-          <div className="flex flex-wrap gap-1.5">
-            <button
-              type="button"
-              aria-pressed={d.category_id === null}
-              onClick={() => patch({ category_id: null })}
-              className={`h-9 rounded-full px-3.5 text-[14px] font-semibold ${d.category_id === null ? 'bg-ink text-bg' : 'bg-raise text-mute hover:text-ink'}`}
-            >
-              인박스
-            </button>
-            {categories.map((c) => (
-              <button
-                key={c.id}
-                type="button"
-                aria-pressed={d.category_id === c.id}
-                onClick={() => patch({ category_id: c.id })}
-                className={`inline-flex h-9 items-center gap-1.5 rounded-full px-3.5 text-[14px] font-semibold ${d.category_id === c.id ? 'bg-ink text-bg' : 'bg-raise text-mute hover:text-ink'}`}
-              >
-                {c.icon ? <span>{c.icon}</span> : <Swatch color={c.color} size={8} />} {c.name}
-              </button>
-            ))}
-            {newCat === null ? (
-              <button type="button" onClick={() => setNewCat('')} className="inline-flex h-9 items-center gap-1 rounded-full border border-dashed border-line px-3.5 text-[14px] font-semibold text-faint hover:text-ink">
-                <Plus size={14} /> 새 카테고리
-              </button>
-            ) : (
-              <input
-                autoFocus
-                value={newCat}
-                onChange={(e) => setNewCat(e.target.value)}
-                onKeyDown={async (e) => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault();
-                    if (newCat.trim()) {
-                      const c = await addCategory(newCat, CATEGORY_COLORS[categories.length % CATEGORY_COLORS.length]);
-                      patch({ category_id: c.id });
-                    }
-                    setNewCat(null);
-                  }
-                  if (e.key === 'Escape') {
-                    e.stopPropagation();
-                    setNewCat(null);
-                  }
-                }}
-                onBlur={() => setNewCat(null)}
-                placeholder="이름 입력 후 Enter"
-                className={`${inputCls} h-9 w-44 rounded-full py-1`}
-              />
-            )}
-          </div>
+          <CategoryPicker value={d.category_id} onChange={(id) => patch({ category_id: id })} />
         </div>
 
         <div>

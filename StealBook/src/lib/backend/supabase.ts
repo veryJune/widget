@@ -33,6 +33,7 @@ function rowToItem(r: Record<string, unknown>): Item {
 function rowToCategory(r: Record<string, unknown>): Category {
   return {
     id: r.id as string,
+    parent_id: (r.parent_id as string) ?? null,
     name: (r.name as string) || '',
     color: (r.color as string) || '#A0A0A0',
     icon: (r.icon as string) || '',
@@ -106,7 +107,7 @@ export function createSupabaseBackend(url: string, key: string): Backend {
     },
 
     async saveCategory(c) {
-      check(await sb.from('categories').upsert({ id: c.id, name: c.name, color: c.color, icon: c.icon, sort: c.sort, created_at: c.created_at }));
+      check(await sb.from('categories').upsert({ id: c.id, parent_id: c.parent_id ?? null, name: c.name, color: c.color, icon: c.icon, sort: c.sort, created_at: c.created_at }));
     },
 
     async deleteCategory(id) {

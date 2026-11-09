@@ -16,6 +16,7 @@ import { familyOf } from '../lib/colors';
 import { primeUrl } from '../lib/urls';
 import { Button, IconButton, Swatch, inputCls } from './ui';
 import { OkMark } from './Scribble';
+import { categoryOptions } from './CategoryPicker';
 
 // ---------------- 구간 북마크 ----------------
 
@@ -336,9 +337,9 @@ export function Detail() {
           style={cat ? { boxShadow: `inset 3px 0 0 ${cat.color}` } : undefined}
         >
           <option value="">인박스</option>
-          {categories.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.name}
+          {categoryOptions(categories).map((o) => (
+            <option key={o.id} value={o.id}>
+              {o.label}
             </option>
           ))}
         </select>

@@ -4,6 +4,7 @@ import { Clapperboard, Search, X } from 'lucide-react';
 import { useStore } from '../store';
 import { AspectFilter, ActiveTag, ColorFilter, DensitySwitch, SortSelect, TypeFilter, ViewSwitch, useFilterActive } from './Controls';
 import { IconButton } from './ui';
+import { ancestors } from '../lib/tree';
 
 export function useScopeLabel() {
   const { scope, categories } = useStore();
@@ -13,9 +14,30 @@ export function useScopeLabel() {
   return categories.find((c) => c.id === scope.id)?.name || '카테고리';
 }
 
+/** 상위 › 하위 경로 제목. 상위 이름을 누르면 그 카테고리로 이동 */
+export function ScopeTitle({ className = '' }: { className?: string }) {
+  const { scope, categories, set } = useStore();
+  const label = useScopeLabel();
+  if (scope.kind !== 'cat') return <h1 className={`min-w-0 truncate font-extrabold tracking-tight ${className}`}>{label}</h1>;
+  const path = ancestors(categories, scope.id);
+  const parents = path.slice(0, -1);
+  return (
+    <h1 className={`flex min-w-0 items-baseline gap-1.5 font-extrabold tracking-tight ${className}`}>
+      {parents.map((p) => (
+        <span key={p.id} className="inline-flex shrink-0 items-baseline gap-1.5">
+          <button type="button" onClick={() => set({ scope: { kind: 'cat', id: p.id } })} className="font-bold text-faint hover:text-ink">
+            {p.name}
+          </button>
+          <span className="text-faint">›</span>
+        </span>
+      ))}
+      <span className="truncate">{label}</span>
+    </h1>
+  );
+}
+
 export function Toolbar({ count }: { count: number }) {
   const { query, set, clearFilters } = useStore();
-  const label = useScopeLabel();
   const active = useFilterActive();
   const searchRef = useRef<HTMLInputElement>(null);
 
@@ -34,7 +56,7 @@ export function Toolbar({ count }: { count: number }) {
   return (
     <div className="sticky top-0 z-20 border-b border-line bg-bg/92 backdrop-blur-md">
       <div className="flex items-center gap-3 px-6 pb-2 pt-4">
-        <h1 className="min-w-0 truncate text-[22px] font-extrabold tracking-tight">{label}</h1>
+        <ScopeTitle className="text-[22px]" />
         <span className="num pt-1 text-[13px] text-faint">{count}</span>
         <div className="flex-1" />
         <label className="relative flex h-9 w-[min(340px,32vw)] items-center">
