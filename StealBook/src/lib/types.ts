@@ -74,6 +74,8 @@ export interface Item {
 
 export interface Category {
   id: string;
+  /** 상위 카테고리 (없으면 맨 위) */
+  parent_id: string | null;
   name: string;
   color: string;
   icon: string;

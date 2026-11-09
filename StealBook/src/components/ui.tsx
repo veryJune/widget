@@ -57,25 +57,27 @@ export function Modal({
 }) {
   const compact = useCompact();
   const ref = useRef<HTMLDivElement>(null);
+  // onClose 는 부모가 그릴 때마다 새로 만들어지므로 ref 로 보관합니다.
+  // (의존성에 넣으면 글자를 칠 때마다 포커스가 창 맨 위로 튀는 문제가 생김)
+  const closeRef = useRef(onClose);
+  closeRef.current = onClose;
   useEffect(() => {
     if (!open) return;
     const prev = document.activeElement as HTMLElement | null;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        e.stopPropagation();
-        onClose();
-      }
+      // 안쪽 입력창이 Esc 를 먼저 처리했으면(예: 새 카테고리 입력 취소) 창은 닫지 않음
+      if (e.key === 'Escape' && !e.defaultPrevented) closeRef.current();
     };
-    window.addEventListener('keydown', onKey, true);
+    window.addEventListener('keydown', onKey);
     requestAnimationFrame(() => {
       const el = ref.current?.querySelector<HTMLElement>('[data-autofocus]') || ref.current;
       el?.focus();
     });
     return () => {
-      window.removeEventListener('keydown', onKey, true);
+      window.removeEventListener('keydown', onKey);
       prev?.focus?.();
     };
-  }, [open, onClose]);
+  }, [open]);
   if (!open) return null;
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-scrim backdrop-blur-[2px] fade-in md:items-center" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>

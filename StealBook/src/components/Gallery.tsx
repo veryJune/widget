@@ -9,6 +9,7 @@ import { useUrl } from '../lib/urls';
 import { domainOf, fmtDate, fmtTime } from '../lib/util';
 import { titleOf } from '../lib/capture';
 import { OkMark } from './Scribble';
+import { pathLabel } from '../lib/tree';
 import { Button, Swatch } from './ui';
 
 const PAGE = 90;
@@ -107,7 +108,8 @@ const TYPE_ICON = { note: FileText, image: ImageIcon, video: Video, link: Link2,
 
 function Row({ item }: { item: Item }) {
   const open = useStore((s) => s.set);
-  const cat = useStore((s) => s.categories.find((c) => c.id === item.category_id));
+  const categories = useStore((s) => s.categories);
+  const cat = categories.find((c) => c.id === item.category_id);
   const cover = useUrl(item.cover);
   const [broken, setBroken] = useState(false);
   const Icon = TYPE_ICON[item.type];
@@ -139,7 +141,7 @@ function Row({ item }: { item: Item }) {
       <span className="hidden w-36 shrink-0 items-center gap-2 truncate text-[13px] text-mute md:flex">
         {cat ? (
           <>
-            <Swatch color={cat.color} size={8} /> <span className="truncate">{cat.name}</span>
+            <Swatch color={cat.color} size={8} /> <span className="truncate" title={pathLabel(categories, cat.id)}>{cat.name}</span>
           </>
         ) : (
           '인박스'

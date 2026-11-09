@@ -7,8 +7,9 @@ import type { Scope } from '../lib/types';
 import { Wordmark } from './Scribble';
 import { AspectFilter, ActiveTag, ColorFilter, DensitySwitch, SORTS, TypeFilter, ViewSwitch, useFilterActive } from './Controls';
 import { Button, IconButton, Modal, Swatch } from './ui';
+import { ancestors, descendants, flatten, siblingsOf } from '../lib/tree';
 
-function Chip({ scope, label, count, dot }: { scope: Scope; label: string; count: number; dot?: string }) {
+function Chip({ scope, label, count, dot, partial, small }: { scope: Scope; label: string; count: number; dot?: string; partial?: boolean; small?: boolean }) {
   const { scope: cur, set } = useStore();
   const active = cur.kind === scope.kind && (cur.kind !== 'cat' || (scope.kind === 'cat' && cur.id === scope.id));
   return (
@@ -16,7 +17,9 @@ function Chip({ scope, label, count, dot }: { scope: Scope; label: string; count
       type="button"
       onClick={() => set({ scope })}
       aria-current={active ? 'page' : undefined}
-      className={`inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full px-3.5 text-[14px] font-semibold transition ${active ? 'bg-ink text-bg' : 'bg-panel text-mute'}`}
+      className={`inline-flex shrink-0 items-center gap-1.5 rounded-full font-semibold transition ${small ? 'h-8 px-3 text-[13px]' : 'h-9 px-3.5 text-[14px]'} ${
+        active ? 'bg-ink text-bg' : partial ? 'bg-raise text-ink ring-1 ring-ink/40' : 'bg-panel text-mute'
+      }`}
     >
       {dot && <Swatch color={dot} size={8} />}
       {label}
@@ -26,7 +29,10 @@ function Chip({ scope, label, count, dot }: { scope: Scope; label: string; count
 }
 
 export function MobileHeader() {
-  const { query, set, categories } = useStore();
+  const { query, set, categories, scope } = useStore();
+  const root = scope.kind === 'cat' ? ancestors(categories, scope.id)[0] : undefined;
+  const inRoot = root ? descendants(categories, root.id) : null;
+  const sub = root && inRoot ? flatten(categories).filter((f) => inRoot.has(f.cat.id) && f.cat.id !== root.id) : [];
   const counts = useCounts();
   const [searching, setSearching] = useState(!!query);
   const filterOn = useFilterActive();
@@ -78,8 +84,8 @@ export function MobileHeader() {
         <Chip scope={{ kind: 'all' }} label="전체" count={counts.all} />
         <Chip scope={{ kind: 'inbox' }} label="인박스" count={counts.inbox} />
         <Chip scope={{ kind: 'fav' }} label="즐겨찾기" count={counts.fav} />
-        {categories.map((c) => (
-          <Chip key={c.id} scope={{ kind: 'cat', id: c.id }} label={c.name} count={counts.byCat.get(c.id) || 0} dot={c.color} />
+        {siblingsOf(categories, null).map((c) => (
+          <Chip key={c.id} scope={{ kind: 'cat', id: c.id }} label={c.name} count={counts.byCat.get(c.id) || 0} dot={c.color} partial={root?.id === c.id && scope.kind === 'cat' && scope.id !== c.id} />
         ))}
         <button
           type="button"
@@ -89,6 +95,13 @@ export function MobileHeader() {
           <Plus size={14} /> 카테고리
         </button>
       </div>
+      {root && sub.length > 0 && (
+        <div className="no-scrollbar flex gap-1.5 overflow-x-auto border-t border-line/60 px-3 py-2">
+          {sub.map(({ cat, depth }) => (
+            <Chip key={cat.id} small scope={{ kind: 'cat', id: cat.id }} label={`${depth > 1 ? '›'.repeat(depth - 1) + ' ' : ''}${cat.name}`} count={counts.byCat.get(cat.id) || 0} />
+          ))}
+        </div>
+      )}
     </header>
   );
 }

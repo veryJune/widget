@@ -37,6 +37,10 @@ create table if not exists public.items (
   updated_at   timestamptz not null default now()
 );
 
+-- 하위 카테고리(계층): 상위를 지우면 맨 위로 올라옴
+alter table public.categories add column if not exists parent_id uuid references public.categories(id) on delete set null;
+create index if not exists categories_parent_idx on public.categories (parent_id);
+
 create index if not exists items_user_created_idx on public.items (user_id, created_at desc);
 create index if not exists categories_user_sort_idx on public.categories (user_id, sort);
 

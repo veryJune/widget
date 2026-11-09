@@ -4,6 +4,7 @@ import { backend, type Session } from './lib/backend';
 import { draftFromText, emptyDraft, mediaPaths, saveDraft, type Draft } from './lib/capture';
 import type { AspectBucket, Category, Item, ItemType, Scope, SortMode, ViewMode } from './lib/types';
 import { nowIso, readLS, uid, writeLS } from './lib/util';
+import { canMoveUnder, siblingsOf } from './lib/tree';
 
 export interface Toast {
   id: string;
@@ -64,8 +65,9 @@ interface State extends Prefs {
   toast(text: string, opt?: Partial<Omit<Toast, 'id' | 'text'>> & { ms?: number }): string;
   dismiss(id: string): void;
 
-  addCategory(name: string, color: string): Promise<Category>;
+  addCategory(name: string, color: string, parentId?: string | null): Promise<Category>;
   updateCategory(id: string, patch: Partial<Category>): Promise<void>;
+  moveCategory(id: string, parentId: string | null): Promise<void>;
   deleteCategory(id: string, withItems: boolean): Promise<void>;
   reorderCategories(ids: string[]): Promise<void>;
 
@@ -83,7 +85,8 @@ let lastFetch = 0;
 let loading: Promise<void> | null = null;
 
 function sortCats(c: Category[]) {
-  return c.slice().sort((a, b) => a.sort - b.sort || a.created_at.localeCompare(b.created_at));
+  // 예전 데이터(parent_id 없음)도 맨 위 카테고리로 다룹니다
+  return c.map((x) => (x.parent_id === undefined ? { ...x, parent_id: null } : x)).sort((a, b) => a.sort - b.sort || a.created_at.localeCompare(b.created_at));
 }
 
 function upsertById<T extends { id: string }>(list: T[], x: T, prepend = false): T[] {
@@ -129,7 +132,7 @@ export const useStore = create<State>((set, get) => {
         onCategory: (c) => set((s) => ({ categories: sortCats(upsertById(s.categories, c)) })),
         onCategoryDelete: (id) =>
           set((s) => ({
-            categories: s.categories.filter((x) => x.id !== id),
+            categories: s.categories.filter((x) => x.id !== id).map((x) => (x.parent_id === id ? { ...x, parent_id: null } : x)),
             items: s.items.map((x) => (x.category_id === id ? { ...x, category_id: null } : x)),
           })),
       });
@@ -227,10 +230,19 @@ export const useStore = create<State>((set, get) => {
     dismiss: (id) => set((s) => ({ toasts: s.toasts.filter((t) => t.id !== id) })),
 
     // ---------- 카테고리 ----------
-    async addCategory(name, color) {
+    async addCategory(name, color, parentId = null) {
       const cats = get().categories;
-      const c: Category = { id: uid(), name: name.trim(), color, icon: '', sort: (cats[cats.length - 1]?.sort ?? 0) + 1, created_at: nowIso() };
-      set({ categories: [...cats, c] });
+      const sibs = siblingsOf(cats, parentId);
+      const c: Category = {
+        id: uid(),
+        parent_id: parentId,
+        name: name.trim(),
+        color,
+        icon: '',
+        sort: (sibs[sibs.length - 1]?.sort ?? 0) + 1,
+        created_at: nowIso(),
+      };
+      set({ categories: sortCats([...cats, c]) });
       try {
         await backend.saveCategory(c);
       } catch (e) {
@@ -253,15 +265,32 @@ export const useStore = create<State>((set, get) => {
       }
     },
 
+    async moveCategory(id, parentId) {
+      const cats = get().categories;
+      const cur = cats.find((c) => c.id === id);
+      if (!cur || cur.parent_id === parentId) return;
+      if (!canMoveUnder(cats, id, parentId)) {
+        get().toast('자기 자신이나 자기 하위 카테고리 안으로는 옮길 수 없습니다.', { kind: 'error' });
+        return;
+      }
+      const sibs = siblingsOf(cats, parentId);
+      await get().updateCategory(id, { parent_id: parentId, sort: (sibs[sibs.length - 1]?.sort ?? 0) + 1 });
+    },
+
     async deleteCategory(id, withItems) {
-      const { items, scope } = get();
+      const { items, scope, categories } = get();
+      const cat = categories.find((c) => c.id === id);
+      if (!cat) return;
       const inCat = items.filter((i) => i.category_id === id);
+      // 하위 카테고리는 지우지 않고 한 단계 위로 올립니다
+      const kids = categories.filter((c) => c.parent_id === id).map((c) => ({ ...c, parent_id: cat.parent_id }));
       set((s) => ({
-        categories: s.categories.filter((c) => c.id !== id),
+        categories: sortCats(s.categories.filter((c) => c.id !== id).map((c) => kids.find((k) => k.id === c.id) || c)),
         items: withItems ? s.items.filter((i) => i.category_id !== id) : s.items.map((i) => (i.category_id === id ? { ...i, category_id: null } : i)),
-        scope: scope.kind === 'cat' && scope.id === id ? { kind: 'all' } : scope,
+        scope: scope.kind === 'cat' && scope.id === id ? (cat.parent_id ? { kind: 'cat', id: cat.parent_id } : { kind: 'all' }) : scope,
       }));
       try {
+        for (const k of kids) await backend.saveCategory(k);
         if (withItems) {
           for (const it of inCat) {
             await backend.deleteItem(it.id);
@@ -275,11 +304,13 @@ export const useStore = create<State>((set, get) => {
       }
     },
 
+    /** 같은 상위 아래 형제들의 순서만 바꿉니다 */
     async reorderCategories(ids) {
-      const map = new Map(get().categories.map((c) => [c.id, c]));
-      const next = ids.map((id, i) => ({ ...map.get(id)!, sort: i + 1 }));
-      const changed = next.filter((c) => map.get(c.id)!.sort !== c.sort);
-      set({ categories: next });
+      const order = new Map(ids.map((id, i) => [id, i + 1]));
+      const before = new Map(get().categories.map((c) => [c.id, c.sort]));
+      const next = get().categories.map((c) => (order.has(c.id) ? { ...c, sort: order.get(c.id)! } : c));
+      const changed = next.filter((c) => order.has(c.id) && before.get(c.id) !== c.sort);
+      set({ categories: sortCats(next) });
       try {
         for (const c of changed) await backend.saveCategory(c);
       } catch (e) {
