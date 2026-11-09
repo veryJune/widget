@@ -69,6 +69,10 @@ create policy "own items" on public.items
   using (user_id = auth.uid())
   with check (user_id = auth.uid());
 
+-- 권한: 로그인한 사용자 역할이 두 표를 쓸 수 있게 (실제 접근 범위는 위 보안 규칙이 결정)
+grant usage on schema public to authenticated;
+grant select, insert, update, delete on public.categories, public.items to authenticated;
+
 -- 4) 실시간 동기화: 다른 기기에서 바꾼 내용이 바로 반영되도록 --------------
 do $$
 begin
