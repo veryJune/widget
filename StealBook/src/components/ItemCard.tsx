@@ -1,6 +1,6 @@
 // 갤러리 카드 하나 — 이미지가 주인공, 정보는 필요할 때만
 import { memo, useRef, useState } from 'react';
-import { FileText, Link2, Play, Images } from 'lucide-react';
+import { AppWindow, FileText, Link2, Play, Images } from 'lucide-react';
 import type { Item } from '../lib/types';
 import { useUrl } from '../lib/urls';
 import { domainOf, fmtBytes, fmtTime } from '../lib/util';
@@ -62,15 +62,18 @@ function CardInner({ item, fill, fresh, selecting }: { item: Item; fill: boolean
     setScrubX(Math.min(0.999, Math.max(0, (e.clientX - r.left) / r.width)));
   };
 
-  // 글(메모) 카드
-  if (!hasCover && (item.type === 'note' || item.type === 'link' || item.type === 'embed')) {
+  // 페이지 항목 이름표: 올린 HTML이면 "HTML 페이지", 웹 주소면 사이트 이름
+  const pageLabel = item.type === 'page' ? (item.url ? `페이지 · ${item.link?.site || domainOf(item.url)}` : 'HTML 페이지') : '';
+
+  // 글(메모) 카드 — 표지 없는 링크·임베드·페이지도 같은 모양
+  if (!hasCover && (item.type === 'note' || item.type === 'link' || item.type === 'embed' || item.type === 'page')) {
     const isNote = item.type === 'note';
     return (
       <div ref={ref} className={`relative flex flex-col bg-panel p-4 transition-[padding] ${selecting ? 'pt-10' : ''} ${fill ? 'aspect-square' : ''}`}>
         {!isNote && (
           <span className="mb-2 inline-flex items-center gap-1.5 text-[12px] font-semibold text-mute">
-            {item.embed ? <Play size={12} /> : <Link2 size={12} />}
-            {item.embed ? PROVIDER_LABEL[item.embed.provider] : domainOf(item.url)}
+            {item.type === 'page' ? <AppWindow size={12} /> : item.embed ? <Play size={12} /> : <Link2 size={12} />}
+            {item.type === 'page' ? pageLabel : item.embed ? PROVIDER_LABEL[item.embed.provider] : domainOf(item.url)}
           </span>
         )}
         {item.title && <p className="mb-1.5 line-clamp-2 text-[15px] font-bold leading-snug">{item.title}</p>}
@@ -120,7 +123,12 @@ function CardInner({ item, fill, fresh, selecting }: { item: Item; fill: boolean
         </Badge>
       )}
       {item.type === 'link' && <Badge className="bottom-2 left-2 max-w-[80%] truncate">{item.link?.site || domainOf(item.url)}</Badge>}
-      {item.media.length > 1 && (
+      {item.type === 'page' && (
+        <Badge className="bottom-2 left-2 inline-flex max-w-[80%] items-center gap-1 truncate">
+          <AppWindow size={11} /> {pageLabel}
+        </Badge>
+      )}
+      {item.media.length > 1 && item.type !== 'page' && (
         <Badge className="left-2 top-2 inline-flex items-center gap-1">
           <Images size={11} /> {item.media.length}
         </Badge>

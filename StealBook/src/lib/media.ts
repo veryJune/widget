@@ -238,8 +238,9 @@ export function imageSize(url: string, ms = 6000): Promise<{ w: number; h: numbe
   });
 }
 
-export function fileKind(file: File): 'image' | 'video' | 'file' {
+export function fileKind(file: File): 'image' | 'video' | 'file' | 'page' {
   if (file.type.startsWith('image/')) return 'image';
   if (file.type.startsWith('video/')) return 'video';
+  if (file.type === 'text/html' || /\.html?$/i.test(file.name)) return 'page';
   return 'file';
 }

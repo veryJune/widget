@@ -1,7 +1,7 @@
 // 상세 보기: 크게 보기 + 정보 + 영상 구간 북마크
 // PC: 왼쪽 미디어, 오른쪽 정보 / 모바일: 전체 화면, 좌우로 밀어서 이전·다음
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ChevronLeft, ChevronRight, Clapperboard, Download, ExternalLink, ImageDown, Pencil, Plus, Repeat, RotateCcw, Trash2, X } from 'lucide-react';
+import { AppWindow, ChevronLeft, ChevronRight, Clapperboard, Download, ExternalLink, ImageDown, Maximize2, Pencil, Plus, Repeat, RotateCcw, Trash2, X } from 'lucide-react';
 import { useStore } from '../store';
 import { useAllTags, useVisibleItems } from '../hooks/useVisible';
 import { useBackClose } from '../hooks/useBackClose';
@@ -238,15 +238,125 @@ function EmbedFrame({ item, src }: { item: Item; src: string }) {
   );
 }
 
-function LinkView({ item }: { item: Item }) {
+function LinkView({ item, note }: { item: Item; note?: string }) {
   const cover = useUrl(coverOf(item));
   return (
     <div className="flex max-h-full max-w-3xl flex-col items-start gap-4">
       {cover && <img src={cover} alt="" referrerPolicy="no-referrer" className="max-h-[60dvh] max-w-full rounded-lg object-contain" />}
+      {note && <p className="max-w-[52ch] text-[14px] leading-relaxed text-mute">{note}</p>}
       <a href={item.url} target="_blank" rel="noreferrer" className="inline-flex h-10 items-center gap-2 rounded-lg bg-ink px-4 text-[14px] font-semibold text-bg">
         <ExternalLink size={16} /> {item.link?.site || domainOf(item.url)}에서 열기
       </a>
     </div>
+  );
+}
+
+// ---------------- 페이지 (올린 HTML · 웹 주소) ----------------
+
+/**
+ * 올린 HTML 은 격리된 틀(sandbox)에서만 실행합니다.
+ * allow-same-origin 이 없어서 페이지 안의 코드는 Steal Book 의 로그인 정보·저장소에 닿지 못합니다.
+ */
+const HTML_SANDBOX = 'allow-scripts allow-popups allow-popups-to-escape-sandbox allow-forms';
+/** 웹 주소는 그 사이트 자신의 출처로 열리므로 same-origin 을 줘도 Steal Book 과는 분리됩니다. */
+const WEB_SANDBOX = 'allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox allow-forms';
+
+/** 페이지 안의 링크는 새 창으로 (틀 안에서 다른 사이트로 넘어가지 않게) */
+function withBlankLinks(html: string): string {
+  if (/<base\b/i.test(html)) return html;
+  const tag = '<base target="_blank">';
+  return /<head[^>]*>/i.test(html) ? html.replace(/<head[^>]*>/i, (h) => h + tag) : tag + html;
+}
+
+function useHtml(path: string) {
+  const url = useUrl(path);
+  const [html, setHtml] = useState<string | null>(null);
+  const [failed, setFailed] = useState(false);
+  useEffect(() => {
+    if (!url) return;
+    let alive = true;
+    setFailed(false);
+    fetch(url)
+      .then((r) => {
+        if (!r.ok) throw new Error(String(r.status));
+        return r.text();
+      })
+      .then((t) => alive && setHtml(t))
+      .catch(() => alive && setFailed(true));
+    return () => {
+      alive = false;
+    };
+  }, [url]);
+  return { html, failed };
+}
+
+/** 페이지 틀: 위쪽 얇은 막대(이름 · 버튼) + 페이지 */
+function PageShell({ label, actions, compact, children }: { label: string; actions?: React.ReactNode; compact: boolean; children: React.ReactNode }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const full = () => {
+    const el = ref.current;
+    if (!el) return;
+    if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+    else el.requestFullscreen?.().catch(() => {});
+  };
+  return (
+    <div ref={ref} className={`flex w-full max-w-[1600px] flex-col overflow-hidden rounded-lg border border-line bg-panel ${compact ? 'h-[72dvh]' : 'h-full'}`}>
+      <div className="flex shrink-0 items-center gap-1 border-b border-line py-1 pl-3 pr-1">
+        <AppWindow size={14} className="shrink-0 text-mute" />
+        <span className="min-w-0 flex-1 truncate text-[13px] font-semibold text-mute">{label}</span>
+        {actions}
+        <IconButton label="전체 화면" onClick={full} className="h-8 w-8">
+          <Maximize2 size={15} />
+        </IconButton>
+      </div>
+      <div className="min-h-0 flex-1">{children}</div>
+    </div>
+  );
+}
+
+function HtmlPage({ m, compact }: { m: MediaFile; compact: boolean }) {
+  const { html, failed } = useHtml(m.path);
+  const download = () => {
+    if (!html) return;
+    const u = URL.createObjectURL(new Blob([html], { type: 'text/html' }));
+    const a = document.createElement('a');
+    a.href = u;
+    a.download = /\.html?$/i.test(m.name) ? m.name : `${m.name || 'page'}.html`;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(u), 1000);
+  };
+  return (
+    <PageShell
+      label={m.name || 'HTML 페이지'}
+      compact={compact}
+      actions={
+        <IconButton label="HTML 내려받기" onClick={download} disabled={!html} className="h-8 w-8">
+          <Download size={15} />
+        </IconButton>
+      }
+    >
+      {html != null ? (
+        <iframe key={m.path} title={m.name || 'HTML 페이지'} srcDoc={withBlankLinks(html)} sandbox={HTML_SANDBOX} className="h-full w-full border-0" />
+      ) : (
+        <div className="grid h-full place-items-center px-6 text-center text-[14px] text-mute">{failed ? '페이지를 불러오지 못했습니다. 잠시 뒤 다시 열어 주세요.' : '불러오는 중…'}</div>
+      )}
+    </PageShell>
+  );
+}
+
+function WebPage({ item, compact }: { item: Item; compact: boolean }) {
+  return (
+    <PageShell
+      label={item.link?.site || domainOf(item.url)}
+      compact={compact}
+      actions={
+        <a href={item.url} target="_blank" rel="noreferrer" aria-label="새 창으로 열기" title="새 창으로 열기 (안 보이면 이걸로)" className="grid h-8 w-8 place-items-center rounded-lg text-mute hover:bg-raise hover:text-ink">
+          <ExternalLink size={15} />
+        </a>
+      }
+    >
+      <iframe key={item.url} title={titleOf(item)} src={item.url} sandbox={WEB_SANDBOX} referrerPolicy="strict-origin-when-cross-origin" allow="fullscreen; clipboard-write" className="h-full w-full border-0 bg-white" />
+    </PageShell>
   );
 }
 
@@ -280,7 +390,7 @@ function InlineEdit({
   };
   if (!editing) {
     return (
-      <button type="button" onClick={() => setEditing(true)} aria-label={`${label} 고치기`} className={`group/edit relative block w-full rounded-md text-left transition hover:bg-raise/60 ${className}`}>
+      <button type="button" onClick={() => setEditing(true)} aria-label={`${label} 고치기`} className={`group/edit relative block w-full min-w-0 rounded-md text-left transition [overflow-wrap:anywhere] hover:bg-raise/60 ${className}`}>
         {value ? display ?? value : <span className="text-faint">{placeholder}</span>}
         <Pencil size={12} className="absolute right-1 top-1 text-faint opacity-0 transition group-hover/edit:opacity-100" />
       </button>
@@ -307,7 +417,7 @@ function InlineEdit({
   return multiline ? (
     <textarea {...common} rows={Math.min(10, Math.max(3, v.split('\n').length + 1))} className={`${inputCls} resize-y text-[14px] leading-relaxed`} />
   ) : (
-    <input {...common} className={`${inputCls} ${className}`} />
+    <input {...common} className={`${inputCls} min-w-0 ${className}`} />
   );
 }
 
@@ -443,8 +553,16 @@ export function Detail() {
   let stage: React.ReactNode;
   if (m?.kind === 'video') stage = <VideoPlayer m={m} videoRef={videoRef} />;
   else if (m?.kind === 'image') stage = <ImageView key={m.path} m={m} />;
+  else if (m?.kind === 'page') stage = <HtmlPage m={m} compact={compact} />;
   else if (m?.kind === 'file') stage = <FileView m={m} />;
   else if (item.embed) stage = <EmbedFrame item={item} src={embedSrc || item.embed.embedUrl} />;
+  else if (item.type === 'page' && item.url)
+    stage =
+      item.link?.frameable === false ? (
+        <LinkView item={item} note="이 사이트는 다른 사이트 안에 띄우는 것을 막아 두었습니다. 새 창으로 열어 보세요." />
+      ) : (
+        <WebPage item={item} compact={compact} />
+      );
   else if (item.type === 'link') stage = <LinkView item={item} />;
   else stage = <p className="note-text max-w-[62ch] cursor-auto text-[19px] leading-[1.75]">{item.body || item.title}</p>;
 
@@ -489,7 +607,7 @@ export function Detail() {
       <div>
         <div className="mb-2 flex items-start gap-1">
           {trashed ? (
-            <h2 className="flex-1 text-[20px] font-extrabold leading-snug tracking-tight">{title}</h2>
+            <h2 className="min-w-0 flex-1 text-[20px] font-extrabold leading-snug tracking-tight [overflow-wrap:anywhere]">{title}</h2>
           ) : (
             <InlineEdit
               label="제목"
@@ -713,8 +831,8 @@ export function Detail() {
 function MediaThumb({ m, active, onClick }: { m: MediaFile; active: boolean; onClick: () => void }) {
   const url = useUrl(m.thumb || (m.kind === 'image' ? m.path : null));
   return (
-    <button type="button" onClick={onClick} aria-pressed={active} className={`h-14 w-14 shrink-0 overflow-hidden rounded-md bg-panel ${active ? 'ring-2 ring-mark' : 'opacity-60 hover:opacity-100'}`}>
-      {url ? <img src={url} alt="" className="h-full w-full object-cover" /> : <span className="text-[10px]">{m.name}</span>}
+    <button type="button" onClick={onClick} aria-pressed={active} aria-label={m.name} title={m.name} className={`grid h-14 w-14 shrink-0 place-items-center overflow-hidden rounded-md bg-panel ${active ? 'ring-2 ring-mark' : 'opacity-60 hover:opacity-100'}`}>
+      {url ? <img src={url} alt="" className="h-full w-full object-cover" /> : m.kind === 'page' ? <AppWindow size={20} className="text-mute" /> : <span className="text-[10px]">{m.name}</span>}
     </button>
   );
 }

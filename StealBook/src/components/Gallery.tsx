@@ -1,6 +1,6 @@
 // 갤러리: 메이슨리(벽돌) · 균일 그리드 · 목록 보기
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Check, ClipboardPaste, FileText, Image as ImageIcon, Link2, Play, Video } from 'lucide-react';
+import { AppWindow, Check, ClipboardPaste, FileText, Image as ImageIcon, Link2, Play, Video } from 'lucide-react';
 import type { Item } from '../lib/types';
 import { useStore, type Pending } from '../store';
 import { useCompact, useElementWidth } from '../hooks/useMedia';
@@ -58,7 +58,7 @@ function Masonry({ items, pending }: { items: Item[]; pending: Pending[] }) {
     for (const it of all) {
       let h: number;
       if ('label' in it) h = colW * 1.25;
-      else if (!coverOf(it) && (it.type === 'note' || it.type === 'link' || it.type === 'embed')) h = noteHeight(it, colW);
+      else if (!coverOf(it) && (it.type === 'note' || it.type === 'link' || it.type === 'embed' || it.type === 'page')) h = noteHeight(it, colW);
       else h = it.ratio ? colW / clampRatio(it.ratio) : colW * (it.type === 'file' ? 0.75 : 1.25);
       const idx = heights.indexOf(Math.min(...heights));
       out[idx].push(it);
@@ -105,7 +105,7 @@ function Grid({ items, pending }: { items: Item[]; pending: Pending[] }) {
   );
 }
 
-const TYPE_ICON = { note: FileText, image: ImageIcon, video: Video, link: Link2, embed: Play, file: FileText };
+const TYPE_ICON = { note: FileText, image: ImageIcon, video: Video, link: Link2, embed: Play, file: FileText, page: AppWindow };
 
 function Row({ item }: { item: Item }) {
   const press = useItemPress(item.id);

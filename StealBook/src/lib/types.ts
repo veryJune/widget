@@ -1,12 +1,13 @@
 // Steal Book 데이터 모양. supabase/schema.sql 의 컬럼과 이름을 맞춰 두었습니다.
 
-export type ItemType = 'note' | 'image' | 'video' | 'link' | 'embed' | 'file';
+export type ItemType = 'note' | 'image' | 'video' | 'link' | 'embed' | 'file' | 'page';
 export type ItemStatus = 'new' | 'incubating' | 'used';
 
 /** 올린 파일 하나. path·thumb·strip 은 저장소 경로입니다. */
 export interface MediaFile {
   path: string;
-  kind: 'image' | 'video' | 'file';
+  /** page = 올린 HTML 파일 (항목 안에 웹페이지로 띄움) */
+  kind: 'image' | 'video' | 'file' | 'page';
   mime: string;
   name: string;
   size: number;
@@ -41,6 +42,8 @@ export interface LinkMeta {
   image?: string;
   site?: string;
   favicon?: string;
+  /** 이 사이트를 다른 사이트 안(iframe)에 띄워도 되는지. false 면 페이지로 띄우지 않고 링크 카드로 보여 줌 */
+  frameable?: boolean;
 }
 
 export interface Marker {

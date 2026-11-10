@@ -30,6 +30,7 @@ interface UnfurlResponse {
   site?: string;
   favicon?: string;
   oembed?: { width?: number; height?: number; thumbnail?: string; title?: string };
+  frameable?: boolean;
 }
 
 async function unfurl(url: string): Promise<UnfurlResponse | null> {
@@ -81,7 +82,7 @@ export async function previewLink(input: string): Promise<LinkPreview> {
     if (!embed.thumb) embed = { ...embed, thumb: meta?.oembed?.thumbnail || meta?.image };
   }
   const link: LinkMeta | null = meta
-    ? { title: meta.oembed?.title || meta.title, description: meta.description, image: meta.image, site: meta.site, favicon: meta.favicon }
+    ? { title: meta.oembed?.title || meta.title, description: meta.description, image: meta.image, site: meta.site, favicon: meta.favicon, frameable: meta.frameable }
     : { site: hostOf(text) };
 
   let ratio: number | null = embed ? cardRatio(embed) : null;
@@ -174,6 +175,12 @@ export async function uploadFile(itemId: string, file: File, onProgress?: (fract
     return mf;
   }
 
+  if (kind === 'page') {
+    const path = `${prefix}${key}.html`;
+    await backend.upload(path, file, 'text/html', onProgress);
+    return { path, kind, mime: 'text/html', name: file.name, size: file.size };
+  }
+
   const path = `${prefix}${key}.${extOf(file.name, file.type)}`;
   await backend.upload(path, file, file.type || 'application/octet-stream', onProgress);
   return { path, kind: 'file', mime: file.type || 'application/octet-stream', name: file.name, size: file.size };
@@ -193,10 +200,12 @@ export interface Draft {
   preview: LinkPreview | null;
   /** preview 가 어떤 입력값으로 만들어졌는지 */
   previewFor: string;
+  /** 링크를 상세에서 웹페이지로 바로 띄울지 */
+  asPage: boolean;
 }
 
 export function emptyDraft(category_id: string | null = null): Draft {
-  return { title: '', body: '', why: '', url: '', tags: [], category_id, favorite: false, keepMedia: [], files: [], preview: null, previewFor: '' };
+  return { title: '', body: '', why: '', url: '', tags: [], category_id, favorite: false, keepMedia: [], files: [], preview: null, previewFor: '', asPage: false };
 }
 
 export function draftFromItem(item: Item): Draft {
@@ -213,6 +222,7 @@ export function draftFromItem(item: Item): Draft {
     files: [],
     preview: item.url || item.embed ? { url: item.url, embed: item.embed, link: item.link, ratio: item.media.length ? null : item.ratio } : null,
     previewFor: item.url,
+    asPage: item.type === 'page' && !item.media.some((m) => m.kind === 'page'),
   };
 }
 
@@ -256,13 +266,18 @@ export async function saveDraft(d: Draft, onStep?: (msg: string) => void): Promi
     );
   }
 
+  // HTML 페이지가 있으면 맨 앞에 (상세에서 페이지가 먼저 보이게)
+  media.sort((a, b) => Number(b.kind === 'page') - Number(a.kind === 'page'));
   const first = media[0];
+  // 카드 표지로 쓸 파일: 썸네일이 있거나 이미지인 첫 파일 (페이지 + 대표 이미지를 함께 올린 경우 그 이미지)
+  const visual = media.find((m) => m.thumb || m.kind === 'image');
   const embed = preview?.embed ?? null;
   const link = preview?.link ?? null;
-  const type: Item['type'] = embed ? 'embed' : first ? first.kind : d.url ? 'link' : 'note';
+  const webPage = d.asPage && !!d.url && !embed && !preview?.isImage && !first;
+  const type: Item['type'] = embed ? 'embed' : first ? first.kind : webPage ? 'page' : d.url ? 'link' : 'note';
   // 사본을 못 받은 이미지 주소는 원본 주소로 미리보기 (링크 카드)
-  const cover = first?.thumb ?? (first?.kind === 'image' ? first.path : null) ?? embed?.thumb ?? link?.image ?? null;
-  const ratio = first?.w && first?.h ? first.w / first.h : (preview?.ratio ?? null);
+  const cover = visual?.thumb ?? (visual?.kind === 'image' ? visual.path : null) ?? embed?.thumb ?? link?.image ?? null;
+  const ratio = visual?.w && visual?.h ? visual.w / visual.h : first?.kind === 'page' ? null : (preview?.ratio ?? null);
   const now = nowIso();
 
   const item: Item = {
@@ -279,7 +294,7 @@ export async function saveDraft(d: Draft, onStep?: (msg: string) => void): Promi
     link,
     cover,
     ratio,
-    colors: first?.colors ?? d.base?.colors ?? [],
+    colors: visual?.colors ?? d.base?.colors ?? [],
     favorite: d.favorite,
     status: d.base?.status ?? 'new',
     markers: d.base?.markers ?? [],

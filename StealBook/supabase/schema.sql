@@ -18,7 +18,7 @@ create table if not exists public.items (
   id           uuid primary key default gen_random_uuid(),
   user_id      uuid not null default auth.uid() references auth.users(id) on delete cascade,
   category_id  uuid references public.categories(id) on delete set null,  -- 카테고리를 지우면 인박스로
-  type         text not null default 'note',      -- note | image | video | link | embed | file
+  type         text not null default 'note',      -- note | image | video | link | embed | file | page
   title        text not null default '',
   body         text not null default '',
   url          text not null default '',          -- 출처 / 링크 주소

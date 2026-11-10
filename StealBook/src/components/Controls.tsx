@@ -1,5 +1,5 @@
 // 필터 · 보기 방식 · 정렬 조작 (PC 툴바와 모바일 시트에서 같이 씀)
-import { FileText, Image as ImageIcon, LayoutGrid, Link2, List, Play, Rows3, Video, X } from 'lucide-react';
+import { AppWindow, FileText, Image as ImageIcon, LayoutGrid, Link2, List, Play, Rows3, Video, X } from 'lucide-react';
 import type { ItemType, SortMode, ViewMode } from '../lib/types';
 import { FAMILIES } from '../lib/colors';
 import { ASPECTS } from '../lib/util';
@@ -13,6 +13,7 @@ export const TYPES: { id: ItemType; label: string; Icon: typeof ImageIcon }[] = 
   { id: 'link', label: '링크', Icon: Link2 },
   { id: 'note', label: '메모', Icon: FileText },
   { id: 'file', label: '파일', Icon: FileText },
+  { id: 'page', label: '페이지', Icon: AppWindow },
 ];
 
 export const SORTS: { id: SortMode; label: string }[] = [

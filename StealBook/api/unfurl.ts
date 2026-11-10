@@ -24,6 +24,8 @@ export interface UnfurlResult {
   imageH?: number;
   site?: string;
   favicon?: string;
+  /** 다른 사이트 안(iframe)에 띄워도 되는지 (X-Frame-Options, CSP frame-ancestors 확인) */
+  frameable?: boolean;
   oembed?: {
     title?: string;
     width?: number;
@@ -163,6 +165,22 @@ async function fetchOembed(endpoint: string): Promise<UnfurlResult['oembed'] | u
   }
 }
 
+/** 응답 헤더를 보고 이 페이지를 다른 사이트 안에 띄울 수 있는지 판단 */
+export function frameableFrom(h: Headers): boolean {
+  const xfo = (h.get('x-frame-options') || '').toLowerCase();
+  if (xfo.includes('deny') || xfo.includes('sameorigin')) return false;
+  const csp = h.get('content-security-policy') || '';
+  const fa = csp
+    .split(';')
+    .map((s) => s.trim())
+    .find((s) => /^frame-ancestors\b/i.test(s));
+  if (fa) {
+    const sources = fa.slice('frame-ancestors'.length).trim().toLowerCase().split(/\s+/);
+    if (!sources.includes('*')) return false;
+  }
+  return true;
+}
+
 export async function unfurl(raw: string): Promise<UnfurlResult> {
   const input = (raw || '').trim();
   if (!input) throw new Error('주소가 비어 있습니다.');
@@ -174,6 +192,7 @@ export async function unfurl(raw: string): Promise<UnfurlResult> {
     out.image = url;
     try { await res.body?.cancel(); } catch { /* ignore */ }
   } else if (type.includes('html') || !type) {
+    out.frameable = frameableFrom(res.headers);
     const html = await readLimited(res);
     const head = html.slice(0, 400_000);
     const meta: Record<string, string> = {};

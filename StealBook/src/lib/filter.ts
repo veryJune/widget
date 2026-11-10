@@ -50,7 +50,7 @@ export function isEmptyCriteria(c: Criteria): boolean {
   return !c.categoryId && !c.inbox && !c.favorite && !c.query && !c.type && !c.aspect && !c.color && !c.tag;
 }
 
-const TYPE_LABEL: Record<string, string> = { image: '이미지', video: '영상', embed: '임베드', link: '링크', note: '메모', file: '파일' };
+const TYPE_LABEL: Record<string, string> = { image: '이미지', video: '영상', embed: '임베드', link: '링크', note: '메모', file: '파일', page: '페이지' };
 
 /** 조건을 사람이 읽는 짧은 이름으로 (컬렉션 기본 이름) */
 export function describeCriteria(c: Criteria, categories: Category[]): string {

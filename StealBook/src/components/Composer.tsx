@@ -240,6 +240,7 @@ export function Composer() {
             <Upload size={20} className="text-mute" />
             <span className="text-[14px] font-semibold">{compact ? '사진 · 영상 · 파일 고르기' : '이미지 · 영상 · 파일을 끌어다 놓거나 붙여넣기'}</span>
             <span className="text-[12px] text-faint">여러 개를 한 게시글에 담을 수 있습니다 · 파일 하나 최대 50MB</span>
+            <span className="text-[12px] text-faint">HTML 파일은 페이지로 띄워집니다 · 이미지를 함께 넣으면 카드 표지가 됩니다</span>
           </button>
         )}
 
@@ -254,6 +255,23 @@ export function Composer() {
             autoComplete="off"
           />
           <PreviewCard p={d.url && d.previewFor === d.url.trim() ? d.preview : null} loading={loading && !!d.url} />
+          {(() => {
+            // 일반 웹 주소만: 상세에서 웹페이지로 바로 띄우기
+            const p = d.url && d.previewFor === d.url.trim() ? d.preview : null;
+            if (!p || p.embed || p.isImage || hasMedia) return null;
+            const blocked = p.link?.frameable === false;
+            return (
+              <label className={`mt-2 flex items-start gap-2.5 rounded-lg px-1 py-1 text-[13px] ${blocked ? 'text-faint' : 'cursor-pointer'}`}>
+                <input type="checkbox" className="mt-0.5 h-4 w-4 accent-[var(--color-mark)]" checked={d.asPage && !blocked} disabled={blocked} onChange={(e) => patch({ asPage: e.target.checked })} />
+                <span>
+                  <span className="font-semibold text-ink">페이지로 띄우기</span>
+                  <span className="block text-mute">
+                    {blocked ? '이 사이트는 다른 사이트 안에 띄우는 것을 막아 두어 링크 카드로 담깁니다.' : '상세 보기에서 이 웹페이지를 바로 보여 줍니다.'}
+                  </span>
+                </span>
+              </label>
+            );
+          })()}
           {dup && (
             <p className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg bg-mark/10 px-3 py-2 text-[13px]">
               <span className="font-semibold text-mark">이미 담아 둔 링크입니다.</span>
