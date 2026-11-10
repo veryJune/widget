@@ -3,6 +3,7 @@ import { familiesOf, FAMILIES } from './colors';
 import { descendants } from './tree';
 import type { Category, Criteria, Item, Scope } from './types';
 import { ASPECTS, aspectBucket } from './util';
+import { inPeriod, parseQuery, PERIODS, sourceLabel, sourceOf, type Period } from './query';
 
 export function haystack(i: Item): string {
   return [i.title, i.body, i.why, i.url, i.tags.join(' '), i.link?.title, i.link?.site, i.link?.description, ...i.media.map((m) => m.name)]
@@ -11,32 +12,52 @@ export function haystack(i: Item): string {
     .toLowerCase();
 }
 
-/** 조건 하나를 미리 준비해 두고 여러 항목에 빠르게 적용 */
+/** 조건 하나를 미리 준비해 두고 여러 항목에 빠르게 적용 (검색창 문법 포함) */
 export function makeMatcher(c: Criteria, categories: Category[]): (i: Item) => boolean {
   const inCat = c.categoryId ? descendants(categories, c.categoryId) : null;
   const known = new Set(categories.map((x) => x.id));
-  const needTags = [...(c.tags || []), ...(c.tag ? [c.tag] : [])];
-  const words = (c.query || '').trim().toLowerCase().split(/\s+/).filter(Boolean);
+  const q = parseQuery(c.query || '');
+  const needTags = [...(c.tags || []), ...(c.tag ? [c.tag] : []), ...q.tags];
+  const sources = [...(c.source ? [c.source] : []), ...q.sources];
+  const types = [c.type, q.type].filter(Boolean) as string[];
+  const periods = [c.period, q.period].filter(Boolean) as Period[];
+  const colors = [c.color, q.color].filter(Boolean) as string[];
+  const fav = c.favorite || q.fav;
+  const now = Date.now();
   return (i) => {
     if (i.deleted_at) return false;
-    // 미분류: 카테고리가 없거나, 가리키던 카테고리가 사라진 항목
+    // Inbox: 카테고리가 없거나, 가리키던 카테고리가 사라진 항목
     if (c.inbox && i.category_id && known.has(i.category_id)) return false;
-    if (c.favorite && !i.favorite) return false;
+    if (fav && !i.favorite) return false;
     if (inCat && !(i.category_id && inCat.has(i.category_id))) return false;
-    if (c.type && i.type !== c.type) return false;
+    if (types.length && !types.every((t) => i.type === t)) return false;
     if (c.aspect && aspectBucket(i.ratio) !== c.aspect) return false;
-    if (c.color && !familiesOf(i.colors).has(c.color)) return false;
+    if (colors.length) {
+      const fam = familiesOf(i.colors);
+      if (!colors.every((x) => fam.has(x))) return false;
+    }
     if (needTags.length && !needTags.every((t) => i.tags.includes(t))) return false;
-    if (words.length) {
+    if (q.notTags.length && q.notTags.some((t) => i.tags.includes(t))) return false;
+    if (sources.length) {
+      const src = sourceOf(i).id;
+      if (!sources.every((x) => x === src)) return false;
+    }
+    if (periods.length && !periods.every((p) => inPeriod(i.created_at, p, now))) return false;
+    if (q.words.length || q.notWords.length) {
       const h = haystack(i);
-      if (!words.every((w) => h.includes(w))) return false;
+      if (!q.words.every((w) => h.includes(w))) return false;
+      if (q.notWords.some((w) => h.includes(w))) return false;
     }
     return true;
   };
 }
 
 /** 지금 화면의 범위 + 필터 → 조건 (스마트 컬렉션으로 저장할 때) */
-export function criteriaFromView(scope: Scope, f: { query: string; type: Criteria['type']; color: string | null; tags: string[] }, base?: Criteria): Criteria {
+export function criteriaFromView(
+  scope: Scope,
+  f: { query: string; type: Criteria['type']; color: string | null; tags: string[]; source: string | null; period: Criteria['period'] },
+  base?: Criteria,
+): Criteria {
   const c: Criteria = { ...(base || {}) };
   if (scope.kind === 'inbox') c.inbox = true;
   if (scope.kind === 'fav') c.favorite = true;
@@ -45,11 +66,13 @@ export function criteriaFromView(scope: Scope, f: { query: string; type: Criteri
   if (f.type) c.type = f.type;
   if (f.color) c.color = f.color;
   if (f.tags.length) c.tags = [...new Set([...(c.tags || []), ...f.tags])];
+  if (f.source) c.source = f.source;
+  if (f.period) c.period = f.period;
   return c;
 }
 
 export function isEmptyCriteria(c: Criteria): boolean {
-  return !c.categoryId && !c.inbox && !c.favorite && !c.query && !c.type && !c.aspect && !c.color && !c.tag && !c.tags?.length;
+  return !c.categoryId && !c.inbox && !c.favorite && !c.query && !c.type && !c.aspect && !c.color && !c.tag && !c.tags?.length && !c.source && !c.period;
 }
 
 const TYPE_LABEL: Record<string, string> = { image: '이미지', video: '영상', embed: '임베드', link: '링크', note: '메모', file: '파일', page: '페이지' };
@@ -57,13 +80,15 @@ const TYPE_LABEL: Record<string, string> = { image: '이미지', video: '영상'
 /** 조건을 사람이 읽는 짧은 이름으로 (컬렉션 기본 이름) */
 export function describeCriteria(c: Criteria, categories: Category[]): string {
   const parts: string[] = [];
-  if (c.inbox) parts.push('미분류');
+  if (c.inbox) parts.push('Inbox');
   if (c.favorite) parts.push('즐겨찾기');
   if (c.categoryId) parts.push(categories.find((x) => x.id === c.categoryId)?.name || '카테고리');
   if (c.type) parts.push(TYPE_LABEL[c.type] || c.type);
   if (c.aspect) parts.push(ASPECTS.find((a) => a.id === c.aspect)?.label || c.aspect);
   if (c.color) parts.push(FAMILIES.find((f) => f.id === c.color)?.label || c.color);
   for (const t of [...(c.tag ? [c.tag] : []), ...(c.tags || [])]) parts.push('#' + t);
+  if (c.source) parts.push(sourceLabel(c.source));
+  if (c.period) parts.push(PERIODS.find((p) => p.id === c.period)?.label || c.period);
   if (c.query) parts.push(`검색 ${c.query}`);
   return parts.join(' + ') || '새 모음';
 }

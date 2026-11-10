@@ -1,5 +1,5 @@
 // 공통 UI 조각: 버튼, 모달/시트, 입력 등
-import { useEffect, useRef, type ButtonHTMLAttributes, type ReactNode } from 'react';
+import { useEffect, useId, useRef, type ButtonHTMLAttributes, type ReactNode } from 'react';
 import { X } from 'lucide-react';
 import { useCompact } from '../hooks/useMedia';
 import { useBackClose } from '../hooks/useBackClose';
@@ -58,6 +58,8 @@ export function Modal({
 }) {
   const compact = useCompact();
   const ref = useRef<HTMLDivElement>(null);
+  const autoId = useId();
+  const lid = labelledBy ?? (title !== undefined ? autoId : undefined);
   // onClose 는 부모가 그릴 때마다 새로 만들어지므로 ref 로 보관합니다.
   // (의존성에 넣으면 글자를 칠 때마다 포커스가 창 맨 위로 튀는 문제가 생김)
   const closeRef = useRef(onClose);
@@ -87,7 +89,7 @@ export function Modal({
         ref={ref}
         role="dialog"
         aria-modal="true"
-        aria-labelledby={labelledBy}
+        aria-labelledby={lid}
         tabIndex={-1}
         className={`sheet-up flex w-full flex-col overflow-hidden bg-panel shadow-[0_24px_80px_rgba(0,0,0,0.45)] outline-none ${
           compact ? (full ? 'h-[100dvh] rounded-none' : 'max-h-[92dvh] rounded-t-2xl') : 'max-h-[88vh] rounded-xl border border-line'
@@ -96,7 +98,7 @@ export function Modal({
       >
         {title !== undefined && (
           <div className="flex shrink-0 items-center gap-3 border-b border-line px-5 py-3">
-            <h2 id={labelledBy} className="flex-1 text-[16px] font-bold">
+            <h2 id={lid} className="flex-1 text-[16px] font-bold">
               {title}
             </h2>
             <IconButton label="닫기" onClick={onClose}>

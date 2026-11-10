@@ -3,6 +3,8 @@ import { AppWindow, FileText, Image as ImageIcon, LayoutGrid, Link2, List, Play,
 import type { ItemType, SortMode, ViewMode } from '../lib/types';
 import { FAMILIES } from '../lib/colors';
 import { useStore } from '../store';
+import { useSourceCounts, useTagCounts } from '../hooks/useVisible';
+import { PERIODS, QUERY_EXAMPLES, type Period } from '../lib/query';
 
 export const TYPES: { id: ItemType; label: string; Icon: typeof ImageIcon }[] = [
   { id: 'image', label: '이미지', Icon: ImageIcon },
@@ -33,8 +35,66 @@ const chip = (on: boolean) =>
   }`;
 
 export function useFilterActive() {
-  const { type, color, tags } = useStore();
-  return !!(type || color || tags.length);
+  const { type, color, tags, source, period } = useStore();
+  return !!(type || color || tags.length || source || period);
+}
+
+const selectCls = (on: boolean) =>
+  `h-8 shrink-0 cursor-pointer rounded-full border-0 pl-3 pr-2 text-[13px] font-semibold outline-none transition ${on ? 'bg-mark text-on-mark' : 'bg-transparent text-mute hover:bg-raise hover:text-ink'}`;
+
+/** 출처(가져온 사이트) — PC 는 펼침 목록, 휴대폰은 칩 */
+export function SourceFilter({ chips = false }: { chips?: boolean }) {
+  const { source, set } = useStore();
+  const counts = useSourceCounts();
+  if (chips) {
+    if (!counts.length) return <p className="text-[13px] text-faint">아직 담은 것이 없습니다.</p>;
+    return (
+      <div className="flex flex-wrap gap-1.5" role="group" aria-label="출처">
+        {counts.slice(0, 12).map(([s, n]) => (
+          <button key={s.id} type="button" aria-pressed={source === s.id} onClick={() => set({ source: source === s.id ? null : s.id })} className={`${chip(source === s.id)} ${source === s.id ? '' : 'bg-raise'}`}>
+            {s.label} <span className="num text-[11px] font-normal opacity-70">{n}</span>
+          </button>
+        ))}
+      </div>
+    );
+  }
+  if (counts.length < 2 && !source) return null;
+  return (
+    <select aria-label="출처" value={source || ''} onChange={(e) => set({ source: e.target.value || null })} className={selectCls(!!source)}>
+      <option value="">출처 전체</option>
+      {counts.map(([s, n]) => (
+        <option key={s.id} value={s.id}>
+          {s.label} ({n})
+        </option>
+      ))}
+    </select>
+  );
+}
+
+/** 기간 */
+export function PeriodFilter({ chips = false }: { chips?: boolean }) {
+  const { period, set } = useStore();
+  if (chips) {
+    return (
+      <div className="flex flex-wrap gap-1.5" role="group" aria-label="기간">
+        {PERIODS.map((p) => (
+          <button key={p.id} type="button" aria-pressed={period === p.id} onClick={() => set({ period: period === p.id ? null : p.id })} className={`${chip(period === p.id)} ${period === p.id ? '' : 'bg-raise'}`}>
+            {p.label}
+          </button>
+        ))}
+      </div>
+    );
+  }
+  return (
+    <select aria-label="기간" value={period || ''} onChange={(e) => set({ period: (e.target.value || null) as Period | null })} className={selectCls(!!period)}>
+      <option value="">기간 전체</option>
+      {PERIODS.map((p) => (
+        <option key={p.id} value={p.id}>
+          {p.label}
+        </option>
+      ))}
+    </select>
+  );
 }
 
 export function TypeFilter({ wrap = false }: { wrap?: boolean }) {
@@ -154,5 +214,43 @@ export function SortSelect() {
         </option>
       ))}
     </select>
+  );
+}
+
+/** 검색창 아래 도움말: 문법 예시 + 자주 쓴 태그·출처 (눌러서 넣기) */
+export function SearchHelp({ onPick, className = '' }: { onPick: (token: string) => void; className?: string }) {
+  const tags = useTagCounts().slice(0, 8);
+  const sources = useSourceCounts().slice(0, 6);
+  const keep = (e: React.MouseEvent) => e.preventDefault(); // 입력칸 포커스 유지
+  return (
+    <div onMouseDown={keep} className={`rounded-xl border border-line bg-panel p-3 text-[13px] shadow-[0_16px_40px_rgba(0,0,0,0.28)] ${className}`}>
+      <p className="mb-2 px-1 text-[12px] font-semibold text-faint">검색 요령 · 눌러서 넣기, 섞어 써도 됩니다</p>
+      <div className="grid grid-cols-1 gap-x-2 gap-y-0.5 sm:grid-cols-2">
+        {QUERY_EXAMPLES.map((x) => (
+          <button key={x.token} type="button" onClick={() => onPick(x.token)} className="flex items-baseline gap-2 rounded-md px-1.5 py-1 text-left hover:bg-raise">
+            <code className="shrink-0 font-sans font-bold text-ink">{x.token}</code>
+            <span className="truncate text-[12px] text-faint">{x.note}</span>
+          </button>
+        ))}
+      </div>
+      {tags.length > 0 && (
+        <div className="mt-2 flex flex-wrap gap-1 border-t border-line pt-2">
+          {tags.map(([t]) => (
+            <button key={t} type="button" onClick={() => onPick('#' + t)} className="h-7 rounded-full bg-raise px-2.5 text-[12px] font-semibold text-mute hover:text-ink">
+              #{t}
+            </button>
+          ))}
+        </div>
+      )}
+      {sources.length > 1 && (
+        <div className="mt-1.5 flex flex-wrap gap-1">
+          {sources.map(([src]) => (
+            <button key={src.id} type="button" onClick={() => onPick('출처:' + src.id)} className="h-7 rounded-full bg-raise px-2.5 text-[12px] font-semibold text-mute hover:text-ink">
+              출처:{src.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }

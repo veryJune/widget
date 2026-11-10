@@ -73,8 +73,8 @@ export function ancestors(cats: Category[], id: string): Category[] {
 }
 
 export function pathLabel(cats: Category[], id: string | null, sep = ' › '): string {
-  if (!id) return '미분류';
-  return ancestors(cats, id).map((c) => c.name).join(sep) || '미분류';
+  if (!id) return 'Inbox';
+  return ancestors(cats, id).map((c) => c.name).join(sep) || 'Inbox';
 }
 
 /** 다른 카테고리 아래로 옮길 수 있는지 (자기 자신·자기 하위로는 못 옮김) */

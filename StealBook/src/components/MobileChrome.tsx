@@ -1,16 +1,17 @@
 // 모바일 화면: 상단 바(검색·필터·메뉴) + 범위 칩 + 오른쪽 아래 담기 버튼 + 시트들
 import { useState } from 'react';
-import { Bookmark, CheckSquare, Hash, Clapperboard, ListFilter, Menu, Plus, Search, Settings, SlidersHorizontal, Trash2 } from 'lucide-react';
+import { Bookmark, CheckSquare, Hash, LayoutDashboard, Clapperboard, ListFilter, Menu, Plus, Search, Settings, SlidersHorizontal, Trash2 } from 'lucide-react';
 import { useStore } from '../store';
 import { useCounts } from '../hooks/useVisible';
 import type { Scope } from '../lib/types';
 import { Wordmark } from './Scribble';
-import { ColorFilter, DensitySwitch, SORTS, TypeFilter, ViewSwitch, useFilterActive } from './Controls';
+import { ColorFilter, PeriodFilter, SourceFilter, DensitySwitch, SORTS, TypeFilter, ViewSwitch, useFilterActive } from './Controls';
 import { Button, IconButton, Modal, Swatch } from './ui';
 import { ancestors, descendants, flatten, siblingsOf } from '../lib/tree';
 import { useSelecting } from './Selection';
 import { TrashBar } from './Toolbar';
 import { TagChips } from './Tags';
+import { SearchBox } from './SearchBox';
 import { ThemePicker } from './Theme';
 
 function Chip({ scope, label, count, dot, partial, small }: { scope: Scope; label: string; count: number; dot?: string; partial?: boolean; small?: boolean }) {
@@ -45,18 +46,7 @@ export function MobileHeader() {
     <header className="sticky top-0 z-20 bg-bg/94 pt-[env(safe-area-inset-top)] backdrop-blur-md">
       {searching ? (
         <div className="flex h-14 items-center gap-2 px-3">
-          <label className="relative flex h-10 flex-1 items-center">
-            <Search size={16} className="pointer-events-none absolute left-3 text-faint" />
-            <input
-              autoFocus
-              type="search"
-              value={query}
-              onChange={(e) => set({ query: e.target.value })}
-              placeholder="제목·메모·태그 검색"
-              aria-label="검색"
-              className="h-full w-full rounded-full bg-panel pl-9 pr-4 outline-none placeholder:text-faint"
-            />
-          </label>
+          <SearchBox variant="mobile" autoFocus />
           <IconButton label="필터" onClick={() => set({ panel: 'filters' })} className="relative h-10 w-10">
             <ListFilter size={19} />
             {filterOn && <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-mark" />}
@@ -90,7 +80,7 @@ export function MobileHeader() {
       )}
       <div className="no-scrollbar flex gap-1.5 overflow-x-auto px-3 pb-2.5">
         <Chip scope={{ kind: 'all' }} label="전체" count={counts.all} />
-        <Chip scope={{ kind: 'inbox' }} label="미분류" count={counts.inbox} />
+        <Chip scope={{ kind: 'inbox' }} label="Inbox" count={counts.inbox} />
         <Chip scope={{ kind: 'fav' }} label="즐겨찾기" count={counts.fav} />
         {collections.map((c) => (
           <Chip key={c.id} scope={{ kind: 'smart', id: c.id }} label={`◇ ${c.name}`} count={counts.byCollection.get(c.id) || 0} />
@@ -165,6 +155,14 @@ export function FilterSheet() {
           <TypeFilter wrap />
         </section>
         <section>
+          <h3 className="mb-2 text-[13px] font-semibold text-mute">출처</h3>
+          <SourceFilter chips />
+        </section>
+        <section>
+          <h3 className="mb-2 text-[13px] font-semibold text-mute">기간</h3>
+          <PeriodFilter chips />
+        </section>
+        <section>
           <h3 className="mb-2 text-[13px] font-semibold text-mute">색</h3>
           <ColorFilter size={24} wrap />
         </section>
@@ -229,6 +227,9 @@ export function MenuSheet() {
         <div className="grid gap-2 border-t border-line pt-5">
           <Button className="justify-start" onClick={() => set({ panel: null, selectMode: true })}>
             <CheckSquare size={16} /> 여러 개 선택 <span className="ml-auto text-[12px] font-normal text-faint">카드를 길게 눌러도 됩니다</span>
+          </Button>
+          <Button className="justify-start" onClick={() => set({ panel: 'moodboard' })}>
+            <LayoutDashboard size={16} /> 무드보드 만들기 <span className="ml-auto text-[12px] font-normal text-faint">고른 것 또는 보이는 것</span>
           </Button>
           <Button className="justify-start" onClick={() => set({ panel: 'tags' })}>
             <Hash size={16} /> 태그 정리
