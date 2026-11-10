@@ -5,10 +5,10 @@ import { criteriaFromView, describeCriteria, makeMatcher } from '../lib/filter';
 import { Button, Modal, inputCls } from './ui';
 
 export function SaveCollectionDialog() {
-  const { panel, set, scope, query, type, color, tags, collections, categories, items, addCollection } = useStore();
+  const { panel, set, scope, query, type, color, tags, source, period, collections, categories, items, addCollection } = useStore();
   const open = panel === 'saveCollection';
   const base = scope.kind === 'smart' ? collections.find((c) => c.id === scope.id)?.criteria : undefined;
-  const criteria = criteriaFromView(scope, { query, type, color, tags }, base);
+  const criteria = criteriaFromView(scope, { query, type, color, tags, source, period }, base);
   const suggested = describeCriteria(criteria, categories);
   const [name, setName] = useState(suggested);
   useEffect(() => {

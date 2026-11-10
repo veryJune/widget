@@ -185,6 +185,26 @@ export function Settings() {
         </div>
       </Section>
 
+      <Section title="크롬 확장 · 오른쪽 클릭으로 훔치기 (PC)">
+        <p className="mb-3 text-[13px] leading-relaxed text-mute">
+          웹에서 이미지·링크·페이지·선택한 글에 <b className="text-ink">오른쪽 클릭 → Steal Book에 훔치기</b>. 작은 창이 열려 메모를 달거나 <b className="text-ink">바로 담기</b>로 한 번에 저장합니다.
+          이 크롬에서 Steal Book에 로그인해 두면 따로 로그인할 필요가 없습니다.
+        </p>
+        <ol className="mb-3 list-decimal space-y-1 pl-5 text-[13px] text-mute">
+          <li>아래 버튼으로 내려받아 압축 풀기</li>
+          <li>
+            크롬 주소창에 <code className="rounded bg-bg px-1 text-ink">chrome://extensions</code> → 오른쪽 위 <b className="text-ink">개발자 모드</b> 켜기
+          </li>
+          <li>
+            <b className="text-ink">압축해제된 확장 프로그램 로드</b> → 풀어 둔 <code className="rounded bg-bg px-1 text-ink">steal-book-extension</code> 폴더 선택
+          </li>
+          <li>퍼즐 모양 아이콘에서 Steal Book을 고정하면 버튼 한 번(또는 Alt+Shift+S)으로 지금 페이지를 담습니다</li>
+        </ol>
+        <a href="/stealbook-extension.zip" download className="inline-flex h-10 items-center gap-2 rounded-lg bg-raise px-4 text-[14px] font-semibold hover:bg-line">
+          <Download size={15} /> 확장 내려받기 (.zip)
+        </a>
+      </Section>
+
       <Section title="휴대폰 앱처럼 쓰기">
         <p className="mb-3 text-[13px] text-mute">
           안드로이드 크롬에서 메뉴 → <b className="text-ink">홈 화면에 추가(앱 설치)</b>를 하면, 유튜브·인스타그램의 <b className="text-ink">공유</b> 목록에 Steal Book이 나타납니다.
@@ -210,6 +230,8 @@ export function Settings() {
             ['/', '검색'],
             ['1 · 2 · 3', '벽돌 · 그리드 · 목록 보기'],
             ['T', '시어터'],
+            ['L', '밝게 ↔ 어둡게'],
+            ['Ctrl+클릭 · Shift+클릭', '여러 개 선택 · 범위 선택'],
             ['← →', '상세 보기에서 이전·다음'],
             ['F · E', '즐겨찾기 · 수정'],
             ['I · O', '영상 구간 시작 · 끝 표시'],

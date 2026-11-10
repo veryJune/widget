@@ -6,9 +6,10 @@ import { useStore } from '../store';
 import { titleOf } from '../lib/capture';
 import { childrenMap } from '../lib/tree';
 import { makeMatcher } from '../lib/filter';
+import { sourceOf, type Source } from '../lib/query';
 
 export function useVisibleItems() {
-  const { items, categories, collections, scope, query, type, color, tags, sort, shuffleSeed } = useStore();
+  const { items, categories, collections, scope, query, type, color, tags, source, period, sort, shuffleSeed } = useStore();
   return useMemo(() => {
     let list;
     if (scope.kind === 'trash') {
@@ -29,14 +30,14 @@ export function useVisibleItems() {
               : {};
     // 컬렉션 조건 위에 지금 고른 필터를 덧붙입니다 (검색어는 둘 다 만족)
     const scopeMatch = makeMatcher(base, categories);
-    const viewMatch = makeMatcher({ query, type, color, tags }, categories);
+    const viewMatch = makeMatcher({ query, type, color, tags, source, period }, categories);
     list = items.filter((i) => scopeMatch(i) && viewMatch(i));
     if (sort === 'old') list.sort((a, b) => a.created_at.localeCompare(b.created_at));
     else if (sort === 'title') list.sort((a, b) => titleOf(a).localeCompare(titleOf(b), 'ko'));
     else if (sort === 'shuffle') list = shuffleSeeded(list, shuffleSeed);
     else list.sort((a, b) => b.created_at.localeCompare(a.created_at));
     return list;
-  }, [items, categories, collections, scope, query, type, color, tags, sort, shuffleSeed]);
+  }, [items, categories, collections, scope, query, type, color, tags, source, period, sort, shuffleSeed]);
 }
 
 export function useCounts() {
@@ -79,6 +80,22 @@ export function useCounts() {
     }
     return { all, inbox, fav, trash, byCat, direct, byCollection };
   }, [items, categories, collections]);
+}
+
+/** 출처(사이트)와 개수 (많은 순) */
+export function useSourceCounts(): [Source, number][] {
+  const items = useStore((s) => s.items);
+  return useMemo(() => {
+    const m = new Map<string, [Source, number]>();
+    for (const i of items) {
+      if (i.deleted_at) continue;
+      const src = sourceOf(i);
+      const cur = m.get(src.id);
+      if (cur) cur[1]++;
+      else m.set(src.id, [src, 1]);
+    }
+    return [...m.values()].sort((a, b) => b[1] - a[1] || a[0].label.localeCompare(b[0].label));
+  }, [items]);
 }
 
 /** 태그와 개수 (많이 쓴 순) */

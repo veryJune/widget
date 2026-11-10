@@ -20,6 +20,8 @@ import { useFilterActive } from './components/Controls';
 import { SelectionBar, visibleOrder } from './components/Selection';
 import { SaveCollectionDialog } from './components/Collections';
 import { TagManager } from './components/Tags';
+import { Moodboard } from './components/Moodboard';
+import { readSteal, StealWindow } from './components/StealWindow';
 import { resolveTheme, useApplyTheme } from './components/Theme';
 
 const isTyping = (t: EventTarget | null) => {
@@ -39,7 +41,7 @@ function readShare(): string | null {
 function DropOverlay() {
   const label = useScopeLabel();
   const scope = useStore((s) => s.scope);
-  const where = scope.kind === 'cat' ? label : '미분류';
+  const where = scope.kind === 'cat' ? label : 'Inbox';
   return (
     <div className="pointer-events-none fixed inset-3 z-[80] grid place-items-center rounded-2xl border-2 border-dashed border-mark bg-scrim fade-in">
       <p className="text-[20px] font-extrabold">놓으면 {where}에 담깁니다</p>
@@ -50,9 +52,9 @@ function DropOverlay() {
 function Main() {
   const compact = useCompact();
   const items = useVisibleItems();
-  const { scope, query, type, color, tags, sort, loaded } = useStore();
+  const { scope, query, type, color, tags, source, period, sort, loaded } = useStore();
   const filtered = useFilterActive() || !!query.trim();
-  const galleryKey = JSON.stringify([scope, query, type, color, tags, sort]);
+  const galleryKey = JSON.stringify([scope, query, type, color, tags, source, period, sort]);
   const scopeKey = JSON.stringify(scope);
   // 다른 곳으로 이동하면 선택은 풉니다
   useEffect(() => {
@@ -96,7 +98,8 @@ export default function App() {
   const s = useStore();
   const { authChecked, session } = s;
   const [dragging, setDragging] = useState(false);
-  const [shared, setShared] = useState<string | null>(() => readShare());
+  const [steal] = useState(() => readSteal());
+  const [shared, setShared] = useState<string | null>(() => (steal ? null : readShare()));
 
   useEffect(() => {
     useStore.getState().boot();
@@ -203,6 +206,17 @@ export default function App() {
   }
   if (backend.mode === 'cloud' && !session) return <Login />;
 
+  // 크롬 확장 '훔치기' 창: 목록 대신 담기 화면만
+  if (steal) {
+    return (
+      <>
+        <StealWindow req={steal} />
+        <Composer />
+        <Toasts />
+      </>
+    );
+  }
+
   return (
     <>
       <Main />
@@ -213,6 +227,7 @@ export default function App() {
       <Settings />
       <SaveCollectionDialog />
       <TagManager />
+      <Moodboard />
       <SelectionBar />
       <Toasts />
       {dragging && <DropOverlay />}

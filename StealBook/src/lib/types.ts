@@ -102,6 +102,10 @@ export interface Criteria {
   tag?: string | null;
   /** 태그 여러 개 — 모두 가진 항목만 */
   tags?: string[];
+  /** 가져온 사이트 (youtube, instagram, … / local = 직접 올림) */
+  source?: string | null;
+  /** 기간 */
+  period?: 'week' | 'month' | 'year' | 'yearAgo' | null;
 }
 
 export interface Collection {

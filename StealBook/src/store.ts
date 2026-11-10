@@ -2,6 +2,7 @@
 import { create } from 'zustand';
 import { backend, type Session } from './lib/backend';
 import { draftFromText, emptyDraft, mediaPaths, saveDraft, type Draft } from './lib/capture';
+import type { Period } from './lib/query';
 import type { Category, Collection, Criteria, Item, ItemType, Scope, SortMode, ViewMode } from './lib/types';
 import { normalizeUrl } from './lib/filter';
 import { parseEmbed } from './lib/embed';
@@ -51,11 +52,15 @@ interface State extends Prefs {
   color: string | null;
   /** 태그 필터 (여러 개면 모두 가진 항목만) */
   tags: string[];
+  /** 출처(사이트) 필터 */
+  source: string | null;
+  /** 기간 필터 */
+  period: Period | null;
   shuffleSeed: number;
   openId: string | null;
   composer: { open: boolean; draft: Draft | null };
   theater: { open: boolean; startId: string | null };
-  panel: null | 'settings' | 'categories' | 'filters' | 'menu' | 'saveCollection' | 'tags';
+  panel: null | 'settings' | 'categories' | 'filters' | 'menu' | 'saveCollection' | 'tags' | 'moodboard';
   /** 여러 개 선택 */
   selected: string[];
   selectMode: boolean;
@@ -189,6 +194,8 @@ export const useStore = create<State>((set, get) => {
     type: null,
     color: null,
     tags: [],
+    source: null,
+    period: null,
     shuffleSeed: Date.now() % 100000,
     openId: null,
     composer: { open: false, draft: null },
@@ -255,7 +262,7 @@ export const useStore = create<State>((set, get) => {
       if (k === 'sort' && v === 'shuffle') set({ shuffleSeed: Date.now() % 100000 });
     },
 
-    clearFilters: () => set({ query: '', type: null, color: null, tags: [] }),
+    clearFilters: () => set({ query: '', type: null, color: null, tags: [], source: null, period: null }),
 
     toast(text, opt = {}) {
       const id = uid();
@@ -384,7 +391,7 @@ export const useStore = create<State>((set, get) => {
           /* 묶음 담기는 마지막에 한 번만 알림 */
         } else if (!d.base) {
           const cat = get().categories.find((c) => c.id === item.category_id);
-          get().toast(`${cat ? cat.name : '미분류'}에 담았습니다`, { action: { label: '열기', run: () => set({ openId: item.id }) } });
+          get().toast(`${cat ? cat.name : 'Inbox'}에 담았습니다`, { action: { label: '열기', run: () => set({ openId: item.id }) } });
         } else get().toast('저장했습니다');
         snapshot();
         return item;
@@ -400,7 +407,7 @@ export const useStore = create<State>((set, get) => {
       const cat = get().currentCategoryId();
       if (files && files.length > 1) {
         // 파일마다 항목 하나씩, 알림은 한 번만
-        const where = get().categories.find((c) => c.id === cat)?.name || '미분류';
+        const where = get().categories.find((c) => c.id === cat)?.name || 'Inbox';
         const tid = get().toast(`담는 중 1/${files.length}`, { kind: 'progress' });
         let ok = 0;
         for (let i = 0; i < files.length; i++) {
@@ -593,7 +600,7 @@ export const useStore = create<State>((set, get) => {
     async addCollection(name, criteria) {
       const list = get().collections;
       const c: Collection = { id: uid(), name: name.trim() || '새 모음', icon: '', criteria, sort: (list[list.length - 1]?.sort ?? 0) + 1, created_at: nowIso() };
-      set({ collections: [...list, c], scope: { kind: 'smart', id: c.id }, query: '', type: null, color: null, tags: [] });
+      set({ collections: [...list, c], scope: { kind: 'smart', id: c.id }, query: '', type: null, color: null, tags: [], source: null, period: null });
       try {
         await backend.saveCollection(c);
         get().toast(`모음 ‘${c.name}’을 만들었습니다`);

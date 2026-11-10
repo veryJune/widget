@@ -2,7 +2,7 @@
 // - PC: Ctrl(⌘)+클릭으로 하나씩, Shift+클릭으로 범위, Ctrl+A 로 보이는 것 전부
 // - 휴대폰: 길게 눌러 선택 시작 → 이어서 톡톡 눌러 추가
 import { useRef, useState } from 'react';
-import { Check, FolderInput, Hash, RotateCcw, Trash2, X } from 'lucide-react';
+import { Check, FolderInput, Hash, LayoutDashboard, RotateCcw, Trash2, X } from 'lucide-react';
 import { useStore } from '../store';
 import { useCompact } from '../hooks/useMedia';
 import { useBackClose } from '../hooks/useBackClose';
@@ -144,7 +144,7 @@ export function SelectionBar() {
 
   const move = (catId: string) => {
     const target = catId === '__inbox' ? null : catId;
-    const name = target ? categories.find((c) => c.id === target)?.name : '미분류';
+    const name = target ? categories.find((c) => c.id === target)?.name : 'Inbox';
     bulkUpdate(selected, () => ({ category_id: target }), `${n}개를 ${name}(으)로 옮겼습니다`);
     clearSelection();
   };
@@ -204,7 +204,7 @@ export function SelectionBar() {
               className="absolute inset-0 cursor-pointer opacity-0"
             >
               <option value="">옮길 곳 고르기</option>
-              <option value="__inbox">미분류</option>
+              <option value="__inbox">Inbox</option>
               {categoryOptions(categories).map((o) => (
                 <option key={o.id} value={o.id}>
                   {o.label}
@@ -225,6 +225,9 @@ export function SelectionBar() {
             onClick={() => bulkUpdate(selected, () => ({ favorite: !allFav }), allFav ? '즐겨찾기를 풀었습니다' : `${n}개를 즐겨찾기했습니다`)}
           >
             <OkMark on={!allFav} size={18} /> {allFav ? '즐겨찾기 풀기' : '즐겨찾기'}
+          </Button>
+          <Button className="h-9 px-3" disabled={!n} onClick={() => useStore.getState().set({ panel: 'moodboard' })} title="고른 카드로 한 장짜리 무드보드 (PNG · PDF)">
+            <LayoutDashboard size={15} /> 무드보드
           </Button>
           <Button variant="danger" className="h-9 px-3" disabled={!n} onClick={() => (trashItems(selected), clearSelection())}>
             <Trash2 size={15} /> 휴지통

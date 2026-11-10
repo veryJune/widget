@@ -67,7 +67,7 @@ export function createLocalBackend(): Backend {
       const db = await localDb();
       const tx = db.transaction(['categories', 'items'], 'readwrite');
       await tx.objectStore('categories').delete(id);
-      // 서버의 'on delete set null' 과 똑같이: 그 카테고리 항목은 미분류로
+      // 서버의 'on delete set null' 과 똑같이: 그 카테고리 항목은 Inbox로
       const items = (await tx.objectStore('items').getAll()) as Item[];
       for (const it of items) if (it.category_id === id) await tx.objectStore('items').put({ ...it, category_id: null });
       await tx.done;

@@ -103,7 +103,7 @@ function Row({ c, depth, onAddChild }: { c: Category; depth: number; onAddChild:
           </p>
           <div className="flex flex-wrap gap-1.5">
             <Button className="h-8 px-3 text-[13px]" onClick={() => deleteCategory(c.id, false)}>
-              미분류로 옮기고 삭제
+              Inbox로 옮기고 삭제
             </Button>
             {direct > 0 && (
               <Button variant="danger" className="h-8 px-3 text-[13px]" onClick={() => deleteCategory(c.id, true)}>

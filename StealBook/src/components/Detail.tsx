@@ -1,7 +1,7 @@
 // 상세 보기: 크게 보기 + 정보 + 영상 구간 북마크
 // PC: 왼쪽 미디어, 오른쪽 정보 / 모바일: 전체 화면, 좌우로 밀어서 이전·다음
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { AppWindow, ChevronLeft, ChevronRight, Clapperboard, Download, ExternalLink, ImageDown, Maximize2, Pencil, Plus, Repeat, RotateCcw, Trash2, X } from 'lucide-react';
+import { AppWindow, ChevronLeft, ChevronRight, Clapperboard, Download, ExternalLink, ImageDown, LayoutGrid, Maximize2, Pencil, Plus, Repeat, RotateCcw, Trash2, X } from 'lucide-react';
 import { useStore } from '../store';
 import { useAllTags, useVisibleItems } from '../hooks/useVisible';
 import { useBackClose } from '../hooks/useBackClose';
@@ -19,6 +19,7 @@ import { primeUrl } from '../lib/urls';
 import { Button, IconButton, Swatch, inputCls } from './ui';
 import { OkMark } from './Scribble';
 import { categoryOptions } from './CategoryPicker';
+import { StillSheet } from './StillSheet';
 
 // ---------------- 구간 북마크 ----------------
 
@@ -498,6 +499,7 @@ export function Detail() {
   const [confirmDel, setConfirmDel] = useState(false);
   const [embedSrc, setEmbedSrc] = useState<string | null>(null);
   const [copying, setCopying] = useState(false);
+  const [stills, setStills] = useState(false);
   const touch = useRef<{ x: number; y: number } | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const close = () => set({ openId: null });
@@ -521,7 +523,7 @@ export function Detail() {
     if (!item) return;
     const onKey = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement;
-      if (/INPUT|TEXTAREA|SELECT/.test(t.tagName) || useStore.getState().composer.open) return;
+      if (stills || /INPUT|TEXTAREA|SELECT/.test(t.tagName) || useStore.getState().composer.open) return;
       if (e.key === 'Escape') close();
       if (e.key === 'ArrowRight') go(1);
       if (e.key === 'ArrowLeft') go(-1);
@@ -639,7 +641,7 @@ export function Detail() {
           className="h-8 cursor-pointer rounded-full border-0 bg-raise px-3 text-[13px] font-semibold outline-none disabled:opacity-50"
           style={cat ? { boxShadow: `inset 3px 0 0 ${cat.color}` } : undefined}
         >
-          <option value="">미분류</option>
+          <option value="">Inbox</option>
           {categoryOptions(categories).map((o) => (
             <option key={o.id} value={o.id}>
               {o.label}
@@ -728,6 +730,11 @@ export function Detail() {
           <Button onClick={() => set({ theater: { open: true, startId: item.id } })}>
             <Clapperboard size={15} /> 시어터
           </Button>
+          {m?.kind === 'video' && (
+            <Button onClick={() => setStills(true)} title="영상에서 장면을 뽑아 한 장짜리 콘택트 시트로">
+              <LayoutGrid size={15} /> 스틸 시트
+            </Button>
+          )}
           <Button variant="danger" onClick={() => deleteItem(item.id)}>
             <Trash2 size={15} /> 휴지통
           </Button>
@@ -776,9 +783,12 @@ export function Detail() {
     else if (dy > 110 && dy > Math.abs(dx) * 1.5) close(); // 아래로 쓸어내리면 닫기
   };
 
+  const stillsEl = m?.kind === 'video' && stills ? <StillSheet item={item} m={m} open={stills} onClose={() => setStills(false)} /> : null;
+
   if (compact) {
     return (
       <div className="fixed inset-0 z-40 flex flex-col bg-bg fade-in" role="dialog" aria-modal="true" aria-label={title}>
+        {stillsEl}
         <div className="flex h-14 shrink-0 items-center gap-1 px-2 pt-[env(safe-area-inset-top)]">
           <IconButton label="닫기" onClick={close} className="h-10 w-10">
             <X size={20} />
@@ -824,6 +834,7 @@ export function Detail() {
         </div>
         <div className="px-6 pb-8 pt-2">{info}</div>
       </aside>
+      {stillsEl}
     </div>
   );
 }

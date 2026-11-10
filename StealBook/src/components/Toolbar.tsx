@@ -1,8 +1,9 @@
 // PC 상단: 지금 보고 있는 범위 이름, 검색, 정렬·보기 방식, 선택, 시어터, 필터 줄
 import { useEffect, useRef, useState } from 'react';
-import { BookmarkPlus, CheckSquare, Clapperboard, Search, Trash2, X } from 'lucide-react';
+import { BookmarkPlus, CheckSquare, Clapperboard, LayoutDashboard, Trash2 } from 'lucide-react';
 import { useStore } from '../store';
-import { ActiveTags, ColorFilter, DensitySwitch, SortSelect, TypeFilter, ViewSwitch, useFilterActive } from './Controls';
+import { SearchBox } from './SearchBox';
+import { ActiveTags, ColorFilter, PeriodFilter, SourceFilter, DensitySwitch, SortSelect, TypeFilter, ViewSwitch, useFilterActive } from './Controls';
 import { Button, IconButton } from './ui';
 import { ancestors } from '../lib/tree';
 import { describeCriteria } from '../lib/filter';
@@ -11,7 +12,7 @@ import { useCounts } from '../hooks/useVisible';
 export function useScopeLabel() {
   const { scope, categories, collections } = useStore();
   if (scope.kind === 'all') return '전체';
-  if (scope.kind === 'inbox') return '미분류';
+  if (scope.kind === 'inbox') return 'Inbox';
   if (scope.kind === 'fav') return '즐겨찾기';
   if (scope.kind === 'trash') return '휴지통';
   if (scope.kind === 'smart') return collections.find((c) => c.id === scope.id)?.name || '모음';
@@ -90,30 +91,15 @@ export function Toolbar({ count }: { count: number }) {
         <ScopeTitle className="text-[22px]" />
         <span className="num pt-1 text-[13px] text-faint">{count}</span>
         <div className="flex-1" />
-        <label className="relative flex h-9 w-[min(320px,28vw)] items-center">
-          <Search size={15} className="pointer-events-none absolute left-3 text-faint" />
-          <input
-            ref={searchRef}
-            value={query}
-            onChange={(e) => set({ query: e.target.value })}
-            onKeyDown={(e) => e.key === 'Escape' && (set({ query: '' }), e.currentTarget.blur())}
-            placeholder="제목·메모·태그·사이트 검색"
-            aria-label="검색"
-            className="h-full w-full rounded-lg border border-transparent bg-panel pl-9 pr-8 text-[14px] outline-none placeholder:text-faint focus:border-line"
-          />
-          {query ? (
-            <button type="button" className="absolute right-2 text-faint hover:text-ink" aria-label="검색어 지우기" onClick={() => set({ query: '' })}>
-              <X size={14} />
-            </button>
-          ) : (
-            <kbd className="pointer-events-none absolute right-2.5 text-[11px] text-faint">/</kbd>
-          )}
-        </label>
+        <SearchBox ref={searchRef} variant="desktop" />
         <SortSelect />
         <ViewSwitch />
         <DensitySwitch />
         <IconButton label={selectMode ? '선택 끝내기' : '여러 개 선택 (Ctrl+클릭)'} active={selectMode} onClick={() => (selectMode ? clearSelection() : set({ selectMode: true }))}>
           <CheckSquare size={17} />
+        </IconButton>
+        <IconButton label="지금 보이는 것으로 무드보드 (PNG · PDF)" onClick={() => set({ panel: 'moodboard' })}>
+          <LayoutDashboard size={17} />
         </IconButton>
         <IconButton label="시어터로 보기 (T)" onClick={() => set({ theater: { open: true, startId: null } })}>
           <Clapperboard size={17} />
@@ -125,6 +111,9 @@ export function Toolbar({ count }: { count: number }) {
         ) : (
           <>
             <TypeFilter />
+            <span className="h-5 w-px shrink-0 bg-line" />
+            <SourceFilter />
+            <PeriodFilter />
             <span className="h-5 w-px shrink-0 bg-line" />
             <ColorFilter size={15} />
             <ActiveTags />

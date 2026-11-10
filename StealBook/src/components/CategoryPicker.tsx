@@ -64,7 +64,7 @@ export function CategoryPicker({ value, onChange }: { value: string | null; onCh
     <div className="space-y-1.5">
       <div className="flex flex-wrap gap-1.5">
         <button type="button" aria-pressed={value === null} onClick={() => onChange(null)} className={chip(value === null)}>
-          미분류
+          Inbox
         </button>
         {roots.map((c) => (
           <button key={c.id} type="button" aria-pressed={value === c.id} onClick={() => onChange(c.id)} className={chip(value === c.id, root?.id === c.id && value !== c.id)}>

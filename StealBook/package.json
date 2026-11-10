@@ -6,9 +6,10 @@
   "description": "Steal Book — 영감을 훔쳐 모아두는 개인 아카이브",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "node scripts/pack-extension.mjs && vite build",
     "preview": "vite preview",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "pack:extension": "node scripts/pack-extension.mjs"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
