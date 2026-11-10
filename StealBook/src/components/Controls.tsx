@@ -2,9 +2,7 @@
 import { AppWindow, FileText, Image as ImageIcon, LayoutGrid, Link2, List, Play, Rows3, Video, X } from 'lucide-react';
 import type { ItemType, SortMode, ViewMode } from '../lib/types';
 import { FAMILIES } from '../lib/colors';
-import { ASPECTS } from '../lib/util';
 import { useStore } from '../store';
-import { RatioGlyph } from './ui';
 
 export const TYPES: { id: ItemType; label: string; Icon: typeof ImageIcon }[] = [
   { id: 'image', label: '이미지', Icon: ImageIcon },
@@ -30,19 +28,19 @@ export const VIEWS: { id: ViewMode; label: string; Icon: typeof LayoutGrid }[] =
 ];
 
 const chip = (on: boolean) =>
-  `inline-flex h-8 items-center gap-1.5 rounded-full px-3 text-[13px] font-semibold transition ${
+  `inline-flex h-8 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-3 text-[13px] font-semibold transition ${
     on ? 'bg-mark text-on-mark' : 'text-mute hover:bg-raise hover:text-ink'
   }`;
 
 export function useFilterActive() {
-  const { type, aspect, color, tag } = useStore();
-  return !!(type || aspect || color || tag);
+  const { type, color, tags } = useStore();
+  return !!(type || color || tags.length);
 }
 
 export function TypeFilter({ wrap = false }: { wrap?: boolean }) {
   const { type, set } = useStore();
   return (
-    <div className={`flex items-center gap-0.5 ${wrap ? 'flex-wrap' : ''}`} role="group" aria-label="종류">
+    <div className={`flex items-center gap-0.5 ${wrap ? 'flex-wrap' : 'shrink-0'}`} role="group" aria-label="종류">
       {TYPES.map(({ id, label, Icon }) => (
         <button key={id} type="button" aria-pressed={type === id} className={chip(type === id)} onClick={() => set({ type: type === id ? null : id })}>
           <Icon size={14} /> {label}
@@ -52,31 +50,10 @@ export function TypeFilter({ wrap = false }: { wrap?: boolean }) {
   );
 }
 
-export function AspectFilter() {
-  const { aspect, set } = useStore();
-  return (
-    <div className="flex items-center gap-0.5" role="group" aria-label="화면 비율">
-      {ASPECTS.map((a) => (
-        <button
-          key={a.id}
-          type="button"
-          title={a.label}
-          aria-label={a.label}
-          aria-pressed={aspect === a.id}
-          onClick={() => set({ aspect: aspect === a.id ? null : a.id })}
-          className={`grid h-8 w-9 place-items-center rounded-lg transition ${aspect === a.id ? 'bg-mark text-on-mark' : 'text-mute hover:bg-raise hover:text-ink'}`}
-        >
-          <RatioGlyph w={a.w} h={a.h} size={15} />
-        </button>
-      ))}
-    </div>
-  );
-}
-
-export function ColorFilter({ size = 18 }: { size?: number }) {
+export function ColorFilter({ size = 18, wrap = false }: { size?: number; wrap?: boolean }) {
   const { color, set } = useStore();
   return (
-    <div className="flex flex-wrap items-center gap-1" role="group" aria-label="색으로 찾기">
+    <div className={`flex items-center gap-1 ${wrap ? 'flex-wrap' : 'shrink-0'}`} role="group" aria-label="색으로 찾기">
       {FAMILIES.map((f) => (
         <button
           key={f.id}
@@ -102,13 +79,21 @@ export function ColorFilter({ size = 18 }: { size?: number }) {
   );
 }
 
-export function ActiveTag() {
-  const { tag, set } = useStore();
-  if (!tag) return null;
+/** 지금 걸린 태그 필터들 — 하나씩 × 로 빼기 */
+export function ActiveTags() {
+  const { tags, pickTag } = useStore();
+  if (!tags.length) return null;
   return (
-    <button type="button" className={chip(true)} onClick={() => set({ tag: null })} aria-label={`#${tag} 태그 필터 해제`}>
-      #{tag} <X size={13} />
-    </button>
+    <div className="flex shrink-0 items-center gap-1" role="group" aria-label="걸린 태그">
+      {tags.map((t, i) => (
+        <span key={t} className="flex items-center gap-1">
+          {i > 0 && <span className="text-[12px] font-bold text-faint">+</span>}
+          <button type="button" className={chip(true)} onClick={() => pickTag(t, 'toggle')} aria-label={`#${t} 태그 필터 빼기`}>
+            #{t} <X size={13} />
+          </button>
+        </span>
+      ))}
+    </div>
   );
 }
 

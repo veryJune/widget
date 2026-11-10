@@ -6,6 +6,7 @@ import { backend } from '../lib/backend';
 import { exportJson, importJson, localLeftovers, migrateLocalToCloud } from '../lib/backup';
 import { fmtBytes } from '../lib/util';
 import { Button, Modal, inputCls } from './ui';
+import { ThemePicker } from './Theme';
 
 const FREE_STORAGE = 1024 ** 3; // Supabase 무료 파일 저장 1GB
 
@@ -74,7 +75,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 }
 
 export function Settings() {
-  const { panel, set, theme, setPref, session, signOut, categories, items, refresh, toast } = useStore();
+  const { panel, set, session, signOut, categories, items, refresh, toast } = useStore();
   const open = panel === 'settings';
   const fileRef = useRef<HTMLInputElement>(null);
   const [leftover, setLeftover] = useState(0);
@@ -93,13 +94,7 @@ export function Settings() {
   return (
     <Modal open={open} onClose={() => set({ panel: null })} title="설정" width={560}>
       <Section title="화면">
-        <div className="flex gap-1 rounded-lg bg-bg p-1">
-          {(['dark', 'light'] as const).map((t) => (
-            <button key={t} type="button" aria-pressed={theme === t} onClick={() => setPref('theme', t)} className={`h-9 flex-1 rounded-md text-[14px] font-semibold ${theme === t ? 'bg-raise text-ink' : 'text-mute'}`}>
-              {t === 'dark' ? '어둡게 (편집실)' : '밝게 (라이트 테이블)'}
-            </button>
-          ))}
-        </div>
+        <ThemePicker long />
       </Section>
 
       <Section title="저장 · 동기화">

@@ -8,7 +8,7 @@ import { childrenMap } from '../lib/tree';
 import { makeMatcher } from '../lib/filter';
 
 export function useVisibleItems() {
-  const { items, categories, collections, scope, query, type, aspect, color, tag, sort, shuffleSeed } = useStore();
+  const { items, categories, collections, scope, query, type, color, tags, sort, shuffleSeed } = useStore();
   return useMemo(() => {
     let list;
     if (scope.kind === 'trash') {
@@ -29,14 +29,14 @@ export function useVisibleItems() {
               : {};
     // 컬렉션 조건 위에 지금 고른 필터를 덧붙입니다 (검색어는 둘 다 만족)
     const scopeMatch = makeMatcher(base, categories);
-    const viewMatch = makeMatcher({ query, type, aspect, color, tag }, categories);
+    const viewMatch = makeMatcher({ query, type, color, tags }, categories);
     list = items.filter((i) => scopeMatch(i) && viewMatch(i));
     if (sort === 'old') list.sort((a, b) => a.created_at.localeCompare(b.created_at));
     else if (sort === 'title') list.sort((a, b) => titleOf(a).localeCompare(titleOf(b), 'ko'));
     else if (sort === 'shuffle') list = shuffleSeeded(list, shuffleSeed);
     else list.sort((a, b) => b.created_at.localeCompare(a.created_at));
     return list;
-  }, [items, categories, collections, scope, query, type, aspect, color, tag, sort, shuffleSeed]);
+  }, [items, categories, collections, scope, query, type, color, tags, sort, shuffleSeed]);
 }
 
 export function useCounts() {
@@ -45,6 +45,7 @@ export function useCounts() {
   const collections = useStore((s) => s.collections);
   return useMemo(() => {
     const direct = new Map<string, number>();
+    const known = new Set(categories.map((c) => c.id));
     let inbox = 0;
     let fav = 0;
     let all = 0;
@@ -55,7 +56,7 @@ export function useCounts() {
         continue;
       }
       all++;
-      if (i.category_id) direct.set(i.category_id, (direct.get(i.category_id) || 0) + 1);
+      if (i.category_id && known.has(i.category_id)) direct.set(i.category_id, (direct.get(i.category_id) || 0) + 1);
       else inbox++;
       if (i.favorite) fav++;
     }
@@ -80,11 +81,17 @@ export function useCounts() {
   }, [items, categories, collections]);
 }
 
-export function useAllTags(): string[] {
+/** 태그와 개수 (많이 쓴 순) */
+export function useTagCounts(): [string, number][] {
   const items = useStore((s) => s.items);
   return useMemo(() => {
     const m = new Map<string, number>();
     for (const i of items) if (!i.deleted_at) for (const t of i.tags) m.set(t, (m.get(t) || 0) + 1);
-    return [...m.entries()].sort((a, b) => b[1] - a[1]).map(([t]) => t);
+    return [...m.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], 'ko'));
   }, [items]);
+}
+
+export function useAllTags(): string[] {
+  const counts = useTagCounts();
+  return useMemo(() => counts.map(([t]) => t), [counts]);
 }

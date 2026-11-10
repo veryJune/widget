@@ -1,15 +1,17 @@
 // 모바일 화면: 상단 바(검색·필터·메뉴) + 범위 칩 + 오른쪽 아래 담기 버튼 + 시트들
 import { useState } from 'react';
-import { Bookmark, CheckSquare, Clapperboard, ListFilter, Menu, Plus, Search, Settings, SlidersHorizontal, Trash2 } from 'lucide-react';
+import { Bookmark, CheckSquare, Hash, Clapperboard, ListFilter, Menu, Plus, Search, Settings, SlidersHorizontal, Trash2 } from 'lucide-react';
 import { useStore } from '../store';
 import { useCounts } from '../hooks/useVisible';
 import type { Scope } from '../lib/types';
 import { Wordmark } from './Scribble';
-import { AspectFilter, ActiveTag, ColorFilter, DensitySwitch, SORTS, TypeFilter, ViewSwitch, useFilterActive } from './Controls';
+import { ColorFilter, DensitySwitch, SORTS, TypeFilter, ViewSwitch, useFilterActive } from './Controls';
 import { Button, IconButton, Modal, Swatch } from './ui';
 import { ancestors, descendants, flatten, siblingsOf } from '../lib/tree';
 import { useSelecting } from './Selection';
 import { TrashBar } from './Toolbar';
+import { TagChips } from './Tags';
+import { ThemePicker } from './Theme';
 
 function Chip({ scope, label, count, dot, partial, small }: { scope: Scope; label: string; count: number; dot?: string; partial?: boolean; small?: boolean }) {
   const { scope: cur, set } = useStore();
@@ -88,7 +90,7 @@ export function MobileHeader() {
       )}
       <div className="no-scrollbar flex gap-1.5 overflow-x-auto px-3 pb-2.5">
         <Chip scope={{ kind: 'all' }} label="전체" count={counts.all} />
-        <Chip scope={{ kind: 'inbox' }} label="인박스" count={counts.inbox} />
+        <Chip scope={{ kind: 'inbox' }} label="미분류" count={counts.inbox} />
         <Chip scope={{ kind: 'fav' }} label="즐겨찾기" count={counts.fav} />
         {collections.map((c) => (
           <Chip key={c.id} scope={{ kind: 'smart', id: c.id }} label={`◇ ${c.name}`} count={counts.byCollection.get(c.id) || 0} />
@@ -163,22 +165,26 @@ export function FilterSheet() {
           <TypeFilter wrap />
         </section>
         <section>
-          <h3 className="mb-2 text-[13px] font-semibold text-mute">화면 비율</h3>
-          <AspectFilter />
+          <h3 className="mb-2 text-[13px] font-semibold text-mute">색</h3>
+          <ColorFilter size={24} wrap />
         </section>
         <section>
-          <h3 className="mb-2 text-[13px] font-semibold text-mute">색</h3>
-          <ColorFilter size={24} />
+          <h3 className="mb-2 flex items-center justify-between text-[13px] font-semibold text-mute">
+            태그 <span className="text-[12px] font-normal text-faint">여러 개 고르면 모두 가진 것만</span>
+          </h3>
+          <TagChips />
         </section>
-        <ActiveTag />
         {canSave && scope.kind !== 'trash' && (
           <button
             type="button"
             onClick={() => set({ panel: 'saveCollection' })}
-            className="flex w-full items-center gap-2 rounded-lg border border-dashed border-line px-3 py-3 text-left text-[14px] font-semibold text-mute"
+            className="flex w-full items-start gap-2.5 rounded-lg border border-dashed border-line px-3 py-3 text-left text-[14px] font-semibold text-mute"
           >
-            <Bookmark size={16} /> 지금 조건을 ‘모음’으로 저장
-            <span className="ml-auto text-[12px] font-normal text-faint">조건에 맞는 새 항목이 자동으로 모입니다</span>
+            <Bookmark size={16} className="mt-0.5 shrink-0" />
+            <span>
+              지금 조건을 ‘모음’으로 저장
+              <span className="mt-0.5 block text-[12px] font-normal text-faint">조건에 맞는 새 항목이 자동으로 모입니다</span>
+            </span>
           </button>
         )}
       </div>
@@ -187,7 +193,7 @@ export function FilterSheet() {
 }
 
 export function MenuSheet() {
-  const { panel, set, sort, setPref, theme } = useStore();
+  const { panel, set, sort, setPref } = useStore();
   const counts = useCounts();
   return (
     <Modal open={panel === 'menu'} onClose={() => set({ panel: null })} title="보기">
@@ -218,17 +224,14 @@ export function MenuSheet() {
         </section>
         <section className="flex items-center justify-between gap-3">
           <h3 className="text-[14px] font-semibold">화면</h3>
-          <div className="flex rounded-lg bg-bg p-0.5">
-            {(['dark', 'light'] as const).map((t) => (
-              <button key={t} type="button" aria-pressed={theme === t} onClick={() => setPref('theme', t)} className={`h-8 rounded-md px-3 text-[13px] font-semibold ${theme === t ? 'bg-raise text-ink' : 'text-mute'}`}>
-                {t === 'dark' ? '어둡게' : '밝게'}
-              </button>
-            ))}
-          </div>
+          <ThemePicker />
         </section>
         <div className="grid gap-2 border-t border-line pt-5">
           <Button className="justify-start" onClick={() => set({ panel: null, selectMode: true })}>
             <CheckSquare size={16} /> 여러 개 선택 <span className="ml-auto text-[12px] font-normal text-faint">카드를 길게 눌러도 됩니다</span>
+          </Button>
+          <Button className="justify-start" onClick={() => set({ panel: 'tags' })}>
+            <Hash size={16} /> 태그 정리
           </Button>
           <Button className="justify-start" onClick={() => set({ panel: null, scope: { kind: 'trash' } })}>
             <Trash2 size={16} /> 휴지통 {counts.trash > 0 && <span className="num ml-auto text-[12px] text-faint">{counts.trash}</span>}

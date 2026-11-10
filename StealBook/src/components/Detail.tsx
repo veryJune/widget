@@ -436,7 +436,7 @@ function TagEditor({ item }: { item: Item }) {
     <div className="flex flex-wrap items-center gap-1.5">
       {item.tags.map((t) => (
         <span key={t} className="group/tag inline-flex h-7 items-center rounded-full bg-raise pl-2.5 pr-1 text-[13px] font-semibold text-mute">
-          <button type="button" onClick={() => set({ tag: t, openId: null })} className="hover:text-ink" title={`#${t} 모아 보기`}>
+          <button type="button" onClick={() => set({ tags: [t], openId: null })} className="hover:text-ink" title={`#${t} 모아 보기`}>
             #{t}
           </button>
           <button type="button" aria-label={`${t} 태그 빼기`} onClick={() => updateItem(item.id, { tags: item.tags.filter((x) => x !== t) })} className="ml-0.5 grid h-5 w-5 place-items-center rounded-full opacity-50 hover:opacity-100">
@@ -639,7 +639,7 @@ export function Detail() {
           className="h-8 cursor-pointer rounded-full border-0 bg-raise px-3 text-[13px] font-semibold outline-none disabled:opacity-50"
           style={cat ? { boxShadow: `inset 3px 0 0 ${cat.color}` } : undefined}
         >
-          <option value="">인박스</option>
+          <option value="">미분류</option>
           {categoryOptions(categories).map((o) => (
             <option key={o.id} value={o.id}>
               {o.label}

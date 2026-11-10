@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { BookmarkPlus, CheckSquare, Clapperboard, Search, Trash2, X } from 'lucide-react';
 import { useStore } from '../store';
-import { AspectFilter, ActiveTag, ColorFilter, DensitySwitch, SortSelect, TypeFilter, ViewSwitch, useFilterActive } from './Controls';
+import { ActiveTags, ColorFilter, DensitySwitch, SortSelect, TypeFilter, ViewSwitch, useFilterActive } from './Controls';
 import { Button, IconButton } from './ui';
 import { ancestors } from '../lib/tree';
 import { describeCriteria } from '../lib/filter';
@@ -11,7 +11,7 @@ import { useCounts } from '../hooks/useVisible';
 export function useScopeLabel() {
   const { scope, categories, collections } = useStore();
   if (scope.kind === 'all') return '전체';
-  if (scope.kind === 'inbox') return '인박스';
+  if (scope.kind === 'inbox') return '미분류';
   if (scope.kind === 'fav') return '즐겨찾기';
   if (scope.kind === 'trash') return '휴지통';
   if (scope.kind === 'smart') return collections.find((c) => c.id === scope.id)?.name || '모음';
@@ -126,10 +126,8 @@ export function Toolbar({ count }: { count: number }) {
           <>
             <TypeFilter />
             <span className="h-5 w-px shrink-0 bg-line" />
-            <AspectFilter />
-            <span className="h-5 w-px shrink-0 bg-line" />
             <ColorFilter size={15} />
-            <ActiveTag />
+            <ActiveTags />
             {canSave && (
               <button type="button" onClick={() => set({ panel: 'saveCollection' })} className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full border border-line px-3 text-[13px] font-semibold text-ink hover:bg-raise">
                 <BookmarkPlus size={14} /> 이 조건을 모음으로 저장
