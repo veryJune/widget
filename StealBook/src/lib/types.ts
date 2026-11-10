@@ -95,9 +95,13 @@ export interface Criteria {
   favorite?: boolean;
   query?: string;
   type?: ItemType | null;
+  /** (예전 버전) 화면 비율 — 지금은 화면에서 고를 수 없지만 저장된 모음은 그대로 동작 */
   aspect?: AspectBucket | null;
   color?: string | null;
+  /** (예전 버전) 태그 하나 */
   tag?: string | null;
+  /** 태그 여러 개 — 모두 가진 항목만 */
+  tags?: string[];
 }
 
 export interface Collection {

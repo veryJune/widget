@@ -153,7 +153,7 @@ function Row({ item }: { item: Item }) {
             <Swatch color={cat.color} size={8} /> <span className="truncate" title={pathLabel(categories, cat.id)}>{cat.name}</span>
           </>
         ) : (
-          '인박스'
+          '미분류'
         )}
       </span>
       <span className="hidden w-40 shrink-0 truncate text-[13px] text-faint xl:block">{item.tags.map((t) => `#${t}`).join(' ')}</span>

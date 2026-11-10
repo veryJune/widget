@@ -31,18 +31,19 @@
   --scrim: rgba(18, 18, 18, 0.78);
 }
 
+/* 밝게: 라이트 테이블 — 종이처럼 밝은 바탕, 카드는 흰색, 표시는 빨간 그리스 펜슬 */
 [data-theme='light'] {
   color-scheme: light;
-  --bg: #e4e4e4;
-  --panel: #eeeeee;
-  --raise: #f8f8f8;
-  --line: #cacaca;
-  --ink: #171717;
-  --mute: #616161;
-  --faint: #8f8f8f;
-  --mark: #cf2438;
+  --bg: #f3f3f1;
+  --panel: #ffffff;
+  --raise: #e9e9e6;
+  --line: #dcdcd8;
+  --ink: #141414;
+  --mute: #5b5b57;
+  --faint: #93938e;
+  --mark: #d12a3a;
   --on-mark: #ffffff;
-  --scrim: rgba(228, 228, 228, 0.82);
+  --scrim: rgba(243, 243, 241, 0.86);
 }
 
 @theme inline {

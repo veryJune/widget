@@ -144,7 +144,7 @@ export function SelectionBar() {
 
   const move = (catId: string) => {
     const target = catId === '__inbox' ? null : catId;
-    const name = target ? categories.find((c) => c.id === target)?.name : '인박스';
+    const name = target ? categories.find((c) => c.id === target)?.name : '미분류';
     bulkUpdate(selected, () => ({ category_id: target }), `${n}개를 ${name}(으)로 옮겼습니다`);
     clearSelection();
   };
@@ -204,7 +204,7 @@ export function SelectionBar() {
               className="absolute inset-0 cursor-pointer opacity-0"
             >
               <option value="">옮길 곳 고르기</option>
-              <option value="__inbox">인박스</option>
+              <option value="__inbox">미분류</option>
               {categoryOptions(categories).map((o) => (
                 <option key={o.id} value={o.id}>
                   {o.label}

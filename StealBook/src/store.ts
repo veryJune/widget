@@ -2,7 +2,7 @@
 import { create } from 'zustand';
 import { backend, type Session } from './lib/backend';
 import { draftFromText, emptyDraft, mediaPaths, saveDraft, type Draft } from './lib/capture';
-import type { AspectBucket, Category, Collection, Criteria, Item, ItemType, Scope, SortMode, ViewMode } from './lib/types';
+import type { Category, Collection, Criteria, Item, ItemType, Scope, SortMode, ViewMode } from './lib/types';
 import { normalizeUrl } from './lib/filter';
 import { parseEmbed } from './lib/embed';
 import { nowIso, readLS, uid, writeLS } from './lib/util';
@@ -26,7 +26,7 @@ interface Prefs {
   view: ViewMode;
   density: 0 | 1 | 2;
   sort: SortMode;
-  theme: 'dark' | 'light';
+  theme: 'dark' | 'light' | 'system';
 }
 
 const PREFS_KEY = 'stealbook.prefs.v1';
@@ -48,14 +48,14 @@ interface State extends Prefs {
   scope: Scope;
   query: string;
   type: ItemType | null;
-  aspect: AspectBucket | null;
   color: string | null;
-  tag: string | null;
+  /** 태그 필터 (여러 개면 모두 가진 항목만) */
+  tags: string[];
   shuffleSeed: number;
   openId: string | null;
   composer: { open: boolean; draft: Draft | null };
   theater: { open: boolean; startId: string | null };
-  panel: null | 'settings' | 'categories' | 'filters' | 'menu' | 'saveCollection';
+  panel: null | 'settings' | 'categories' | 'filters' | 'menu' | 'saveCollection' | 'tags';
   /** 여러 개 선택 */
   selected: string[];
   selectMode: boolean;
@@ -94,6 +94,13 @@ interface State extends Prefs {
   setSelected(ids: string[], anchor?: string | null): void;
   clearSelection(): void;
   findDuplicate(url: string): Item | undefined;
+
+  /** 태그 이름 바꾸기 (이미 있는 이름이면 합치기) */
+  renameTag(from: string, to: string): Promise<void>;
+  /** 모든 항목에서 태그 빼기 */
+  deleteTag(tag: string): Promise<void>;
+  /** 태그 필터: only=그 태그만 / add=더하기·빼기 */
+  pickTag(tag: string, mode: 'only' | 'toggle'): void;
 
   addCollection(name: string, criteria: Criteria): Promise<Collection>;
   updateCollection(id: string, patch: Partial<Collection>): Promise<void>;
@@ -180,9 +187,8 @@ export const useStore = create<State>((set, get) => {
     scope: { kind: 'all' },
     query: '',
     type: null,
-    aspect: null,
     color: null,
-    tag: null,
+    tags: [],
     shuffleSeed: Date.now() % 100000,
     openId: null,
     composer: { open: false, draft: null },
@@ -249,7 +255,7 @@ export const useStore = create<State>((set, get) => {
       if (k === 'sort' && v === 'shuffle') set({ shuffleSeed: Date.now() % 100000 });
     },
 
-    clearFilters: () => set({ query: '', type: null, aspect: null, color: null, tag: null }),
+    clearFilters: () => set({ query: '', type: null, color: null, tags: [] }),
 
     toast(text, opt = {}) {
       const id = uid();
@@ -378,7 +384,7 @@ export const useStore = create<State>((set, get) => {
           /* 묶음 담기는 마지막에 한 번만 알림 */
         } else if (!d.base) {
           const cat = get().categories.find((c) => c.id === item.category_id);
-          get().toast(`${cat ? cat.name : '인박스'}에 담았습니다`, { action: { label: '열기', run: () => set({ openId: item.id }) } });
+          get().toast(`${cat ? cat.name : '미분류'}에 담았습니다`, { action: { label: '열기', run: () => set({ openId: item.id }) } });
         } else get().toast('저장했습니다');
         snapshot();
         return item;
@@ -394,7 +400,7 @@ export const useStore = create<State>((set, get) => {
       const cat = get().currentCategoryId();
       if (files && files.length > 1) {
         // 파일마다 항목 하나씩, 알림은 한 번만
-        const where = get().categories.find((c) => c.id === cat)?.name || '인박스';
+        const where = get().categories.find((c) => c.id === cat)?.name || '미분류';
         const tid = get().toast(`담는 중 1/${files.length}`, { kind: 'progress' });
         let ok = 0;
         for (let i = 0; i < files.length; i++) {
@@ -544,11 +550,50 @@ export const useStore = create<State>((set, get) => {
       return get().items.find((i) => !i.deleted_at && i.url && keys.has(normalizeUrl(i.url)));
     },
 
+    // ---------- 태그 ----------
+    async renameTag(from, raw) {
+      const to = raw.replace(/^#+/, '').trim().replace(/[\s,]+/g, '_');
+      if (!to || to === from) return;
+      const { items, collections, tags } = get();
+      const ids = items.filter((i) => i.tags.includes(from)).map((i) => i.id);
+      const merge = items.some((i) => !i.deleted_at && i.tags.includes(to));
+      set({ tags: [...new Set(tags.map((t) => (t === from ? to : t)))] });
+      await get().bulkUpdate(ids, (it) => ({ tags: [...new Set(it.tags.map((t) => (t === from ? to : t)))] }), merge ? `태그 합침: #${from} → #${to}` : `태그 이름 바꿈: #${from} → #${to}`);
+      // 이 태그를 쓰는 모음 조건도 같이 고칩니다
+      for (const c of collections) {
+        const cr = c.criteria;
+        if (cr.tag !== from && !cr.tags?.includes(from)) continue;
+        await get().updateCollection(c.id, {
+          criteria: { ...cr, tag: cr.tag === from ? to : cr.tag, tags: cr.tags ? [...new Set(cr.tags.map((t) => (t === from ? to : t)))] : cr.tags },
+        });
+      }
+    },
+
+    async deleteTag(tag) {
+      const items = get().items.filter((i) => i.tags.includes(tag));
+      const before = new Map(items.map((i) => [i.id, i.tags]));
+      const ids = items.map((i) => i.id);
+      set((s) => ({ tags: s.tags.filter((t) => t !== tag) }));
+      await get().bulkUpdate(ids, (it) => ({ tags: it.tags.filter((t) => t !== tag) }));
+      get().toast(`#${tag} 태그를 ${ids.length}개 항목에서 뺐습니다`, {
+        ms: 7000,
+        action: { label: '되돌리기', run: () => get().bulkUpdate(ids, (it) => ({ tags: before.get(it.id) ?? it.tags }), `#${tag} 태그를 되돌렸습니다`) },
+      });
+    },
+
+    pickTag(tag, mode) {
+      const { tags, scope } = get();
+      let next: string[];
+      if (mode === 'toggle') next = tags.includes(tag) ? tags.filter((t) => t !== tag) : [...tags, tag];
+      else next = tags.length === 1 && tags[0] === tag ? [] : [tag];
+      set({ tags: next, ...(scope.kind === 'trash' ? { scope: { kind: 'all' } as Scope } : {}) });
+    },
+
     // ---------- 스마트 컬렉션 ----------
     async addCollection(name, criteria) {
       const list = get().collections;
       const c: Collection = { id: uid(), name: name.trim() || '새 모음', icon: '', criteria, sort: (list[list.length - 1]?.sort ?? 0) + 1, created_at: nowIso() };
-      set({ collections: [...list, c], scope: { kind: 'smart', id: c.id }, query: '', type: null, aspect: null, color: null, tag: null });
+      set({ collections: [...list, c], scope: { kind: 'smart', id: c.id }, query: '', type: null, color: null, tags: [] });
       try {
         await backend.saveCollection(c);
         get().toast(`모음 ‘${c.name}’을 만들었습니다`);

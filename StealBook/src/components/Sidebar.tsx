@@ -1,4 +1,4 @@
-// PC 왼쪽 사이드바: 범위(전체·인박스·즐겨찾기·카테고리 트리), 담기 버튼, 설정
+// PC 왼쪽 사이드바: 범위(전체·미분류·즐겨찾기·모음·카테고리 트리·태그), 담기 버튼, 설정
 // 카드를 끌어다 카테고리에 놓으면 그 카테고리로 옮겨집니다. 카테고리 이름 옆 + 로 하위 카테고리를 만듭니다.
 import { useRef, useState, type ReactNode } from 'react';
 import { ChevronRight, Cloud, HardDrive, Inbox, Layers, Pencil, Plus, Settings, SlidersHorizontal, Sparkles, Trash2, X } from 'lucide-react';
@@ -11,12 +11,14 @@ import { backend } from '../lib/backend';
 import { readLS, writeLS } from '../lib/util';
 import { Button, Swatch, inputCls } from './ui';
 import { Wordmark } from './Scribble';
+import { TagSection } from './Tags';
+import { ThemeToggle } from './Theme';
 
 const DRAG_MIME = 'application/x-stealbook-item';
 const COLLAPSED_KEY = 'stealbook.collapsed.v1';
 
 function sameScope(a: Scope, b: Scope) {
-  return a.kind === b.kind && (a.kind !== 'cat' || (b.kind === 'cat' && a.id === b.id));
+  return a.kind === b.kind && (!('id' in a) || ('id' in b && a.id === b.id));
 }
 
 function NavRow({
@@ -196,7 +198,7 @@ export function Sidebar() {
   };
   const move = (cat: Category | null) => (id: string) => {
     const ids = dragged(id);
-    const where = cat ? `'${cat.name}' 카테고리로` : '인박스로';
+    const where = cat ? `'${cat.name}' 카테고리로` : '미분류로';
     if (ids.length > 1) bulkUpdate(ids, () => ({ category_id: cat?.id ?? null }), `${ids.length}개를 ${where} 옮겼습니다`);
     else {
       updateItem(id, { category_id: cat?.id ?? null });
@@ -237,7 +239,7 @@ export function Sidebar() {
 
       <nav className="scroll-thin mt-4 min-h-0 flex-1 overflow-y-auto px-3 pb-4" aria-label="범위">
         <NavRow scope={{ kind: 'all' }} icon={<Layers size={15} />} label="전체" count={counts.all} />
-        <NavRow scope={{ kind: 'inbox' }} icon={<Inbox size={15} />} label="인박스" count={counts.inbox} onDropItem={move(null)} />
+        <NavRow scope={{ kind: 'inbox' }} icon={<Inbox size={15} />} label="미분류" count={counts.inbox} onDropItem={move(null)} />
         <NavRow
           scope={{ kind: 'fav' }}
           icon={<span className="block h-3 w-3 rounded-full border-[1.5px] border-current" />}
@@ -288,6 +290,8 @@ export function Sidebar() {
           </button>
         )}
 
+        <TagSection />
+
         <div className="mt-6">
           <NavRow
             scope={{ kind: 'trash' }}
@@ -304,6 +308,7 @@ export function Sidebar() {
           {backend.mode === 'cloud' ? <Cloud size={14} /> : <HardDrive size={14} />}
           {backend.mode === 'cloud' ? '동기화 켜짐' : '체험 모드'}
         </span>
+        <ThemeToggle />
         <button type="button" onClick={() => set({ panel: 'settings' })} className="rounded-lg p-2 text-mute hover:bg-panel hover:text-ink" aria-label="설정" title="설정">
           <Settings size={16} />
         </button>

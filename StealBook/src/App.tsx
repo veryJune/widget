@@ -19,6 +19,8 @@ import { Wordmark } from './components/Scribble';
 import { useFilterActive } from './components/Controls';
 import { SelectionBar, visibleOrder } from './components/Selection';
 import { SaveCollectionDialog } from './components/Collections';
+import { TagManager } from './components/Tags';
+import { resolveTheme, useApplyTheme } from './components/Theme';
 
 const isTyping = (t: EventTarget | null) => {
   const el = t as HTMLElement | null;
@@ -37,7 +39,7 @@ function readShare(): string | null {
 function DropOverlay() {
   const label = useScopeLabel();
   const scope = useStore((s) => s.scope);
-  const where = scope.kind === 'cat' ? label : '인박스';
+  const where = scope.kind === 'cat' ? label : '미분류';
   return (
     <div className="pointer-events-none fixed inset-3 z-[80] grid place-items-center rounded-2xl border-2 border-dashed border-mark bg-scrim fade-in">
       <p className="text-[20px] font-extrabold">놓으면 {where}에 담깁니다</p>
@@ -48,9 +50,9 @@ function DropOverlay() {
 function Main() {
   const compact = useCompact();
   const items = useVisibleItems();
-  const { scope, query, type, aspect, color, tag, sort, loaded } = useStore();
+  const { scope, query, type, color, tags, sort, loaded } = useStore();
   const filtered = useFilterActive() || !!query.trim();
-  const galleryKey = JSON.stringify([scope, query, type, aspect, color, tag, sort]);
+  const galleryKey = JSON.stringify([scope, query, type, color, tags, sort]);
   const scopeKey = JSON.stringify(scope);
   // 다른 곳으로 이동하면 선택은 풉니다
   useEffect(() => {
@@ -92,7 +94,7 @@ function Main() {
 
 export default function App() {
   const s = useStore();
-  const { theme, authChecked, session } = s;
+  const { authChecked, session } = s;
   const [dragging, setDragging] = useState(false);
   const [shared, setShared] = useState<string | null>(() => readShare());
 
@@ -100,10 +102,7 @@ export default function App() {
     useStore.getState().boot();
   }, []);
 
-  useEffect(() => {
-    document.documentElement.dataset.theme = theme;
-    document.querySelector('meta[name="theme-color"]')?.setAttribute('content', theme === 'dark' ? '#1e1e1e' : '#e4e4e4');
-  }, [theme]);
+  useApplyTheme();
 
   // 공유로 들어온 내용은 로그인 확인 후 작성 창으로
   useEffect(() => {
@@ -177,6 +176,7 @@ export default function App() {
       if (e.key === '2') st.setPref('view', 'grid');
       if (e.key === '3') st.setPref('view', 'list');
       if (e.key === 't' || e.key === 'T') st.set({ theater: { open: true, startId: null } });
+      if (e.key === 'l' || e.key === 'L') st.setPref('theme', resolveTheme(st.theme) === 'dark' ? 'light' : 'dark');
     };
     window.addEventListener('paste', onPaste);
     window.addEventListener('dragenter', onDragEnter);
@@ -212,6 +212,7 @@ export default function App() {
       <CategoryManager />
       <Settings />
       <SaveCollectionDialog />
+      <TagManager />
       <SelectionBar />
       <Toasts />
       {dragging && <DropOverlay />}
