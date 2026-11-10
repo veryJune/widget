@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>스토리 구조 교본</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap">
+<style>
+:root {
+  /* 어두운 편집실 바탕 + 앰버(긴장) · 틸(구조) 두 가지 강조 */
+  --bg: #10141A;
+  --panel: #181D25;
+  --panel-2: #1D232D;
+  --line: #2A313C;
+  --ink: #EDEAE3;
+  --mute: #A9AFB8;
+  --amber: #F2A541;
+  --teal: #6FC2B6;
+  --sans: 'IBM Plex Sans KR', 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
+  --mono: 'IBM Plex Mono', ui-monospace, monospace;
+  /* 레이아웃: 1256px 한 단, 섹션 사이 넉넉히, 휴대폰에서는 카드가 세로로 쌓임 */
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--bg); color: var(--ink); }
+body { font-family: var(--sans); font-size: 17px; line-height: 1.55; word-break: keep-all; -webkit-font-smoothing: antialiased; }
+.page { max-width: 1400px; margin: 0 auto; padding: 72px 72px 88px; display: flex; flex-direction: column; gap: 96px; }
+h1, h2, h3, p { margin: 0; text-wrap: balance; }
+.num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+
+/* 헤더 */
+.head { display: flex; flex-direction: column; gap: 22px; }
+.eyebrow { display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 8px 24px; }
+.eyebrow .en { font-family: var(--mono); font-size: 15px; font-weight: 600; letter-spacing: .18em; color: var(--amber); }
+.eyebrow .ko { font-size: 15px; font-weight: 500; color: var(--mute); }
+h1 { font-size: clamp(40px, 6vw, 68px); line-height: 1.1; font-weight: 700; letter-spacing: -0.02em; }
+.thesis { padding: 24px 28px; background: var(--amber); color: var(--bg); border-radius: 6px; font-size: clamp(20px, 2.4vw, 27px); line-height: 1.4; font-weight: 600; }
+.lede { color: var(--mute); }
+
+/* 섹션 머리 */
+section { display: flex; flex-direction: column; gap: 28px; }
+.sec-head { display: flex; align-items: baseline; flex-wrap: wrap; gap: 6px 16px; padding-bottom: 16px; border-bottom: 1px solid var(--line); }
+.sec-head .n { font-family: var(--mono); font-size: 22px; font-weight: 600; color: var(--amber); }
+.sec-head h2 { font-size: clamp(26px, 3vw, 32px); line-height: 1.2; font-weight: 700; }
+.sec-head p { color: var(--mute); font-size: 16px; }
+.sub { font-size: 15px; font-weight: 600; color: var(--teal); }
+
+/* 01 다섯 요소: 카드를 화살표로 잇기 */
+.chain { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 36px; }
+.chain li { position: relative; padding: 20px; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; display: flex; flex-direction: column; gap: 6px; }
+.chain li:not(:last-child)::after { content: ""; position: absolute; top: 50%; right: -27px; width: 18px; height: 18px; transform: translateY(-50%);
+  background: no-repeat center/18px url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 18 18' fill='none' stroke='%236FC2B6' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M2 9h13M10 4l5 5-5 5'/%3E%3C/svg%3E"); }
+.chain li.goal { border-color: var(--amber); }
+.chain .k { font-family: var(--mono); font-size: 14px; font-weight: 600; color: var(--teal); }
+.chain li.goal .k { color: var(--amber); }
+.chain .t { font-size: 26px; font-weight: 700; line-height: 1.25; }
+.chain .q { font-size: 17px; }
+.chain .x { font-size: 15px; color: var(--mute); }
+
+/* 3막 + 두 곡선 */
+.arc { display: flex; flex-direction: column; gap: 12px; }
+.legend { display: flex; flex-wrap: wrap; gap: 8px 24px; font-size: 15px; color: var(--mute); }
+.legend span { display: inline-flex; align-items: center; gap: 8px; }
+.legend i { display: inline-block; width: 28px; height: 0; border-top: 3px solid var(--amber); }
+.legend i.dash { border-top: 3px dashed var(--teal); }
+.arc-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.arc-inner { min-width: 760px; }
+.arc svg { display: block; width: 100%; height: auto; }
+.acts { display: grid; grid-template-columns: 1fr 2fr 1fr; }
+.acts > div { padding: 16px 18px; background: var(--panel); border: 1px solid var(--line); display: flex; flex-direction: column; gap: 4px; }
+.acts > div:first-child { border-radius: 6px 0 0 6px; }
+.acts > div:nth-child(2) { background: var(--panel-2); border-left: 0; border-right: 0; }
+.acts > div:last-child { border-radius: 0 6px 6px 0; }
+.acts .k { font-size: 14px; font-weight: 600; color: var(--teal); }
+.acts .t { font-size: 22px; font-weight: 700; }
+.acts .x { font-size: 15px; color: var(--mute); }
+.scroll-hint { display: none; font-size: 13px; color: var(--mute); }
+
+/* 확장 구조 */
+.grid4 { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
+.ext { padding: 18px 20px; border: 1px solid var(--line); border-radius: 6px; display: flex; flex-direction: column; gap: 6px; }
+.ext .k { font-size: 14px; font-weight: 600; color: var(--teal); }
+.ext .t { font-size: 19px; font-weight: 700; }
+.ext .x { font-size: 15px; color: var(--mute); }
+
+/* 02 장치 */
+.device { padding: 22px; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; display: flex; flex-direction: column; gap: 10px; }
+.device svg { width: 40px; height: 40px; fill: none; stroke: var(--amber); stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; }
+.device .t { font-size: 25px; font-weight: 700; }
+.device .tag { font-size: 17px; font-weight: 600; color: var(--amber); }
+.device .x { font-size: 16px; }
+.device .check { margin-top: auto; padding-top: 10px; border-top: 1px solid var(--line); font-size: 15px; color: var(--mute); }
+.aux { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 10px; }
+.aux > div { padding: 14px 16px; border: 1px solid var(--line); border-radius: 6px; }
+.aux .t { font-size: 17px; font-weight: 700; }
+.aux .x { font-size: 14px; color: var(--mute); }
+
+/* 03 형식별 표 */
+.table-wrap { border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+table { width: 100%; border-collapse: collapse; }
+th { text-align: left; padding: 12px 22px; background: var(--panel-2); font-size: 14px; font-weight: 600; letter-spacing: .04em; color: var(--teal); }
+td { padding: 15px 22px; border-top: 1px solid var(--line); vertical-align: middle; }
+td:first-child { font-size: 20px; font-weight: 700; white-space: nowrap; }
+td:nth-child(2) { font-weight: 600; }
+td:nth-child(3) { font-weight: 600; color: var(--amber); }
+td:nth-child(4) { font-size: 16px; color: var(--mute); }
+.lengths { display: grid; grid-template-columns: 150px repeat(4, minmax(0, 1fr)); gap: 10px; align-items: stretch; }
+.lengths .lab { display: flex; align-items: center; }
+.lengths > div:not(.lab) { padding: 14px 16px; border: 1px solid var(--line); border-radius: 6px; }
+.lengths .d { font-size: 14px; font-weight: 600; color: var(--amber); }
+.lengths .t { font-size: 16px; font-weight: 600; }
+.lengths .x { font-size: 14px; color: var(--mute); }
+
+/* 마무리: 로그라인 + 점검 */
+.foot { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 40px; padding-top: 32px; border-top: 1px solid var(--amber); }
+.foot h3 { font-size: 15px; font-weight: 700; letter-spacing: .06em; color: var(--amber); margin-bottom: 12px; }
+.logline { font-size: 21px; line-height: 1.6; font-weight: 500; }
+.logline b { color: var(--teal); font-weight: 700; }
+.example { margin-top: 16px; padding: 16px 18px; background: var(--panel); border-left: 3px solid var(--teal); border-radius: 0 6px 6px 0; font-size: 16px; line-height: 1.65; }
+.example .lbl { display: block; font-size: 13px; font-weight: 600; color: var(--mute); margin-bottom: 4px; }
+ol.checks { margin: 0; padding-left: 1.4em; display: flex; flex-direction: column; gap: 6px; font-size: 16px; }
+
+/* 태블릿 */
+@media (max-width: 1100px) {
+  .page { padding: 56px 40px 72px; gap: 80px; }
+  .chain { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .chain li:nth-child(3)::after { display: none; }
+  .grid4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .aux { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .lengths { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .lengths .lab { grid-column: 1 / -1; }
+}
+/* 휴대폰 */
+@media (max-width: 640px) {
+  body { font-size: 16px; }
+  .page { padding: 36px 18px 56px; gap: 64px; }
+  .thesis { padding: 18px 20px; }
+  .chain { grid-template-columns: 1fr; gap: 30px; }
+  .chain li::after { right: auto !important; top: auto !important; left: 50% !important; bottom: -25px; transform: translateX(-50%) rotate(90deg) !important; display: block !important; }
+  .chain li:last-child::after { display: none !important; }
+  .grid4, .aux, .lengths, .foot { grid-template-columns: 1fr; }
+  .scroll-hint { display: block; }
+  /* 표는 형식마다 한 덩어리로 */
+  thead { display: none; }
+  table, tbody, tr, td { display: block; width: 100%; }
+  tr { padding: 14px 16px; border-top: 1px solid var(--line); }
+  tr:first-child { border-top: 0; }
+  td { padding: 2px 0; border: 0; }
+  td:first-child { margin-bottom: 4px; }
+}
+</style>
+</head>
+<body>
+<main class="page">
+
+  <header class="head">
+    <div class="eyebrow">
+      <span class="en">STORY STRUCTURE FIELD GUIDE</span>
+      <span class="ko">콘텐츠 기획 · 창작 참고용</span>
+    </div>
+    <h1>스토리 구조 교본</h1>
+    <p class="thesis">원하는 것이 있는 누군가가 장애물을 만나고, 그 과정에서 무언가가 바뀐다.</p>
+    <p class="lede">광고든 모션그래픽이든 장편이든 뼈대는 같습니다. 달라지는 것은 각 단계에 쓰는 시간뿐입니다.</p>
+  </header>
+
+  <section aria-labelledby="s1">
+    <div class="sec-head">
+      <span class="n">01</span>
+      <h2 id="s1">모든 이야기의 최소 단위</h2>
+      <p>다섯 요소 중 하나라도 빠지면 이야기가 아니라 사건 나열이 됩니다</p>
+    </div>
+
+    <ol class="chain">
+      <li><span class="k">1</span><span class="t">인물</span><span class="q">누구 이야기인가?</span><span class="x">없으면 감정이입할 곳이 없다</span></li>
+      <li><span class="k">2</span><span class="t">욕망</span><span class="q">무엇을 원하나?</span><span class="x">없으면 방향이 없다</span></li>
+      <li><span class="k">3</span><span class="t">장애물</span><span class="q">무엇이 막나?</span><span class="x">없으면 긴장이 없다</span></li>
+      <li><span class="k">4</span><span class="t">스테이크</span><span class="q">실패하면 뭘 잃나?</span><span class="x">없으면 신경 쓸 이유가 없다</span></li>
+      <li class="goal"><span class="k">5</span><span class="t">변화</span><span class="q">끝나고 뭐가 달라졌나?</span><span class="x">없으면 이야기가 아니다</span></li>
+    </ol>
+
+    <div class="arc">
+      <div class="legend" aria-hidden="true">
+        <span><i></i>긴장도</span>
+        <span><i class="dash"></i>주인공의 형편</span>
+      </div>
+      <p class="scroll-hint">← 옆으로 밀어서 보기 →</p>
+      <div class="arc-scroll">
+        <div class="arc-inner">
+          <svg viewBox="0 0 1256 256" role="img" aria-label="3막 구조 곡선. 긴장도는 사건, 중간점, 최악의 순간을 지나 클라이맥스에서 가장 높고, 주인공의 형편은 중간점에서 잠시 오른 뒤 최악의 순간에 가장 낮았다가 클라이맥스 뒤에 회복된다.">
+            <g stroke="#2A313C" stroke-width="1" stroke-dasharray="4 6">
+              <line x1="314" y1="0" x2="314" y2="256"/>
+              <line x1="942" y1="0" x2="942" y2="256"/>
+            </g>
+            <g stroke="#3A4250" stroke-width="1">
+              <line x1="150" y1="34" x2="150" y2="256"/>
+              <line x1="628" y1="52" x2="628" y2="256"/>
+              <line x1="890" y1="52" x2="890" y2="256"/>
+              <line x1="1080" y1="34" x2="1080" y2="256"/>
+            </g>
+            <g font-family="IBM Plex Sans KR, sans-serif" font-size="16" font-weight="600" fill="#EDEAE3" text-anchor="middle">
+              <text x="150" y="22">사건이 터진다</text>
+              <text x="628" y="22">중간점: 판이 뒤집힌다</text>
+              <text x="890" y="22">최악의 순간</text>
+              <text x="1080" y="22" fill="#F2A541" font-weight="700">클라이맥스의 선택</text>
+            </g>
+            <g transform="translate(0 16)">
+            <path d="M 0 205 L 150 185 L 314 168 L 628 118 L 760 136 L 890 92 L 1080 50 L 1256 150 L 1256 240 L 0 240 Z" fill="#F2A541" fill-opacity="0.09"/>
+            <path d="M 0 205 L 150 185 L 314 168 L 628 118 L 760 136 L 890 92 L 1080 50 L 1256 150" fill="none" stroke="#F2A541" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/>
+            <path d="M 0 140 L 150 172 L 314 150 L 628 78 L 760 140 L 890 222 L 1080 120 L 1256 68" fill="none" stroke="#6FC2B6" stroke-width="3" stroke-dasharray="8 7" stroke-linejoin="round" stroke-linecap="round"/>
+            <g fill="#10141A" stroke="#F2A541" stroke-width="3">
+              <circle cx="150" cy="185" r="6"/><circle cx="628" cy="118" r="6"/><circle cx="890" cy="92" r="6"/>
+            </g>
+            <circle cx="1080" cy="50" r="8" fill="#F2A541"/>
+            <g fill="#10141A" stroke="#6FC2B6" stroke-width="3">
+              <circle cx="628" cy="78" r="6"/><circle cx="890" cy="222" r="6"/>
+            </g>
+            </g>
+            <g font-family="IBM Plex Sans KR, sans-serif" font-size="13" fill="#A9AFB8" text-anchor="middle">
+              <text x="628" y="41">형편이 잠깐 오른다</text>
+              <text x="890" y="41">긴장 최고 · 형편 최저</text>
+            </g>
+          </svg>
+          <div class="acts">
+            <div><span class="k">1막 설정 · 25%</span><span class="t">질문을 던진다</span><span class="x">일상 → 사건 → 뛰어든다</span></div>
+            <div><span class="k">2막 대립 · 50%</span><span class="t">답을 미룬다</span><span class="x">시도와 실패 → 판이 커진다 → 뒤집힌다 → 모든 것을 잃는다</span></div>
+            <div><span class="k">3막 해결 · 25%</span><span class="t">답한다</span><span class="x">선택 → 결과 → 새로운 일상</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="grid4">
+      <div class="ext"><span class="k">확장 ① 기승전결</span><span class="t">전(轉)에서 뒤집는다</span><span class="x">갈등이 없어도 낯선 연결 하나로 성립한다. 광고, 모션, 숏폼 반전에 맞다.</span></div>
+      <div class="ext"><span class="k">확장 ② 영웅의 여정 · 스토리 서클</span><span class="t">떠났다가 변해서 돌아온다</span><span class="x">안락 → 낯선 곳 → 얻고 대가를 치른다 → 귀환. 반복 포맷과 시리즈에 강하다.</span></div>
+      <div class="ext"><span class="k">확장 ③ 감정 곡선</span><span class="t">구덩이 ↘↗ · 신데렐라 ↗↘↗</span><span class="x">대중이 가장 좋아하는 두 형태. 떨어졌다 올라올 때 쾌감이 크다.</span></div>
+      <div class="ext"><span class="k">확장 ④ 거꾸로 설계</span><span class="t">끝을 먼저 정한다</span><span class="x">결말을 정하고 정반대 상태에서 시작한다. 첫 장면과 끝 장면이 대칭이 된다.</span></div>
+    </div>
+  </section>
+
+  <section aria-labelledby="s2">
+    <div class="sec-head">
+      <span class="n">02</span>
+      <h2 id="s2">뇌를 붙잡는 장치</h2>
+      <p>구조는 그릇이고, 몰입은 이 네 가지에서 나옵니다</p>
+    </div>
+
+    <div class="grid4">
+      <div class="device">
+        <svg viewBox="0 0 40 40" aria-hidden="true"><path d="M4 30 L15 30"/><path d="M25 30 L36 30"/><path d="M14 14 a6 6 0 1 1 9 5 q-3 2 -3 5"/><circle cx="20" cy="30" r="1.2"/></svg>
+        <span class="t">정보 격차</span>
+        <span class="tag">알고 싶은데 아직 모른다</span>
+        <p class="x">질문 하나를 닫기 전에 다음 질문을 연다. 답은 가능한 한 늦게 준다.</p>
+        <p class="check">점검: 지금 관객이 궁금해하는 것이 한 문장으로 써지는가?</p>
+      </div>
+      <div class="device">
+        <svg viewBox="0 0 40 40" aria-hidden="true"><path d="M4 10 L36 10"/><path d="M8 10 L8 34"/><path d="M32 10 L32 34"/><circle cx="20" cy="26" r="7"/><path d="M20 22 L20 26 L23 28"/></svg>
+        <span class="t">서스펜스</span>
+        <span class="tag">관객만 아는 폭탄</span>
+        <p class="x">위험을 먼저 보여주고 인물은 모르게 둔다. 놀라움은 몇 초, 서스펜스는 몇 분을 끈다.</p>
+        <p class="check">점검: 관객이 인물보다 먼저 아는 정보가 있는가?</p>
+      </div>
+      <div class="device">
+        <svg viewBox="0 0 40 40" aria-hidden="true"><path d="M4 30 L20 30 L20 10 L34 10"/><path d="M29 5 L34 10 L29 15"/><path d="M24 30 L36 30" stroke-dasharray="2 5"/></svg>
+        <span class="t">기대 위반</span>
+        <span class="tag">놀랍지만 필연</span>
+        <p class="x">예측하게 만든 뒤 그 예측을 깬다. 돌아보면 앞뒤가 맞아야 반전이고, 안 맞으면 속임수다.</p>
+        <p class="check">점검: 관객이 예상할 결말은 무엇이고, 나는 어디서 틀어 주는가?</p>
+      </div>
+      <div class="device">
+        <svg viewBox="0 0 40 40" aria-hidden="true"><rect x="4" y="14" width="16" height="12" rx="6"/><rect x="20" y="14" width="16" height="12" rx="6"/><path d="M15 20 L25 20"/></svg>
+        <span class="t">인과의 사슬</span>
+        <span class="tag">그런데 · 그래서</span>
+        <p class="x">장면과 장면을 「그리고」로 잇지 않는다. 앞 장면이 다음 장면의 원인이 되게 한다.</p>
+        <p class="check">점검: 장면 순서를 바꿔도 말이 되면 사슬이 끊긴 것이다.</p>
+      </div>
+    </div>
+
+    <div style="display: flex; flex-direction: column; gap: 10px">
+      <span class="sub">함께 쓰면 세지는 보조 장치</span>
+      <div class="aux">
+        <div><div class="t">결핍</div><div class="x">완벽한 인물보다 모자란 인물을 응원한다</div></div>
+        <div><div class="t">스테이크 상승</div><div class="x">잃을 것이 점점 커진다</div></div>
+        <div><div class="t">시간 제한</div><div class="x">마감과 카운트다운. 가장 싼 긴장</div></div>
+        <div><div class="t">가치 전환</div><div class="x">장면마다 +와 −가 바뀐다</div></div>
+        <div><div class="t">복선 회수</div><div class="x">앞에 심고 뒤에서 거둔다</div></div>
+        <div><div class="t">구체성 · 리듬</div><div class="x">설명 대신 디테일, 긴장 뒤엔 이완</div></div>
+      </div>
+    </div>
+  </section>
+
+  <section aria-labelledby="s3">
+    <div class="sec-head">
+      <span class="n">03</span>
+      <h2 id="s3">형식별 적용</h2>
+      <p>형식이 바뀌면 주인공 자리에 앉는 것이 바뀝니다</p>
+    </div>
+
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th scope="col">형식</th><th scope="col">뼈대</th><th scope="col">주인공 자리</th><th scope="col">놓치기 쉬운 것</th></tr></thead>
+        <tbody>
+          <tr><td>광고</td><td>문제 → 고조 → 해결(제품)</td><td>고객 (제품은 멘토)</td><td>제품이 영웅이 되면 몰입이 깨진다</td></tr>
+          <tr><td>브랜드 필름</td><td>결핍 → 시련 → 변화 (여정 축약)</td><td>브랜드가 믿는 가치</td><td>왜를 먼저, 기능은 마지막에 보여준다</td></tr>
+          <tr><td>모션그래픽 · 설명</td><td>질문 → 직관 깨기 → 원리 → 적용</td><td>개념</td><td>형태 변형이 곧 반전. 한 화면에 한 생각</td></tr>
+          <tr><td>다큐 · 정보 채널</td><td>미스터리 → 단서 → 오해 → 진실</td><td>질문 그 자체</td><td>정보를 공개하는 순서가 서스펜스다</td></tr>
+          <tr><td>뮤직비디오</td><td>감정 곡선 우선, 서사는 암시</td><td>감정</td><td>반복 모티프와 이미지 은유로 묶는다</td></tr>
+          <tr><td>관광 · 지역 홍보</td><td>기대 → 발견 → 감탄 → 여운</td><td>장소 (인물처럼)</td><td>첫인상과 숨은 얼굴의 대비를 만든다</td></tr>
+          <tr><td>드라마 · 영화</td><td>3막 + 중간점 반전</td><td>결핍 있는 인물</td><td>원하는 것과 필요한 것을 다르게 둔다</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="lengths">
+      <div class="lab"><span class="sub">길이는 압축률만 다르다</span></div>
+      <div><div class="d num">6~15초</div><div class="t">훅 → 반전</div><div class="x">상황 한가운데서 시작</div></div>
+      <div><div class="d num">30~60초</div><div class="t">훅 → 전개 → 보상 → 루프</div><div class="x">첫 3초에 질문</div></div>
+      <div><div class="d num">3~20분</div><div class="t">3막 압축</div><div class="x">인물 1, 사건 1, 변화 1</div></div>
+      <div><div class="d">장편 · 시리즈</div><div class="t">3막 × 8시퀀스</div><div class="x">작은 질문은 닫고 큰 질문은 연다</div></div>
+    </div>
+  </section>
+
+  <footer class="foot">
+    <div>
+      <h3>로그라인 공식</h3>
+      <p class="logline"><b>[결핍 있는 인물]</b>이 <b>[사건]</b> 때문에 <b>[목표]</b>를 이루려 하지만 <b>[장애물]</b>에 부딪히고, 실패하면 <b>[스테이크]</b>를 잃는다.</p>
+      <p class="example"><span class="lbl">예시</span>은퇴를 하루 앞둔 등대지기가 폭풍 예보 때문에 고장 난 등대를 밤새 고치려 하지만 부품이 바닥나고, 실패하면 돌아오는 마지막 배가 길을 잃는다.</p>
+    </div>
+    <div>
+      <h3>내보내기 전 5가지</h3>
+      <ol class="checks">
+        <li>첫 장면이 질문을 던지는가</li>
+        <li>장면이 「그런데 · 그래서」로 이어지는가</li>
+        <li>중간에 판이 뒤집히는가</li>
+        <li>결말이 놀랍지만 필연인가</li>
+        <li>끝나고 무엇이 달라졌는가</li>
+      </ol>
+    </div>
+  </footer>
+
+</main>
+</body>
+</html>
