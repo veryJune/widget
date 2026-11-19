@@ -41,10 +41,16 @@ public/legacy/        예전 단일 HTML 버전 (/legacy/) — 새 버전이 자
 supabase/schema.sql   mg_projects · mg_items · moodgrid 버킷 · RLS
 ```
 
-## Supabase 설정 (StealBook 프로젝트에 추가)
-1. SQL Editor 에 `supabase/schema.sql` 전체를 붙여넣고 Run (여러 번 실행해도 안전, StealBook 표는 건드리지 않음)
-2. 로그인 계정은 StealBook 과 같음 — 가입은 `stealbook_single_owner` 트리거가 프로젝트 전체에서 막고 있음
-3. Vercel 환경변수 `VITE_SUPABASE_URL`, `VITE_SUPABASE_KEY`(공개 키 `sb_publishable_…`) — service role 키는 절대 넣지 않음
+## 연결된 상태 (2026-11-19)
+| 항목 | 값 |
+|---|---|
+| Vercel 프로젝트 | `moodgrid` (팀 v-june, Root Directory `MoodGrid`, 리전 icn1) |
+| Supabase 프로젝트 | `steal-book` 와 공유 (서울) — `moodgrid_initial` 마이그레이션 적용됨 |
+| 추가된 것 | 표 `mg_projects` · `mg_items`, 비공개 버킷 `moodgrid`(20MB·이미지 형식만), RLS 정책. StealBook 표는 그대로 |
+| 로그인 | StealBook 과 같은 계정. 가입은 `stealbook_single_owner` 트리거가 프로젝트 전체에서 차단 |
+| 환경변수 | `VITE_SUPABASE_URL`, `VITE_SUPABASE_KEY`(공개 키 `sb_publishable_…`)가 production · preview · development 에 등록됨. service role 키는 쓰지 않음 |
+
+처음부터 다시 만들거나 다른 곳에 하나 더 만들 때: Supabase SQL Editor 에 `supabase/schema.sql` 전체를 붙여넣고 Run (여러 번 실행해도 안전) → Vercel 에 위 환경변수 2개 등록.
 
 ## 배포
 - Vercel 프로젝트 `moodgrid` (팀 v-june), Root Directory `MoodGrid`, 리전 icn1
