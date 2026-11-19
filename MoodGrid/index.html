@@ -11,58 +11,15 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&display=swap" rel="stylesheet">
 
-    <!-- Tailwind CSS -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-        tailwind.config = {
-            darkMode: 'class',
-            theme: {
-                extend: {
-                    colors: {
-                        apple: {
-                            gray: '#F5F5F7',
-                            dark: '#1C1C1E',
-                            darkCard: '#2C2C2E',
-                        }
-                    },
-                    fontFamily: {
-                        batang: ['"Gowun Batang"', 'serif'],
-                    },
-                    animation: {
-                        'fade-in': 'fadeIn 0.2s ease-out',
-                        'slide-up': 'slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
-                        'zoom-in': 'zoomIn 0.25s cubic-bezier(0.34, 1.56, 0.64, 1)',
-                        'zoom-out': 'zoomOut 0.2s cubic-bezier(0.4, 0.0, 0.2, 1)',
-                    },
-                    keyframes: {
-                        fadeIn: {
-                            '0%': { opacity: '0' },
-                            '100%': { opacity: '1' },
-                        },
-                        slideUp: {
-                            '0%': { transform: 'translateY(20px)', opacity: '0' },
-                            '100%': { transform: 'translateY(0)', opacity: '1' },
-                        },
-                        zoomIn: {
-                            '0%': { opacity: '0', transform: 'scale(0.9)' },
-                            '100%': { opacity: '1', transform: 'scale(1)' },
-                        },
-                        zoomOut: {
-                            '0%': { opacity: '1', transform: 'scale(1)' },
-                            '100%': { opacity: '0', transform: 'scale(0.9)' },
-                        }
-                    }
-                }
-            }
-        }
-    </script>
-    
-    <!-- Libraries -->
-    <!-- 버전 고정: 외부 업데이트로 앱이 갑자기 깨지지 않게 -->
-    <script src="https://unpkg.com/dexie@4.0.10/dist/dexie.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-    <script src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js"></script>
+    <!-- Tailwind CSS (빌드된 파일). 클래스를 바꾸면 아래 명령으로 다시 만든다:
+         npx tailwindcss@3.4.17 -c tailwind.config.js -i tailwind.src.css -o tailwind.css --minify -->
+    <link rel="stylesheet" href="tailwind.css">
+
+    <!-- Libraries (vendor/ 에 내장 — 외부 CDN 장애와 무관하게 동작. 버전은 vendor/VERSIONS.txt) -->
+    <script src="vendor/dexie.min.js"></script>
+    <script src="vendor/Sortable.min.js"></script>
+    <script src="vendor/html2canvas.min.js"></script>
+    <script src="vendor/lucide.min.js"></script>
 
     <style>
         body {
