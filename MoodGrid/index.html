@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="robots" content="noindex, nofollow">
     <title>MoodGrid v2.6</title>
     
     <!-- Google Fonts: Gowun Batang -->
@@ -57,10 +58,11 @@
     </script>
     
     <!-- Libraries -->
-    <script src="https://unpkg.com/dexie/dist/dexie.js"></script>
+    <!-- 버전 고정: 외부 업데이트로 앱이 갑자기 깨지지 않게 -->
+    <script src="https://unpkg.com/dexie@4.0.10/dist/dexie.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js"></script>
 
     <style>
         body {
@@ -689,6 +691,8 @@
     <script>
         const db = new Dexie("MoodGridDB_v12");
         db.version(1).stores({ items: "++id, type, content, meta, order, timestamp" });
+        // v2: 이미지(base64)가 들어 있는 content 와 객체인 meta 는 인덱스에서 제외 (쓰기 속도·용량 개선)
+        db.version(2).stores({ items: "++id, type, order, timestamp" });
 
         let isEditMode = false;
         let selectedItems = new Set();
@@ -704,7 +708,58 @@
         let editingNoteId = null; 
         let currentFilter = 0;
 
-        const VISUAL_GAP = 24; 
+        const VISUAL_GAP = 24;
+
+        // --- Safety helpers ---
+        // http/https 주소만 허용 (javascript: 등 차단). 통과하면 정규화된 주소, 아니면 null
+        function safeHttpUrl(value) {
+            try {
+                const u = new URL(String(value).trim());
+                return (u.protocol === 'http:' || u.protocol === 'https:') ? u.href : null;
+            } catch (e) { return null; }
+        }
+
+        const ITEM_TYPES = ['image', 'text', 'bookmark', 'divider'];
+        const TEXT_COLORS = ['white', 'yellow', 'blue', 'green', 'dark'];
+
+        // 불러온 JSON 한 항목을 검사·정리. 쓸 수 없으면 null
+        function sanitizeItem(raw, index) {
+            if (!raw || typeof raw !== 'object') return null;
+            if (!ITEM_TYPES.includes(raw.type)) return null;
+            if (typeof raw.content !== 'string') return null;
+            const m = (raw.meta && typeof raw.meta === 'object') ? raw.meta : {};
+            const meta = {};
+            let content = raw.content;
+
+            if (raw.type === 'image') {
+                if (!(content.startsWith('data:image/') || safeHttpUrl(content))) return null;
+                if (Number.isFinite(m.width) && Number.isFinite(m.height) && m.width > 0 && m.height > 0) {
+                    meta.width = m.width; meta.height = m.height;
+                }
+            } else if (raw.type === 'bookmark') {
+                content = safeHttpUrl(content);
+                if (!content) return null;
+            } else if (raw.type === 'text') {
+                content = content.slice(0, 20000);
+                meta.color = TEXT_COLORS.includes(m.color) ? m.color : 'white';
+            } else { // divider
+                content = content.slice(0, 200);
+                if (m.collapsed === true) meta.collapsed = true;
+            }
+            if (raw.type !== 'divider') {
+                const rating = Number(m.rating);
+                if (Number.isInteger(rating) && rating >= 1 && rating <= 3) meta.rating = rating;
+                if (m.pinned === true) meta.pinned = true;
+                if (typeof m.note === 'string' && m.note.trim()) meta.note = m.note.slice(0, 20000);
+            }
+            return {
+                type: raw.type,
+                content,
+                meta,
+                order: Number.isFinite(raw.order) ? raw.order : index,
+                timestamp: Number.isFinite(raw.timestamp) ? raw.timestamp : Date.now()
+            };
+        }
 
         window.addEventListener('DOMContentLoaded', async () => {
             if (localStorage.getItem('darkMode') === 'true' || 
@@ -1070,21 +1125,29 @@
                 } else if (item.type === 'bookmark') {
                     const card = document.createElement('div');
                     card.className = 'p-4 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors';
+                    const safeUrl = safeHttpUrl(item.content);
                     let domain = "Link";
-                    try { domain = new URL(item.content).hostname; } catch(e){}
+                    if (safeUrl) { try { domain = new URL(safeUrl).hostname; } catch(e){} }
+                    // 사용자 입력은 innerHTML 에 넣지 않고 textContent 로만 넣는다 (XSS 방지)
                     card.innerHTML = `
                         <div class="flex items-start gap-3">
                             <div class="w-10 h-10 rounded-lg bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center shrink-0 text-blue-500">
                                 <i data-lucide="link" class="w-5 h-5"></i>
                             </div>
                             <div class="flex-1 min-w-0 overflow-hidden">
-                                <h4 class="font-bold text-sm text-gray-900 dark:text-gray-100 truncate">${domain}</h4>
-                                <p class="text-xs text-gray-500 truncate mt-0.5">${item.content}</p>
+                                <h4 class="bm-domain font-bold text-sm text-gray-900 dark:text-gray-100 truncate"></h4>
+                                <p class="bm-url text-xs text-gray-500 truncate mt-0.5"></p>
                             </div>
                         </div>
                     `;
+                    card.querySelector('.bm-domain').textContent = domain;
+                    card.querySelector('.bm-url').textContent = String(item.content);
                     contentInner.appendChild(card);
-                    contentDiv.onclick = () => window.open(item.content, '_blank');
+                    contentDiv.onclick = () => {
+                        if (isEditMode) return toggleSelection(item.id);
+                        if (safeUrl) window.open(safeUrl, '_blank', 'noopener,noreferrer');
+                        else showToast("열 수 없는 주소입니다.");
+                    };
 
                 } else if (item.type === 'text') {
                     const p = document.createElement('div');
@@ -1113,7 +1176,7 @@
                 // --- Indicators (Small visual cues) ---
                 const hasNote = item.meta && item.meta.note && item.meta.note.trim().length > 0;
                 const isPinned = item.meta?.pinned;
-                const rating = item.meta?.rating || 0;
+                const rating = Math.min(3, Math.max(0, parseInt(item.meta?.rating, 10) || 0));
 
                 // Pin Indicator
                 if (isPinned) {
@@ -1497,13 +1560,20 @@
         }
 
         function handlePaste(e) {
-            const items = (e.clipboardData || e.originalEvent.clipboardData).items;
+            // 메모창·제목 등 입력칸에 붙여넣을 때는 보드에 항목을 추가하지 않는다
+            if (e.target && e.target.closest && e.target.closest('input, textarea, [contenteditable="true"]')) return;
+            const clip = e.clipboardData;
+            if (!clip) return;
+            const items = clip.items || [];
             const files = [];
             for (let item of items) {
-                if (item.type.indexOf("image") === 0) files.push(item.getAsFile());
+                if (item.type.indexOf("image") === 0) {
+                    const f = item.getAsFile();
+                    if (f) files.push(f);
+                }
             }
             if (files.length > 0) return handleFiles(files);
-            const text = e.clipboardData.getData('text');
+            const text = clip.getData('text');
             if (text) {
                 const trimmed = text.trim();
                 const urlPattern = /^(https?:\/\/[^\s]+)/;
@@ -1547,6 +1617,34 @@
             });
         }
 
+        // 화면에 보이는 항목들의 새 순서를 DB 순서에 반영한다.
+        // 필터·접힌 섹션 때문에 숨겨진 항목은 '바로 앞에 보이는 항목'을 따라다니게 해서
+        // (접힌 섹션은 구분선과 함께 이동) 숨은 항목의 순서가 뒤섞이지 않게 한다.
+        async function applyVisibleOrder(visibleIds) {
+            await db.transaction('rw', db.items, async () => {
+                const all = await db.items.orderBy('order').toArray();
+                const visible = new Set(visibleIds);
+                const leading = [];            // 첫 번째 보이는 항목보다 앞에 있는 숨은 항목
+                const chunks = new Map();      // 보이는 항목 id -> [그 항목, 뒤따르는 숨은 항목들]
+                let current = null;
+                for (const it of all) {
+                    if (visible.has(it.id)) { current = [it]; chunks.set(it.id, current); }
+                    else if (current) current.push(it);
+                    else leading.push(it);
+                }
+                const result = [...leading];
+                for (const id of visibleIds) {
+                    const chunk = chunks.get(id);
+                    if (chunk) result.push(...chunk);
+                }
+                const updates = [];
+                result.forEach((it, idx) => {
+                    if (it.order !== idx) updates.push({ id: it.id, order: idx });
+                });
+                for (const u of updates) await db.items.update(u.id, { order: u.order });
+            });
+        }
+
         function initSortable() {
             const el = document.getElementById('gridContainer');
             window.sortableInstance = Sortable.create(el, {
@@ -1556,10 +1654,14 @@
                 onStart: function() { document.body.style.cursor = 'grabbing'; },
                 onEnd: async function (evt) {
                     document.body.style.cursor = '';
-                    const wrapperEls = document.querySelectorAll('.grid-item-wrapper');
-                    const updates = [];
-                    wrapperEls.forEach((el, idx) => updates.push(db.items.update(parseInt(el.dataset.id), { order: idx })));
-                    await Promise.all(updates);
+                    try {
+                        const visibleIds = Array.from(document.querySelectorAll('.grid-item-wrapper'))
+                            .map(el => parseInt(el.dataset.id));
+                        await applyVisibleOrder(visibleIds);
+                    } catch (err) {
+                        console.error('Reorder failed', err);
+                        showToast("순서 저장에 실패했습니다.");
+                    }
                     loadBoard();
                 }
             });
@@ -1754,21 +1856,47 @@
             URL.revokeObjectURL(url);
         }
         function loadProject(file) {
-            toggleMenu(); if (!file) return;
+            toggleMenu();
+            const input = document.getElementById('loadInput');
+            if (!file) return;
             const reader = new FileReader();
             reader.onload = async (e) => {
                 try {
+                    // 1) 먼저 검증만 한다 — 이 단계에서 실패하면 현재 보드는 그대로
                     const data = JSON.parse(e.target.result);
-                    await db.items.clear();
-                    if(data.title) {
-                        document.getElementById('projectTitle').value = data.title;
-                        saveTitle(data.title);
+                    const rawItems = Array.isArray(data) ? data : (data && data.items);
+                    if (!Array.isArray(rawItems)) throw new Error('항목 목록이 없습니다');
+                    const items = rawItems.map(sanitizeItem).filter(Boolean);
+                    if (rawItems.length > 0 && items.length === 0) throw new Error('읽을 수 있는 항목이 없습니다');
+                    const skipped = rawItems.length - items.length;
+
+                    // 2) 현재 보드를 덮어쓴다는 것을 확인
+                    const current = await db.items.count();
+                    const msg = `불러오면 현재 보드(${current}개)가 지워지고 파일의 ${items.length}개로 교체됩니다.\n계속하시겠습니까?`
+                        + (skipped > 0 ? `\n(읽을 수 없는 ${skipped}개 항목은 제외됩니다)` : '');
+                    if (!confirm(msg)) return;
+
+                    // 3) 지우기와 넣기를 한 트랜잭션으로 — 중간에 실패하면 원래대로 복구
+                    await db.transaction('rw', db.items, async () => {
+                        await db.items.clear();
+                        await db.items.bulkAdd(items);
+                    });
+                    actionHistory = [];
+                    const title = (data && typeof data.title === 'string') ? data.title.trim().slice(0, 100) : '';
+                    if (title) {
+                        document.getElementById('projectTitle').value = title;
+                        saveTitle(title);
                     }
-                    const items = Array.isArray(data) ? data : data.items;
-                    for(let item of items) { delete item.id; await db.items.add(item); }
-                    loadBoard(); showToast("프로젝트 로드 완료");
-                } catch(err) { showToast("파일 오류"); }
+                    await loadBoard();
+                    showToast(skipped > 0 ? `불러오기 완료 (${skipped}개 제외)` : "프로젝트 로드 완료");
+                } catch (err) {
+                    console.error('Load failed', err);
+                    showToast("파일 오류 — 현재 보드는 그대로입니다");
+                } finally {
+                    input.value = ''; // 같은 파일을 다시 선택해도 동작하게
+                }
             };
+            reader.onerror = () => { showToast("파일을 읽지 못했습니다"); input.value = ''; };
             reader.readAsText(file);
         }
         async function clearBoard() {
