@@ -186,7 +186,7 @@ function CardBase({ item, ctx }: { item: Item; ctx: CardCtx }) {
 
           {/* 도구 */}
           {!uploading && (
-            <div className="card-tools absolute right-2 top-2 z-30 flex items-center gap-1 rounded-full bg-black/60 p-1 backdrop-blur-sm" onClick={(e) => e.stopPropagation()} onPointerDown={(e) => e.stopPropagation()}>
+            <div className="card-tools absolute right-2 top-2 z-30 flex h-9 items-center gap-0.5 rounded-full border border-line/70 bg-panel/80 px-1 text-ink shadow-md backdrop-blur-md" onClick={(e) => e.stopPropagation()} onPointerDown={(e) => e.stopPropagation()}>
               <ToolBtn label={item.pinned ? '고정 해제 (P)' : '맨 위에 고정 (P)'} active={item.pinned} onClick={() => act().togglePin([item.id])}>
                 <Pin size={14} />
               </ToolBtn>
@@ -204,8 +204,8 @@ function CardBase({ item, ctx }: { item: Item; ctx: CardCtx }) {
             </div>
           )}
           {!uploading && (
-            <div className="card-tools absolute bottom-2 left-1/2 z-30 -translate-x-1/2 rounded-full bg-black/60 px-1.5 py-0.5 backdrop-blur-sm" onClick={(e) => e.stopPropagation()} onPointerDown={(e) => e.stopPropagation()}>
-              <Stars value={item.rating} size={15} onChange={(r) => act().setRating([item.id], r)} />
+            <div className="card-tools absolute bottom-2 left-1/2 z-30 flex h-9 -translate-x-1/2 items-center rounded-full border border-line/70 bg-panel/80 px-1.5 text-ink shadow-md backdrop-blur-md" onClick={(e) => e.stopPropagation()} onPointerDown={(e) => e.stopPropagation()}>
+              <Stars value={item.rating} size={16} onChange={(r) => act().setRating([item.id], r)} />
             </div>
           )}
         </div>
@@ -218,8 +218,9 @@ function CardBase({ item, ctx }: { item: Item; ctx: CardCtx }) {
 }
 
 function ToolBtn({ label, active, danger, onClick, children }: { label: string; active?: boolean; danger?: boolean; onClick: () => void; children: React.ReactNode }) {
+  const tone = danger ? 'text-[#e5534b]/75 hover:bg-[#e5534b]/15 hover:text-[#e5534b]' : active ? 'text-mark hover:bg-raise' : 'text-mute hover:bg-raise hover:text-ink';
   return (
-    <button type="button" aria-label={label} title={label} onClick={onClick} className={`flex h-7 w-7 items-center justify-center rounded-full transition hover:bg-white/20 ${danger ? 'text-[#ff8a80]' : active ? 'text-mark' : 'text-white'}`}>
+    <button type="button" aria-label={label} title={label} onClick={onClick} className={`flex h-7 w-7 items-center justify-center rounded-full transition-colors ${tone}`}>
       {children}
     </button>
   );

@@ -132,19 +132,24 @@
   grid-column: 1 / -1;
 }
 
-/* 카드: 위에 올리면 도구가 보임. 터치 화면에서는 늘 보임 */
+/* 카드 도구: 카드에 올리면 아주 연하게(미리보기를 가리지 않게) 보이고, 도구 위에 올리면 선명해짐.
+   터치 화면에서는 늘 보임 */
 .card-tools {
   opacity: 0;
-  transition: opacity 140ms;
+  transition: opacity 160ms ease;
 }
 .card:hover .card-tools,
 .card:focus-within .card-tools,
 .card[data-selected='true'] .card-tools {
+  opacity: 0.36;
+}
+.card .card-tools:hover,
+.card .card-tools:focus-within {
   opacity: 1;
 }
 @media (hover: none) {
   .card-tools {
-    opacity: 1;
+    opacity: 0.92;
   }
 }
 .card-note {
