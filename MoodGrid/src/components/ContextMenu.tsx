@@ -74,7 +74,7 @@ function Inner({ m }: { m: NonNullable<ReturnType<typeof useStore.getState>['men
 
   if (!item) return null;
   const single = picked.length === 1;
-  const video = item.type === 'bookmark' ? parseVideo(item.content) : null;
+  const video = item.type === 'bookmark' ? parseVideo(item.content) || item.embed : null;
   const url = item.type === 'bookmark' ? safeHttpUrl(item.content) : null;
   const run = (fn: () => void) => () => {
     close();

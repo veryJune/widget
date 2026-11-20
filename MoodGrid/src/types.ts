@@ -33,6 +33,8 @@ export interface Item {
   collapsed: boolean;
   pos: number;
   colors: string[];
+  /** 안에서 재생할 플레이어(iframe) 주소 — 링크 카드(bookmark)에만. https 만 */
+  embed: string | null;
   created_at: string;
   updated_at: string;
   deleted_at: string | null;

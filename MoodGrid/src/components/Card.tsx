@@ -68,7 +68,7 @@ function CardBase({ item, ctx }: { item: Item; ctx: CardCtx }) {
   const onClick = (e: React.MouseEvent) => {
     if (Date.now() - dragState.endedAt < 200) return; // 끌기를 마친 직후의 클릭은 무시
     const s = act();
-    if (cinema && item.type !== 'image' && !(item.type === 'bookmark' && parseVideo(item.content))) return;
+    if (cinema && item.type !== 'image' && !(item.type === 'bookmark' && (parseVideo(item.content) || item.embed))) return;
     if (!cinema && e.shiftKey && s.anchor) {
       e.preventDefault();
       s.select(rangeFromView(s.anchor, item.id), 'add');
@@ -80,7 +80,7 @@ function CardBase({ item, ctx }: { item: Item; ctx: CardCtx }) {
     }
     if (item.type === 'image') s.setViewer(item.id);
     else if (item.type === 'text' && !cinema) s.setEditor({ mode: 'text', id: item.id });
-    else if (item.type === 'bookmark' && parseVideo(item.content)) s.setVideoView({ kind: 'item', id: item.id });
+    else if (item.type === 'bookmark' && (parseVideo(item.content) || item.embed)) s.setVideoView({ kind: 'item', id: item.id });
     else if (item.type === 'bookmark') {
       const u = safeHttpUrl(item.content);
       if (u) window.open(u, '_blank', 'noopener,noreferrer');
@@ -89,6 +89,8 @@ function CardBase({ item, ctx }: { item: Item; ctx: CardCtx }) {
   };
 
   const video = item.type === 'bookmark' ? parseVideo(item.content) : null;
+  const embedded = item.type === 'bookmark' && !!item.embed && !video;
+  const playable = !!video || embedded;
   const hasNote = !!item.note.trim();
   const ratio = item.w && item.h ? item.w / item.h : undefined;
   const dragging = drag.isDragging;
@@ -130,10 +132,10 @@ function CardBase({ item, ctx }: { item: Item; ctx: CardCtx }) {
 
           {item.type === 'bookmark' && (
             <div className="bg-card">
-              {(src || video) && (
-                <div className={`relative w-full ${video ? 'bg-[#0f0f0f]' : 'bg-raise'}`} style={{ aspectRatio: video ? '16 / 9' : ratio ? String(ratio) : '16 / 9' }}>
+              {(src || playable) && (
+                <div className={`relative w-full ${playable ? 'bg-[#0f0f0f]' : 'bg-raise'}`} style={{ aspectRatio: video ? '16 / 9' : ratio ? String(ratio) : '16 / 9' }}>
                   {src && <img src={src} alt="" draggable={false} decoding="async" className="block h-full w-full object-cover" />}
-                  {video && (
+                  {playable && (
                     <span className="absolute inset-0 flex items-center justify-center">
                       <span className="flex h-12 w-12 items-center justify-center rounded-full bg-black/60 text-white backdrop-blur-sm transition group-hover:scale-110 group-hover:bg-black/75">
                         <Play size={20} className="ml-0.5 fill-white" />
@@ -143,10 +145,10 @@ function CardBase({ item, ctx }: { item: Item; ctx: CardCtx }) {
                 </div>
               )}
               <div className="flex items-start gap-3 p-4">
-                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-raise text-mute">{video ? <Play size={16} /> : <Link2 size={17} />}</div>
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-raise text-mute">{playable ? <Play size={16} /> : <Link2 size={17} />}</div>
                 <div className="min-w-0 flex-1">
                   <p className="line-clamp-2 text-[14px] font-bold leading-snug">{item.title || domainOf(item.content) || '링크'}</p>
-                  <p className="mt-0.5 truncate text-[12px] text-mute">{video ? `${PROVIDER_LABEL[video.kind]}${video.start ? ` · ${fmtStart(video.start)}부터` : ''}` : item.content}</p>
+                  <p className="mt-0.5 truncate text-[12px] text-mute">{video ? `${PROVIDER_LABEL[video.kind]}${video.start ? ` · ${fmtStart(video.start)}부터` : ''}` : embedded ? `임베드 · ${domainOf(item.embed ?? '')}` : item.content}</p>
                 </div>
               </div>
             </div>

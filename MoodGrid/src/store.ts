@@ -11,6 +11,7 @@ import { fetchImageFile, processImage } from './lib/media';
 import { outbox } from './lib/outbox';
 import { buildView, liveSorted, moveSection as planMoveSection, planMove, posForNew, sectionIdOf, type MoveDest, type ViewOpts } from './lib/order';
 import { parseVideo, withStart } from './lib/video';
+import { httpsOnly, type ParsedEmbedCode } from './lib/embed';
 import { clamp, domainOf, fileExt, nowIso, safeHttpUrl, shuffled, uid } from './lib/util';
 import type { Item, ItemType, Project, Rating, SortMode, TextColor } from './types';
 
@@ -109,7 +110,7 @@ function newItemBase(projectId: string, type: ItemType): Item {
   const now = nowIso();
   return {
     id: uid(), project_id: projectId, type, content: '', title: '', path: null, thumb: null, w: null, h: null,
-    color: 'white', note: '', rating: 0, pinned: false, collapsed: false, pos: 0, colors: [],
+    color: 'white', note: '', rating: 0, pinned: false, collapsed: false, pos: 0, colors: [], embed: null,
     created_at: now, updated_at: now, deleted_at: null,
   };
 }
@@ -197,7 +198,8 @@ interface Store {
   setVideoStart(id: string, seconds: number): void;
   addImageUrl(url: string): Promise<void>;
   addText(text: string, color: TextColor): void;
-  addBookmark(url: string): void;
+  addBookmark(url: string, extra?: { embed?: string | null; title?: string; w?: number | null; h?: number | null }): void;
+  addEmbedCode(code: ParsedEmbedCode): void;
   addDivider(title?: string): void;
   editText(id: string, content: string, color: TextColor): void;
   setNote(id: string, note: string): void;
@@ -985,33 +987,56 @@ export const useStore = create<Store>()((set, get) => {
       addNew({ ...newItemBase(pid, 'text'), content: t.slice(0, 20000), color });
     },
 
-    addBookmark(url) {
+    addBookmark(url, extra) {
       const pid = get().currentId;
       const safe = safeHttpUrl(url);
       if (!pid || !safe) return;
-      const item = addNew({ ...newItemBase(pid, 'bookmark'), content: safe, title: domainOf(safe) });
+      const item = addNew({
+        ...newItemBase(pid, 'bookmark'),
+        content: safe,
+        title: (extra?.title || domainOf(safe)).slice(0, 300),
+        embed: httpsOnly(extra?.embed ?? undefined),
+        w: extra?.w ?? null,
+        h: extra?.h ?? null,
+      });
       // 제목과 대표 이미지를 서버가 가져오면 조용히 채움 (실패해도 링크 카드는 그대로)
       void (async () => {
         try {
           const token = await backend.accessToken();
           const r = await fetch(`/api/unfurl?url=${encodeURIComponent(safe)}`, { headers: token ? { authorization: `Bearer ${token}` } : {} });
           if (!r.ok) return;
-          const j = (await r.json()) as { title?: string; image?: string };
+          const j = (await r.json()) as { title?: string; image?: string; embed?: { url?: string; width?: number; height?: number } };
           const cur = get().items.find((i) => i.id === item.id);
           if (!cur || cur.deleted_at) return;
-          if (j.title) mutate([{ ...cur, title: j.title.slice(0, 300) }], false);
+          const patch: Partial<Item> = {};
+          // 사용자가 직접 지은 제목(임베드 코드의 title)은 덮어쓰지 않음
+          if (j.title && !extra?.title) patch.title = j.title.slice(0, 300);
+          // 사이트가 알려 준 플레이어 주소(oEmbed · twitter:player · og:video)가 있으면 바로 재생되는 카드로
+          const found = httpsOnly(j.embed?.url);
+          if (found && !cur.embed && !parseVideo(cur.content)) {
+            patch.embed = found;
+            if (j.embed?.width && j.embed?.height) Object.assign(patch, { w: j.embed.width, h: j.embed.height });
+          }
+          if (Object.keys(patch).length) mutate([{ ...cur, ...patch }], false);
           if (j.image) {
             const file = await fetchImageFile(j.image, token);
             if (!file) return;
             const res = await processImage(file);
             const { path, thumb } = await uploadPair(`${userId()}/${pid}/${item.id}`, res);
             const cur2 = get().items.find((i) => i.id === item.id);
-            if (cur2 && !cur2.deleted_at) mutate([{ ...cur2, path, thumb, w: res.w, h: res.h, colors: res.colors }], false);
+            // 임베드 카드는 플레이어의 가로세로 비율을 유지 (썸네일 크기로 덮어쓰지 않음)
+            if (cur2 && !cur2.deleted_at) mutate([{ ...cur2, path, thumb, colors: res.colors, ...(cur2.embed ? {} : { w: res.w, h: res.h }) }], false);
           }
         } catch {
           /* 미리보기는 있으면 좋은 정도 */
         }
       })();
+    },
+
+    addEmbedCode(code) {
+      if (code.kind === 'video-link') return get().addBookmark(code.url);
+      // 임베드 코드의 주소를 링크로도 저장(원본 열기용), 재생은 embed 로
+      get().addBookmark(code.embed.src, { embed: code.embed.src, title: code.embed.title, w: code.embed.w, h: code.embed.h });
     },
 
     addDivider(title = '새 섹션') {
@@ -1178,7 +1203,7 @@ export const useStore = create<Store>()((set, get) => {
         if (/\.zip$/i.test(file.name)) {
           const parsed = parseBackup(new Uint8Array(await file.arrayBuffer()));
           const entries: ImportEntry[] = parsed.data.items.map((b) => ({
-            item: { type: b.type, content: b.content, title: b.title, color: b.color, note: b.note, rating: b.rating, pinned: b.pinned, collapsed: b.collapsed, colors: b.colors, created_at: b.created_at, w: b.w, h: b.h },
+            item: { type: b.type, content: b.content, title: b.title, embed: b.embed, color: b.color, note: b.note, rating: b.rating, pinned: b.pinned, collapsed: b.collapsed, colors: b.colors, created_at: b.created_at, w: b.w, h: b.h },
             getFile: b.type === 'image' ? async () => parsed.fileOf(b) : undefined,
           }));
           // 백업의 순서(pos)를 그대로 쓰기 위해 정렬해서 넘김

@@ -32,7 +32,11 @@ export interface UnfurlResult {
     height?: number;
     thumbnail?: string;
     provider?: string;
+    /** 서버 안에서만 사용: oEmbed 의 html (플레이어 주소를 뽑은 뒤 지워서 응답에는 싣지 않음) */
+    html?: string;
   };
+  /** 이 페이지 안에서 바로 재생할 수 있는 플레이어(iframe) 주소 — oEmbed · twitter:player · og:video 에서 찾음 */
+  embed?: { url: string; width?: number; height?: number };
 }
 
 const TIMEOUT_MS = 7000;
@@ -159,10 +163,57 @@ async function fetchOembed(endpoint: string): Promise<UnfurlResult['oembed'] | u
       height: num(j.height),
       thumbnail: typeof j.thumbnail_url === 'string' ? j.thumbnail_url : undefined,
       provider: typeof j.provider_name === 'string' ? j.provider_name : undefined,
+      html: typeof j.html === 'string' ? j.html.slice(0, 20000) : undefined,
     };
   } catch {
     return undefined;
   }
+}
+
+// ---------- 플레이어(embed) 주소 찾기 ----------
+
+/** 안전한 https 주소만 (프로토콜 생략 '//host/..' 는 https 로). 아니면 undefined */
+function httpsUrl(value: string | undefined, base: string): string | undefined {
+  if (!value) return undefined;
+  try {
+    const u = new URL(value.trim().startsWith('//') ? `https:${value.trim()}` : value.trim(), base);
+    return u.protocol === 'https:' ? u.href : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+const pxNumber = (v: string | undefined): number | undefined => {
+  const n = Number(String(v ?? '').replace(/px$/i, ''));
+  return Number.isFinite(n) && n > 0 && n < 20000 ? Math.round(n) : undefined;
+};
+
+/** html 조각(oEmbed 의 html 등) 안의 첫 iframe src */
+export function iframeSrcFrom(html: string | undefined, base: string): { url: string; width?: number; height?: number } | undefined {
+  if (!html) return undefined;
+  const tag = html.match(/<iframe\b[^>]*>/i)?.[0];
+  if (!tag) return undefined;
+  const a = attrs(tag);
+  const url = httpsUrl(a.src || a['data-src'], base);
+  return url ? { url, width: pxNumber(a.width), height: pxNumber(a.height) } : undefined;
+}
+
+/**
+ * 페이지의 공유 정보에서 '바로 재생할 수 있는 플레이어 주소'를 찾습니다. 우선순위:
+ *  1) oEmbed 응답의 iframe  2) twitter:player  3) og:video(:secure_url) 가 html 플레이어일 때 (type=text/html 이거나 /embed · /player 주소)
+ */
+export function embedFromMeta(meta: Record<string, string>, base: string, oembedHtml?: string): { url: string; width?: number; height?: number } | undefined {
+  const fromOembed = iframeSrcFrom(oembedHtml, base);
+  if (fromOembed) return fromOembed;
+  const tw = httpsUrl(meta['twitter:player'], base);
+  if (tw) return { url: tw, width: pxNumber(meta['twitter:player:width']), height: pxNumber(meta['twitter:player:height']) };
+  const ogUrl = httpsUrl(meta['og:video:secure_url'] || meta['og:video:url'] || meta['og:video'], base);
+  if (ogUrl) {
+    const type = (meta['og:video:type'] || '').toLowerCase();
+    const looksLikePlayer = type.includes('html') || /\/(embed|player)\b/i.test(new URL(ogUrl).pathname);
+    if (looksLikePlayer) return { url: ogUrl, width: pxNumber(meta['og:video:width']), height: pxNumber(meta['og:video:height']) };
+  }
+  return undefined;
 }
 
 /** 응답 헤더를 보고 이 페이지를 다른 사이트 안에 띄울 수 있는지 판단 */
@@ -219,6 +270,8 @@ export async function unfurl(raw: string): Promise<UnfurlResult> {
     out.favicon = abs(icon || '/favicon.ico', url);
     const endpoint = knownOembed(url) || abs(oembedHref, url);
     if (endpoint) out.oembed = await fetchOembed(endpoint);
+    out.embed = embedFromMeta(meta, url, out.oembed?.html);
+    if (out.oembed) delete out.oembed.html;
   } else {
     try { await res.body?.cancel(); } catch { /* ignore */ }
   }
@@ -226,6 +279,10 @@ export async function unfurl(raw: string): Promise<UnfurlResult> {
   if (!out.oembed) {
     const endpoint = knownOembed(url);
     if (endpoint) out.oembed = await fetchOembed(endpoint);
+    if (out.oembed) {
+      out.embed = out.embed ?? iframeSrcFrom(out.oembed.html, url);
+      delete out.oembed.html;
+    }
   }
   if (out.oembed?.title && !out.title) out.title = out.oembed.title;
   if (out.oembed?.thumbnail && !out.image) out.image = out.oembed.thumbnail;

@@ -2,6 +2,7 @@
 import { strFromU8, strToU8, unzipSync, zipSync } from 'fflate';
 import type { Item, Project, Rating, SortMode, TextColor } from '../types';
 import { TEXT_COLORS } from '../types';
+import { httpsOnly } from './embed';
 import { clamp, fileExt, safeHttpUrl } from './util';
 
 export interface BackupItem {
@@ -16,6 +17,7 @@ export interface BackupItem {
   collapsed: boolean;
   pos: number;
   colors: string[];
+  embed: string | null;
   created_at: string;
   w: number | null;
   h: number | null;
@@ -48,7 +50,7 @@ export async function buildBackup(project: Project, items: Item[], getBlob: (pat
     }
     out.push({
       id: it.id, type: it.type, content: it.content, title: it.title, color: it.color, note: it.note, rating: it.rating,
-      pinned: it.pinned, collapsed: it.collapsed, pos: it.pos, colors: it.colors, created_at: it.created_at, w: it.w, h: it.h, file,
+      pinned: it.pinned, collapsed: it.collapsed, pos: it.pos, colors: it.colors, embed: it.embed, created_at: it.created_at, w: it.w, h: it.h, file,
     });
     onProgress?.(++done, live.length);
   }
@@ -96,6 +98,7 @@ export function parseBackup(bytes: Uint8Array): ParsedBackup {
       collapsed: r.collapsed === true,
       pos: typeof r.pos === 'number' && Number.isFinite(r.pos) ? r.pos : items.length,
       colors: Array.isArray(r.colors) ? (r.colors as unknown[]).filter((c): c is string => typeof c === 'string' && /^#[0-9a-f]{6}$/i.test(c)).slice(0, 5) : [],
+      embed: type === 'bookmark' ? httpsOnly(typeof r.embed === 'string' ? r.embed : undefined) : null,
       created_at: typeof r.created_at === 'string' && !isNaN(Date.parse(r.created_at)) ? r.created_at : new Date().toISOString(),
       w: typeof r.w === 'number' && r.w > 0 ? r.w : null,
       h: typeof r.h === 'number' && r.h > 0 ? r.h : null,
