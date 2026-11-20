@@ -5,7 +5,7 @@ const GROUPS: { title: string; rows: [string[], string][] }[] = [
   {
     title: '항목 추가',
     rows: [
-      [['Ctrl', 'V'], '이미지 · 링크 · 글 · 임베드 코드(<iframe …>) 붙여넣기'],
+      [['Ctrl', 'V'], '이미지 · 링크 · 글 · 임베드 코드(<iframe …>) 붙여넣기 — Spotify · SoundCloud · Instagram · TikTok · X · Pinterest · Figma · Behance · Loom · Google Drive 링크는 바로 재생/미리보기 카드로'],
       [['끌어다 놓기'], '파일 · 웹 이미지 · 링크'],
       [['N'], '새 메모 카드'],
       [['S'], '새 섹션(구분선)'],

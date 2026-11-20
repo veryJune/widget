@@ -12,6 +12,7 @@ import { outbox } from './lib/outbox';
 import { buildView, liveSorted, moveSection as planMoveSection, planMove, posForNew, sectionIdOf, type MoveDest, type ViewOpts } from './lib/order';
 import { parseVideo, withStart } from './lib/video';
 import { httpsOnly, type ParsedEmbedCode } from './lib/embed';
+import { resolveEmbed } from './lib/providers';
 import { clamp, domainOf, fileExt, nowIso, safeHttpUrl, shuffled, uid } from './lib/util';
 import type { Item, ItemType, Project, Rating, SortMode, TextColor } from './types';
 
@@ -991,13 +992,15 @@ export const useStore = create<Store>()((set, get) => {
       const pid = get().currentId;
       const safe = safeHttpUrl(url);
       if (!pid || !safe) return;
+      // 아는 서비스(Spotify · Instagram · Figma …)의 링크는 서버 응답을 기다리지 않고 바로 재생 카드로. YouTube/Vimeo/영상 파일은 기존 영상 카드가 처리
+      const known = !extra?.embed && !parseVideo(safe) ? resolveEmbed(safe) : null;
       const item = addNew({
         ...newItemBase(pid, 'bookmark'),
         content: safe,
         title: (extra?.title || domainOf(safe)).slice(0, 300),
-        embed: httpsOnly(extra?.embed ?? undefined),
-        w: extra?.w ?? null,
-        h: extra?.h ?? null,
+        embed: httpsOnly(extra?.embed ?? known?.embed),
+        w: extra?.w ?? known?.w ?? null,
+        h: extra?.h ?? known?.h ?? null,
       });
       // 제목과 대표 이미지를 서버가 가져오면 조용히 채움 (실패해도 링크 카드는 그대로)
       void (async () => {

@@ -5,6 +5,7 @@ import { Check, ChevronDown, ChevronRight, ChevronUp, ExternalLink, Link2, Loade
 import { useStore } from '../store';
 import { dragState, hover } from '../ui';
 import { domainOf, safeHttpUrl } from '../lib/util';
+import { embedBadge } from '../lib/providers';
 import { PROVIDER_LABEL, fmtStart, parseVideo } from '../lib/video';
 import type { Item, TextColor } from '../types';
 import { Stars } from './ui';
@@ -133,7 +134,7 @@ function CardBase({ item, ctx }: { item: Item; ctx: CardCtx }) {
           {item.type === 'bookmark' && (
             <div className="bg-card">
               {(src || playable) && (
-                <div className={`relative w-full ${playable ? 'bg-[#0f0f0f]' : 'bg-raise'}`} style={{ aspectRatio: video ? '16 / 9' : ratio ? String(ratio) : '16 / 9' }}>
+                <div className={`relative w-full ${playable ? 'bg-[#0f0f0f]' : 'bg-raise'}`} style={{ aspectRatio: video ? '16 / 9' : embedded ? (ratio && ratio < 1 ? String(ratio) : '16 / 9') : ratio ? String(ratio) : '16 / 9' }}>
                   {src && <img src={src} alt="" draggable={false} decoding="async" className="block h-full w-full object-cover" />}
                   {playable && (
                     <span className="absolute inset-0 flex items-center justify-center">
@@ -148,7 +149,7 @@ function CardBase({ item, ctx }: { item: Item; ctx: CardCtx }) {
                 <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-raise text-mute">{playable ? <Play size={16} /> : <Link2 size={17} />}</div>
                 <div className="min-w-0 flex-1">
                   <p className="line-clamp-2 text-[14px] font-bold leading-snug">{item.title || domainOf(item.content) || '링크'}</p>
-                  <p className="mt-0.5 truncate text-[12px] text-mute">{video ? `${PROVIDER_LABEL[video.kind]}${video.start ? ` · ${fmtStart(video.start)}부터` : ''}` : embedded ? `임베드 · ${domainOf(item.embed ?? '')}` : item.content}</p>
+                  <p className="mt-0.5 truncate text-[12px] text-mute">{video ? `${PROVIDER_LABEL[video.kind]}${video.start ? ` · ${fmtStart(video.start)}부터` : ''}` : embedded ? embedBadge(item.embed) : item.content}</p>
                 </div>
               </div>
             </div>
