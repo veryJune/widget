@@ -1,7 +1,7 @@
 // 크게 보기: 필름스트립 · 휠/핀치 확대 · 더블클릭 100% · 키보드 별점 · 정보/메모 패널
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ChevronLeft, ChevronRight, ExternalLink, Info, Pin, Trash2, X } from 'lucide-react';
-import { useStore } from '../store';
+import { ChevronLeft, ChevronRight, ExternalLink, Info, Pause, Pin, Play, Trash2, X } from 'lucide-react';
+import { useStore, viewOptsOf } from '../store';
 import { buildView } from '../lib/order';
 import { safeHttpUrl } from '../lib/util';
 import type { Rating } from '../types';
@@ -18,13 +18,21 @@ export function Lightbox() {
 function Viewer() {
   const viewerId = useStore((s) => s.viewerId) as string;
   const items = useStore((s) => s.items);
-  const sort = useStore((s) => s.projects.find((p) => p.id === s.currentId)?.sort_mode ?? 'manual');
+  const projects = useStore((s) => s.projects);
+  const currentId = useStore((s) => s.currentId);
   const filter = useStore((s) => s.filter);
+  const query = useStore((s) => s.query);
+  const colorFilter = useStore((s) => s.colorFilter);
+  const cinema = useStore((s) => s.cinema);
+  const slideshow = useStore((s) => s.slideshow);
   const urls = useStore((s) => s.urls);
   const previews = useStore((s) => s.previews);
   const act = useStore.getState;
 
-  const images = useMemo(() => buildView(items, { sort, minRating: filter }).filter((i) => i.type === 'image' && i.path), [items, sort, filter]);
+  const images = useMemo(
+    () => buildView(items, viewOptsOf({ projects, currentId, filter, query, colorFilter, cinema })).filter((i) => i.type === 'image' && i.path),
+    [items, projects, currentId, filter, query, colorFilter, cinema],
+  );
   const index = Math.max(0, images.findIndex((i) => i.id === viewerId));
   const item = images[index];
 
@@ -96,7 +104,17 @@ function Viewer() {
     const n = images[(index + d + images.length) % images.length];
     if (n) act().setViewer(n.id);
   }, [images, index, act]);
-  const close = useCallback(() => act().setViewer(null), [act]);
+  const close = useCallback(() => {
+    act().setSlideshow(false);
+    act().setViewer(null);
+  }, [act]);
+
+  // 슬라이드쇼: 4초마다 다음 이미지 (Space 로 시작/멈춤)
+  useEffect(() => {
+    if (!slideshow || images.length < 2) return;
+    const id = setInterval(() => go(1), 4000);
+    return () => clearInterval(id);
+  }, [slideshow, images.length, go]);
 
   // 이 항목이 사라지면(삭제 등) 이웃으로, 이웃이 없으면 닫기
   useEffect(() => {
@@ -123,6 +141,7 @@ function Viewer() {
       else if (e.key === '-' || e.key === '_') zoomAt(tRef.current.k / 1.4);
       else if (e.key === '0') apply({ k: 1, x: 0, y: 0 });
       else if (e.key === 'i' || e.key === 'I') setInfo((v) => !v);
+      else if (e.key === ' ') act().setSlideshow(!useStore.getState().slideshow);
       else if (e.key === '1' || e.key === '2' || e.key === '3') act().setRating([viewerId], Number(e.key) as Rating);
       else handled = false;
       if (handled) {
@@ -208,6 +227,11 @@ function Viewer() {
         <span className="num rounded-full bg-white/10 px-2.5 py-0.5 text-[12px] text-white/70">{Math.round(t.k * 100)}%</span>
         <div className="ml-auto flex items-center gap-1">
           <Stars value={item.rating} size={18} onChange={(r) => act().setRating([item.id], r)} className="mr-2" />
+          {images.length > 1 && (
+            <IconButton label={slideshow ? '슬라이드쇼 멈춤 (Space)' : '슬라이드쇼 (Space)'} active={slideshow} onClick={() => act().setSlideshow(!slideshow)} className="!text-white/80 hover:!bg-white/15">
+              {slideshow ? <Pause size={18} /> : <Play size={18} />}
+            </IconButton>
+          )}
           <IconButton label="정보·메모 (I)" active={info} onClick={() => setInfo((v) => !v)} className="!text-white/80 hover:!bg-white/15">
             <Info size={18} />
           </IconButton>

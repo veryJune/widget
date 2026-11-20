@@ -4,6 +4,7 @@
 // 이웃 사이에 넣을 틈이 너무 좁아졌을 때만 전체를 다시 번호 매깁니다.
 // 필터·접힌 섹션 때문에 화면에 안 보이는 항목도 항상 '전체 목록' 기준으로 계산하므로 순서가 꼬이지 않습니다.
 import type { Item, SortMode } from '../types';
+import { hexToHsl, itemMatchesColor } from './colors';
 
 export const byPos = (a: Item, b: Item) => a.pos - b.pos || a.created_at.localeCompare(b.created_at) || a.id.localeCompare(b.id);
 
@@ -13,27 +14,6 @@ export function liveSorted(items: Item[]): Item[] {
 }
 
 // ---------- 보기(화면에 보이는 항목과 순서) ----------
-
-function hexToHsl(hex: string): [number, number, number] {
-  const m = /^#?([0-9a-f]{6})$/i.exec(hex);
-  if (!m) return [0, 0, 0.5];
-  const n = parseInt(m[1], 16);
-  const r = ((n >> 16) & 255) / 255;
-  const g = ((n >> 8) & 255) / 255;
-  const b = (n & 255) / 255;
-  const max = Math.max(r, g, b);
-  const min = Math.min(r, g, b);
-  const l = (max + min) / 2;
-  const d = max - min;
-  if (d === 0) return [0, 0, l];
-  const s = d / (1 - Math.abs(2 * l - 1));
-  let h = 0;
-  if (max === r) h = ((g - b) / d) % 6;
-  else if (max === g) h = (b - r) / d + 2;
-  else h = (r - g) / d + 4;
-  h = (h * 60 + 360) % 360;
-  return [h, s, l];
-}
 
 /** 색 정렬 키: 색조 띠(20°) 안에서 밝은 것 → 어두운 것, 무채색은 뒤, 색 정보 없는 항목은 맨 뒤 */
 export function colorKey(it: Item): number {
@@ -47,13 +27,36 @@ export function colorKey(it: Item): number {
 export interface ViewOpts {
   sort: SortMode;
   minRating: number;
+  /** 검색어: 공백으로 나눈 낱말이 모두 (메모 글 · 제목 · 출처 · 카드 메모) 안에 있어야 함 */
+  query?: string;
+  /** 대표 색이 이 색과 비슷한 항목만 */
+  color?: string | null;
+  /** 섹션을 무시하고 순서대로 쭉 (시네마틱 모드) */
+  flat?: boolean;
+}
+
+export const queryTokens = (q: string | undefined): string[] => (q ?? '').toLowerCase().split(/\s+/).filter(Boolean);
+
+export function matchesQuery(it: Item, tokens: string[]): boolean {
+  if (!tokens.length) return true;
+  const hay = `${it.content}\n${it.title}\n${it.note}`.toLowerCase();
+  return tokens.every((t) => hay.includes(t));
+}
+
+/** 별점 · 검색 · 색 중 하나라도 걸려 있는지 */
+export function isFiltering(o: Pick<ViewOpts, 'minRating' | 'query' | 'color'>): boolean {
+  return o.minRating > 0 || queryTokens(o.query).length > 0 || !!o.color;
 }
 
 /** 화면에 그릴 항목들 (표시 순서대로) */
-export function buildView(items: Item[], { sort, minRating }: ViewOpts): Item[] {
+export function buildView(items: Item[], opts: ViewOpts): Item[] {
+  const { sort, minRating, color, flat } = opts;
+  const tokens = queryTokens(opts.query);
   const ordered = liveSorted(items);
+  const keep = (i: Item) => i.type !== 'divider' && i.rating >= minRating && matchesQuery(i, tokens) && (!color || itemMatchesColor(i, color));
   if (sort === 'manual') {
-    if (minRating > 0) return ordered.filter((i) => i.type !== 'divider' && i.rating >= minRating);
+    // 필터가 걸렸거나 flat 이면 섹션 없이 순서대로 쭉 (끌어서 옮기는 것은 전체 목록 기준이라 안전)
+    if (flat || isFiltering(opts)) return ordered.filter(keep);
     const out: Item[] = [];
     let collapsed = false;
     for (const it of ordered) {
@@ -64,16 +67,16 @@ export function buildView(items: Item[], { sort, minRating }: ViewOpts): Item[] 
     }
     return out;
   }
-  const flat = ordered.filter((i) => i.type !== 'divider' && i.rating >= minRating);
+  const list = ordered.filter(keep);
   const cmp: Record<Exclude<SortMode, 'manual'>, (a: Item, b: Item) => number> = {
     newest: (a, b) => b.created_at.localeCompare(a.created_at),
     oldest: (a, b) => a.created_at.localeCompare(b.created_at),
     rating: (a, b) => b.rating - a.rating || b.created_at.localeCompare(a.created_at),
     color: (a, b) => colorKey(a) - colorKey(b),
   };
-  flat.sort(cmp[sort]);
+  list.sort(cmp[sort]);
   // 고정한 항목은 어떤 정렬에서도 맨 앞 (sort 는 안정 정렬이라 나머지 순서는 유지)
-  return [...flat.filter((i) => i.pinned), ...flat.filter((i) => !i.pinned)];
+  return [...list.filter((i) => i.pinned), ...list.filter((i) => !i.pinned)];
 }
 
 // ---------- 섹션 ----------

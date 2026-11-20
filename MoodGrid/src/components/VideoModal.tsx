@@ -5,7 +5,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Camera, ChevronsLeft, ChevronsRight, ExternalLink, Pause, Play, SkipBack, SkipForward, X } from 'lucide-react';
 import { useStore } from '../store';
 import { domainOf, safeHttpUrl } from '../lib/util';
-import { PROVIDER_LABEL, embedSrc, fmtStart, fmtTimecode, parseTimeInput, parseVideo } from '../lib/video';
+import { PROVIDER_LABEL, embedSrc, fmtStart, fmtTimecode, parseTimeInput, parseVideo, previewTime } from '../lib/video';
 import { Button, IconButton, Kbd } from './ui';
 
 export function VideoModal() {
@@ -63,27 +63,49 @@ function Embed({ src, title, start, onStart }: { src: string; title: string; sta
   const [text, setText] = useState(start ? fmtStart(start) : '');
   const parsed = parseTimeInput(text);
   const invalid = text.trim() !== '' && parsed === null;
+  const preview = text.trim() && !invalid ? previewTime(text) : null;
+  const changed = (parsed ?? 0) !== start;
+  const apply = () => {
+    if (invalid) return;
+    onStart(parsed ?? 0);
+  };
   return (
     <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-5 px-4 pb-6">
       <div className="aspect-video w-[min(1100px,92vw,calc((100vh-220px)*16/9))] overflow-hidden rounded-xl bg-black shadow-2xl">
-        <iframe src={src} title={title} className="h-full w-full" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowFullScreen referrerPolicy="strict-origin-when-cross-origin" />
+        <iframe src={src} title={title} className="h-full w-full" allow="autoplay; encrypted-media; picture-in-picture; fullscreen; clipboard-write" allowFullScreen referrerPolicy="strict-origin-when-cross-origin" />
       </div>
       <form
-        className="flex flex-wrap items-center justify-center gap-2 text-[14px]"
+        className="flex flex-wrap items-center justify-center gap-x-3 gap-y-2 text-[14px]"
         onSubmit={(e) => {
           e.preventDefault();
-          if (!invalid) onStart(parsed ?? 0);
+          apply();
         }}
       >
         <label className="flex items-center gap-2 text-white/70">
           시작 시간
-          <input value={text} onChange={(e) => setText(e.target.value)} placeholder="예: 1:23" aria-invalid={invalid} className={`h-9 w-28 rounded-lg border bg-white/5 px-3 text-white placeholder:text-white/30 focus:outline-none ${invalid ? 'border-[#e5534b]' : 'border-white/20 focus:border-white/60'}`} />
+          <input
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            onBlur={() => parsed !== null && text.trim() && setText(fmtStart(parsed))}
+            inputMode="numeric"
+            placeholder="936 → 9:36"
+            aria-invalid={invalid}
+            aria-describedby="start-hint"
+            className={`h-9 w-32 rounded-lg border bg-white/5 px-3 text-white placeholder:text-white/30 focus:outline-none ${invalid ? 'border-[#e5534b]' : 'border-white/20 focus:border-white/60'}`}
+          />
         </label>
-        <Button type="submit" variant="quiet" disabled={invalid} className="!h-9 !bg-white/10 !text-white hover:!bg-white/20">
+        <span id="start-hint" className={`num min-w-[110px] text-[13px] ${invalid ? 'text-[#e5534b]' : 'text-white/60'}`} aria-live="polite">
+          {invalid ? '시간을 알 수 없어요' : preview ? `→ ${preview}` : ''}
+        </span>
+        <Button type="submit" variant="quiet" disabled={invalid || !changed} className="!h-9 !bg-white/10 !text-white hover:!bg-white/20">
           적용
         </Button>
-        <span className="text-[12px] text-white/40">카드에도 저장돼요 · YouTube/Vimeo 는 보안상 프레임 캡처가 안 돼요 (화면 캡처를 Ctrl+V 로 붙여넣으세요)</span>
       </form>
+      <p className="max-w-[640px] text-center text-[12px] leading-relaxed text-white/40">
+        숫자만 쳐도 돼요 (<b className="text-white/60">936</b> · <b className="text-white/60">9 36</b> → 9:36, <b className="text-white/60">10236</b> → 1:02:36). 카드에도 저장됩니다.
+        <br />
+        YouTube/Vimeo 는 브라우저 보안상 프레임 캡처가 안 돼요 — 화면 캡처(<kbd className="rounded border border-white/20 px-1">Win+Shift+S</kbd> · <kbd className="rounded border border-white/20 px-1">⌘⇧4</kbd>)를 찍고 <kbd className="rounded border border-white/20 px-1">Ctrl+V</kbd> 로 붙여넣으면 보드에 담겨요.
+      </p>
     </div>
   );
 }

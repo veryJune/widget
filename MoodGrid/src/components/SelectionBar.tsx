@@ -1,6 +1,6 @@
 // 항목을 선택하면 아래에 뜨는 막대: 별점 · 고정 · 섹션으로 이동 · 삭제
 import { useMemo, useRef, useState } from 'react';
-import { ArrowRightToLine, ChevronUp, Pin, Trash2, X } from 'lucide-react';
+import { ArrowRightToLine, ChevronUp, Columns2, Pin, Trash2, X } from 'lucide-react';
 import { useStore } from '../store';
 import { liveSorted, sectionsOf } from '../lib/order';
 import { useClickAway } from '../hooks/useClickAway';
@@ -21,6 +21,7 @@ export function SelectionBar() {
   const sections = useMemo(() => sectionsOf(liveSorted(items)), [items]);
   const same = picked.length > 0 && picked.every((i) => i.rating === picked[0].rating) ? picked[0].rating : 0;
   const pinnedAll = picked.length > 0 && picked.every((i) => i.pinned);
+  const imageIds = picked.filter((i) => i.type === 'image' && i.path).map((i) => i.id);
 
   if (!selectMode && selection.size === 0) return null;
 
@@ -52,6 +53,11 @@ export function SelectionBar() {
         <button type="button" title="맨 위에 고정 (P)" aria-label="고정" aria-pressed={pinnedAll} onClick={() => act().togglePin(ids)} className={`flex h-9 w-9 items-center justify-center rounded-full transition hover:bg-raise ${pinnedAll ? 'text-mark' : 'text-mute hover:text-ink'}`}>
           <Pin size={16} />
         </button>
+        {imageIds.length >= 2 && (
+          <button type="button" title="선택한 이미지 비교 (C) — 2~4장" onClick={() => act().openCompare(imageIds)} className="flex h-9 items-center gap-1.5 rounded-full px-3 text-[13px] font-semibold text-mute transition hover:bg-raise hover:text-ink">
+            <Columns2 size={15} /> 비교
+          </button>
+        )}
         {sort === 'manual' && (
           <button type="button" onClick={() => setOpen((o) => !o)} aria-expanded={open} className="flex h-9 items-center gap-1.5 rounded-full px-3 text-[13px] font-semibold text-mute transition hover:bg-raise hover:text-ink">
             <ArrowRightToLine size={15} /> 섹션으로 이동 <ChevronUp size={13} className={open ? '' : 'rotate-180'} />

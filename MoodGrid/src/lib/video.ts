@@ -12,19 +12,50 @@ export interface VideoRef {
 
 const FILE_RE = /\.(mp4|webm|mov|m4v|ogv)$/i;
 
-/** "83" · "1:23" · "1:02:03" · "1m23s" · "1h2m3s" → 초 (해석할 수 없으면 null) */
+/**
+ * 시간 입력 → 초 (해석할 수 없으면 null). 편하게 쳐도 되도록 여러 형식을 받아요:
+ *  - 숫자만: 오른쪽부터 초(2자리) · 분(2자리) · 시간 — 936 → 9:36, 1234 → 12:34, 10236 → 1:02:36, 45 → 0:45
+ *  - 구분자(공백 · : . , - ): 9 36 → 9:36, 1 2 36 → 1:02:36, 9.36 → 9:36
+ *  - 글자: 1m23s · 1h2m3s
+ */
 export function parseTimeInput(text: string): number | null {
   const t = text.trim().toLowerCase();
   if (!t) return null;
-  if (/^\d+(\.\d+)?$/.test(t)) return Math.floor(Number(t));
-  if (t.includes(':')) {
-    const parts = t.split(':').map(Number);
-    if (parts.length > 3 || parts.some((p) => !Number.isFinite(p) || p < 0)) return null;
-    return Math.floor(parts.reduce((acc, p) => acc * 60 + p, 0));
+  const letters = /^(?:(\d+)\s*h)?\s*(?:(\d+)\s*m)?\s*(?:(\d+)\s*s)?$/.exec(t);
+  if (letters && (letters[1] || letters[2] || letters[3])) return Number(letters[1] || 0) * 3600 + Number(letters[2] || 0) * 60 + Number(letters[3] || 0);
+  if (!/^[\d\s:.,;·-]+$/.test(t)) return null;
+  const parts = t.split(/[\s:.,;·-]+/).filter(Boolean);
+  if (!parts.length) return null;
+  if (parts.length === 1) {
+    // 숫자만: 시계처럼 오른쪽부터 채움 (최대 6자리 = 시·분·초 각 2자리)
+    const d = parts[0];
+    if (d.length > 6) return null;
+    const sec = Number(d.slice(-2));
+    const min = d.length > 2 ? Number(d.slice(-4, -2)) : 0;
+    const hr = d.length > 4 ? Number(d.slice(0, -4)) : 0;
+    return hr * 3600 + min * 60 + sec;
   }
+  if (parts.length > 3 || parts.some((p) => p.length > 3)) return null;
+  return parts.reduce((acc, p) => acc * 60 + Number(p), 0);
+}
+
+/**
+ * 링크의 t= / start= 값 → 초. 사람이 치는 입력(parseTimeInput)과 달리 숫자만 있으면 '초 단위'입니다 (t=576 은 576초).
+ * 지원: 576 · 576s · 1m23s · 1h2m3s · 83.5
+ */
+export function parseTimeParam(text: string): number | null {
+  const t = text.trim().toLowerCase();
+  if (!t) return null;
+  if (/^\d+(\.\d+)?s?$/.test(t)) return Math.floor(Number(t.replace('s', '')));
   const m = /^(?:(\d+)h)?(?:(\d+)m)?(?:(\d+)s)?$/.exec(t);
   if (m && (m[1] || m[2] || m[3])) return Number(m[1] || 0) * 3600 + Number(m[2] || 0) * 60 + Number(m[3] || 0);
   return null;
+}
+
+/** 입력창에 보여줄 미리보기: 936 → "9:36 (576초)". 해석할 수 없으면 null */
+export function previewTime(text: string): string | null {
+  const sec = parseTimeInput(text);
+  return sec === null ? null : `${fmtStart(sec)} (${sec}초)`;
 }
 
 /** 초 → "1:23" / "1:02:03" */
@@ -65,14 +96,14 @@ export function parseVideo(raw: string): VideoRef | null {
       id = m?.[1] ?? '';
     }
     if (!/^[\w-]{6,15}$/.test(id)) return null;
-    return { kind: 'youtube', id, start: parseTimeInput(startParam) ?? 0, url: u.href };
+    return { kind: 'youtube', id, start: parseTimeParam(startParam) ?? 0, url: u.href };
   }
   if (host === 'vimeo.com' || host === 'player.vimeo.com') {
     const m = host === 'vimeo.com' ? /^\/(?:channels\/[\w-]+\/|groups\/[\w-]+\/videos\/)?(\d{5,})/.exec(u.pathname) : /^\/video\/(\d{5,})/.exec(u.pathname);
     if (!m) return null;
-    return { kind: 'vimeo', id: m[1], start: parseTimeInput(startParam) ?? 0, url: u.href };
+    return { kind: 'vimeo', id: m[1], start: parseTimeParam(startParam) ?? 0, url: u.href };
   }
-  if (FILE_RE.test(u.pathname)) return { kind: 'file', id: '', start: parseTimeInput(startParam) ?? 0, url: u.href };
+  if (FILE_RE.test(u.pathname)) return { kind: 'file', id: '', start: parseTimeParam(startParam) ?? 0, url: u.href };
   return null;
 }
 

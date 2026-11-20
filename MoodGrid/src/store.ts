@@ -9,7 +9,7 @@ import { buildBackup, parseBackup } from './lib/backup';
 import { detectLegacyBoard, parseLegacyJson, readLegacyBoard, type LegacyBoard } from './lib/legacy';
 import { fetchImageFile, processImage } from './lib/media';
 import { outbox } from './lib/outbox';
-import { liveSorted, moveSection as planMoveSection, planMove, posForNew, sectionIdOf, type MoveDest } from './lib/order';
+import { buildView, liveSorted, moveSection as planMoveSection, planMove, posForNew, sectionIdOf, type MoveDest, type ViewOpts } from './lib/order';
 import { parseVideo, withStart } from './lib/video';
 import { clamp, domainOf, fileExt, nowIso, safeHttpUrl, shuffled, uid } from './lib/util';
 import type { Item, ItemType, Project, Rating, SortMode, TextColor } from './types';
@@ -88,9 +88,21 @@ let persistTimer: ReturnType<typeof setTimeout> | undefined;
 /** 시작할 때 서버에 못 올린 저장 대기 변경 (열리는 프로젝트에 겹쳐서 다시 저장 시도) */
 let pendingRecovery: { items: Item[]; projects: Project[] } = { items: [], projects: [] };
 
+/** 지금 화면 상태(정렬 · 필터 · 검색 · 색 · 시네마틱)에서 보드에 보일 항목을 고르는 옵션 */
+export function viewOptsOf(s: { projects: Project[]; currentId: string | null; filter: number; query: string; colorFilter: string | null; cinema: boolean }): ViewOpts {
+  const p = s.projects.find((x) => x.id === s.currentId);
+  return { sort: p?.sort_mode ?? 'manual', minRating: s.filter, query: s.query, color: s.colorFilter, flat: s.cinema };
+}
+
 export function hasUnsavedWork(): boolean {
   const s = useStore.getState();
   return dirtyItems.size > 0 || dirtyProject || Object.keys(s.uploading).length > 0;
+}
+
+/** 올린 파일의 이름을 출처로 저장 (검색 · 정보 패널용). 붙여넣은 스크린샷처럼 뜻 없는 이름은 제외 */
+function sourceNameOf(file: File): string {
+  const name = (file.name || '').trim();
+  return !name || /^(image|blob|untitled|screenshot)\.(png|jpe?g|webp|gif)$/i.test(name) ? '' : name;
 }
 
 function newItemBase(projectId: string, type: ItemType): Item {
@@ -122,6 +134,13 @@ interface Store {
   switcherOpen: boolean;
   trashOpen: boolean;
   videoView: { kind: 'item'; id: string } | { kind: 'file'; file: File } | null;
+  query: string;
+  colorFilter: string | null;
+  filterOpen: boolean;
+  cinema: boolean;
+  slideshow: boolean;
+  menu: { x: number; y: number; id: string } | null;
+  compareIds: string[] | null;
   focusId: string | null;
   save: { state: SaveState; at: number; error?: string };
   undoCount: number;
@@ -165,6 +184,16 @@ interface Store {
 
   addFiles(files: File[], meta?: { title?: string; content?: string }): Promise<void>;
   setVideoView(v: Store['videoView']): void;
+  setQuery(q: string): void;
+  setColorFilter(hex: string | null): void;
+  setFilterOpen(on: boolean): void;
+  clearFilters(): void;
+  setCinema(on: boolean): void;
+  setSlideshow(on: boolean): void;
+  startSlideshow(): void;
+  setMenu(m: Store['menu']): void;
+  openCompare(ids: string[]): void;
+  closeCompare(): void;
   setVideoStart(id: string, seconds: number): void;
   addImageUrl(url: string): Promise<void>;
   addText(text: string, color: TextColor): void;
@@ -518,6 +547,13 @@ export const useStore = create<Store>()((set, get) => {
     switcherOpen: false,
     trashOpen: false,
     videoView: null,
+    query: '',
+    colorFilter: null,
+    filterOpen: false,
+    cinema: false,
+    slideshow: false,
+    menu: null,
+    compareIds: null,
     focusId: null,
     save: { state: 'saved', at: Date.now() },
     undoCount: 0,
@@ -545,6 +581,10 @@ export const useStore = create<Store>()((set, get) => {
           e.preventDefault();
           e.returnValue = '';
         }
+      });
+      // 브라우저 전체 화면에서 Esc 등으로 나오면 시네마틱 모드도 끝냄
+      document.addEventListener('fullscreenchange', () => {
+        if (!document.fullscreenElement && get().cinema) set({ cinema: false, slideshow: false });
       });
       document.addEventListener('visibilitychange', () => {
         if (document.visibilityState === 'visible') void get().refreshIfIdle();
@@ -609,7 +649,7 @@ export const useStore = create<Store>()((set, get) => {
       await flushNow();
       undoStack.length = 0;
       redoStack.length = 0;
-      set({ currentId: id, items: [], loadingItems: true, selection: new Set(), anchor: null, selectMode: false, viewerId: null, filter: 0, undoCount: 0, redoCount: 0, switcherOpen: false });
+      set({ currentId: id, items: [], loadingItems: true, selection: new Set(), anchor: null, selectMode: false, viewerId: null, filter: 0, query: '', colorFilter: null, filterOpen: false, cinema: false, slideshow: false, menu: null, compareIds: null, undoCount: 0, redoCount: 0, switcherOpen: false });
       writePrefs({ lastProject: id });
       try {
         const all = await backend.fetchItems(id);
@@ -784,6 +824,50 @@ export const useStore = create<Store>()((set, get) => {
     setVideoView(v) {
       set({ videoView: v });
     },
+    setQuery(q) {
+      set({ query: q.slice(0, 200) });
+    },
+    setColorFilter(hex) {
+      set((s) => ({ colorFilter: s.colorFilter === hex ? null : hex }));
+    },
+    setFilterOpen(on) {
+      set({ filterOpen: on });
+    },
+    clearFilters() {
+      set({ filter: 0, query: '', colorFilter: null });
+    },
+    setCinema(on) {
+      set({ cinema: on, slideshow: false, selection: new Set(), anchor: null, selectMode: false, menu: null, viewerId: null });
+      try {
+        if (on) void document.documentElement.requestFullscreen?.().catch(() => {});
+        else if (document.fullscreenElement) void document.exitFullscreen?.().catch(() => {});
+      } catch {
+        /* 전체 화면을 못 쓰는 환경에서는 UI 숨김만 */
+      }
+      if (on) toast('시네마틱 모드 · 이미지를 누르면 크게 · Space 슬라이드쇼 · Esc 로 나가기', { ms: 4500 });
+    },
+    setSlideshow(on) {
+      set({ slideshow: on });
+    },
+    startSlideshow() {
+      const s = get();
+      const first = buildView(s.items, viewOptsOf(s)).find((i) => i.type === 'image' && i.path);
+      if (!first) return toast('슬라이드쇼로 보여 줄 이미지가 없습니다.');
+      set({ viewerId: first.id, slideshow: true });
+    },
+    setMenu(m) {
+      set({ menu: m });
+    },
+    openCompare(ids) {
+      const live = new Map(get().items.filter((i) => !i.deleted_at && i.type === 'image' && i.path).map((i) => [i.id, i]));
+      const picked = ids.filter((id) => live.has(id)).slice(0, 4);
+      if (picked.length < 2) return toast('비교하려면 이미지를 2~4장 선택하세요.');
+      set({ compareIds: picked, menu: null });
+    },
+    closeCompare() {
+      set({ compareIds: null });
+    },
+
     setVideoStart(id, seconds) {
       const it = get().items.find((i) => i.id === id);
       const v = it ? parseVideo(it.content) : null;
@@ -839,7 +923,7 @@ export const useStore = create<Store>()((set, get) => {
             if (get().currentId !== pid) throw new Error('다른 프로젝트로 이동해서 취소되었습니다.');
             const id = uid();
             const base = `${uid_}/${pid}/${id}`;
-            const item: Item = { ...newItemBase(pid, 'image'), id, title: (meta?.title ?? '').slice(0, 300), content: (meta?.content ?? '').slice(0, 2000), w: res.w, h: res.h, colors: res.colors, path: `${base}.${res.main.ext}`, thumb: `${base}_t.${res.thumb.ext}` };
+            const item: Item = { ...newItemBase(pid, 'image'), id, title: (meta?.title ?? '').slice(0, 300), content: (meta?.content ?? sourceNameOf(file)).slice(0, 2000), w: res.w, h: res.h, colors: res.colors, path: `${base}.${res.main.ext}`, thumb: `${base}_t.${res.thumb.ext}` };
             const preview = URL.createObjectURL(res.thumb.blob);
             set((s) => ({ uploading: { ...s.uploading, [id]: true }, previews: { ...s.previews, [id]: preview } }));
             addNew(item);

@@ -42,11 +42,13 @@ export interface CardCtx {
   cols: number;
   /** 직접 정렬 + 필터 없음일 때만 끌어서 옮길 수 있음 */
   canDrag: boolean;
+  /** 시네마틱 모드: 도구 · 배지 · 선택을 모두 숨기고 이미지만 */
+  cinema: boolean;
   hint: 'before' | 'after' | null;
 }
 
 function CardBase({ item, ctx }: { item: Item; ctx: CardCtx }) {
-  const { gap, cols, canDrag, hint } = ctx;
+  const { gap, cols, canDrag, hint, cinema } = ctx;
   const { wrapRef, bodyRef } = useSpan(gap);
   const selected = useStore((s) => s.selection.has(item.id));
   const selecting = useStore((s) => s.selection.size > 0 || s.selectMode);
@@ -66,17 +68,18 @@ function CardBase({ item, ctx }: { item: Item; ctx: CardCtx }) {
   const onClick = (e: React.MouseEvent) => {
     if (Date.now() - dragState.endedAt < 200) return; // 끌기를 마친 직후의 클릭은 무시
     const s = act();
-    if (e.shiftKey && s.anchor) {
+    if (cinema && item.type !== 'image' && !(item.type === 'bookmark' && parseVideo(item.content))) return;
+    if (!cinema && e.shiftKey && s.anchor) {
       e.preventDefault();
       s.select(rangeFromView(s.anchor, item.id), 'add');
       return;
     }
-    if (e.ctrlKey || e.metaKey || s.selection.size > 0 || s.selectMode) {
+    if (!cinema && (e.ctrlKey || e.metaKey || s.selection.size > 0 || s.selectMode)) {
       s.select([item.id], 'toggle');
       return;
     }
     if (item.type === 'image') s.setViewer(item.id);
-    else if (item.type === 'text') s.setEditor({ mode: 'text', id: item.id });
+    else if (item.type === 'text' && !cinema) s.setEditor({ mode: 'text', id: item.id });
     else if (item.type === 'bookmark' && parseVideo(item.content)) s.setVideoView({ kind: 'item', id: item.id });
     else if (item.type === 'bookmark') {
       const u = safeHttpUrl(item.content);
@@ -91,7 +94,7 @@ function CardBase({ item, ctx }: { item: Item; ctx: CardCtx }) {
   const dragging = drag.isDragging;
 
   return (
-    <div ref={setRefs} className="m-item" data-card data-id={item.id} onPointerEnter={() => (hover.id = item.id)} onPointerLeave={() => hover.id === item.id && (hover.id = null)} {...(canDrag ? drag.listeners : {})}>
+    <div ref={setRefs} className="m-item" data-card data-id={item.id} onContextMenu={(e) => { if (cinema) return; e.preventDefault(); act().setMenu({ x: e.clientX, y: e.clientY, id: item.id }); }} onPointerEnter={() => (hover.id = item.id)} onPointerLeave={() => hover.id === item.id && (hover.id = null)} {...(canDrag ? drag.listeners : {})}>
       <div ref={bodyRef} className="relative">
         <div
           className={`card drop-in group relative cursor-pointer overflow-hidden rounded-2xl ${item.type === 'bookmark' || (item.type === 'text' && (item.color === 'white' || item.color === 'dark')) ? 'border border-line' : ''} ${dragging ? 'opacity-30' : ''} ${selected ? 'ring-2 ring-mark ring-offset-2 ring-offset-bg' : ''}`}
@@ -151,23 +154,23 @@ function CardBase({ item, ctx }: { item: Item; ctx: CardCtx }) {
 
           {/* 상태 표시 */}
           {selected && (
-            <span className="absolute left-2 top-2 z-10 flex h-6 w-6 items-center justify-center rounded-full bg-mark text-on-mark shadow">
+            <span className="card-ui absolute left-2 top-2 z-10 flex h-6 w-6 items-center justify-center rounded-full bg-mark text-on-mark shadow">
               <Check size={14} strokeWidth={3} />
             </span>
           )}
           {!selected && item.pinned && (
-            <span className="absolute left-2 top-2 z-10 flex h-6 w-6 items-center justify-center rounded-full bg-black/55 text-mark backdrop-blur-sm">
+            <span className="card-ui absolute left-2 top-2 z-10 flex h-6 w-6 items-center justify-center rounded-full bg-black/55 text-mark backdrop-blur-sm">
               <Pin size={12} />
             </span>
           )}
           {item.rating > 0 && (
-            <span className="pointer-events-none absolute bottom-2 right-2 z-10 flex items-center gap-0.5 rounded-full bg-black/55 px-2 py-0.5 text-[11px] font-bold text-white backdrop-blur-sm">
+            <span className="card-ui pointer-events-none absolute bottom-2 right-2 z-10 flex items-center gap-0.5 rounded-full bg-black/55 px-2 py-0.5 text-[11px] font-bold text-white backdrop-blur-sm">
               <span className="text-mark">★</span>
               {item.rating}
             </span>
           )}
           {((item.type === 'image' && item.title) || (hasNote && !selecting)) && (
-            <div className="pointer-events-none absolute bottom-2 left-2 z-10 flex items-center gap-1">
+            <div className="card-ui pointer-events-none absolute bottom-2 left-2 z-10 flex items-center gap-1">
               {item.type === 'image' && item.title && <span className="num rounded-full bg-black/60 px-2 py-0.5 text-[11px] font-semibold text-white backdrop-blur-sm">{item.title}</span>}
               {hasNote && !selecting && (
                 <span className="flex h-6 w-6 items-center justify-center rounded-full bg-black/55 text-mark backdrop-blur-sm">
@@ -179,14 +182,14 @@ function CardBase({ item, ctx }: { item: Item; ctx: CardCtx }) {
 
           {/* 메모는 아래에서 올라오는 자막처럼 */}
           {hasNote && (
-            <div className="card-note pointer-events-none absolute inset-x-0 bottom-0 z-20 max-h-[60%] overflow-hidden bg-gradient-to-t from-black/85 via-black/70 to-transparent px-4 pb-4 pt-10">
+            <div className="card-note card-ui pointer-events-none absolute inset-x-0 bottom-0 z-20 max-h-[60%] overflow-hidden bg-gradient-to-t from-black/85 via-black/70 to-transparent px-4 pb-4 pt-10">
               <p className="note-text line-clamp-6 font-[family-name:var(--font-note)] text-[14px] leading-relaxed text-white/95">{item.note}</p>
             </div>
           )}
 
           {/* 도구 */}
           {!uploading && (
-            <div className="card-tools absolute right-2 top-2 z-30 flex h-9 items-center gap-0.5 rounded-full tool-pill px-1 text-ink" onClick={(e) => e.stopPropagation()} onPointerDown={(e) => e.stopPropagation()}>
+            <div className="card-tools card-ui absolute right-2 top-2 z-30 flex h-9 items-center gap-0.5 rounded-full tool-pill px-1 text-ink" onClick={(e) => e.stopPropagation()} onPointerDown={(e) => e.stopPropagation()}>
               <ToolBtn label={item.pinned ? '고정 해제 (P)' : '맨 위에 고정 (P)'} active={item.pinned} onClick={() => act().togglePin([item.id])}>
                 <Pin size={14} />
               </ToolBtn>
@@ -204,7 +207,7 @@ function CardBase({ item, ctx }: { item: Item; ctx: CardCtx }) {
             </div>
           )}
           {!uploading && (
-            <div className="card-tools absolute bottom-2 left-1/2 z-30 flex h-9 -translate-x-1/2 items-center rounded-full tool-pill px-1.5 text-ink" onClick={(e) => e.stopPropagation()} onPointerDown={(e) => e.stopPropagation()}>
+            <div className="card-tools card-ui absolute bottom-2 left-1/2 z-30 flex h-9 -translate-x-1/2 items-center rounded-full tool-pill px-1.5 text-ink" onClick={(e) => e.stopPropagation()} onPointerDown={(e) => e.stopPropagation()}>
               <Stars value={item.rating} size={16} onChange={(r) => act().setRating([item.id], r)} />
             </div>
           )}
@@ -240,7 +243,7 @@ function rangeFromView(a: string, b: string): string[] {
   return ids.slice(lo, hi + 1);
 }
 
-export const Card = memo(CardBase, (a, b) => a.item === b.item && a.ctx.gap === b.ctx.gap && a.ctx.cols === b.ctx.cols && a.ctx.canDrag === b.ctx.canDrag && a.ctx.hint === b.ctx.hint);
+export const Card = memo(CardBase, (a, b) => a.item === b.item && a.ctx.gap === b.ctx.gap && a.ctx.cols === b.ctx.cols && a.ctx.canDrag === b.ctx.canDrag && a.ctx.cinema === b.ctx.cinema && a.ctx.hint === b.ctx.hint);
 
 // ---------- 섹션 헤더 ----------
 

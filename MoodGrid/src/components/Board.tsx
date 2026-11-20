@@ -5,7 +5,7 @@ import {
   type CollisionDetection, type DragEndEvent, type DragMoveEvent, type DragStartEvent,
 } from '@dnd-kit/core';
 import { ArrowUp, ImagePlus, Layers } from 'lucide-react';
-import { useStore } from '../store';
+import { useStore, viewOptsOf } from '../store';
 import { buildView, liveSorted, sectionsOf } from '../lib/order';
 import { dragState } from '../ui';
 import { Card, SectionHeader, registerViewIds } from './Card';
@@ -47,6 +47,11 @@ export function Board() {
   const items = useStore((s) => s.items);
   const project = useStore((s) => s.projects.find((p) => p.id === s.currentId));
   const filter = useStore((s) => s.filter);
+  const query = useStore((s) => s.query);
+  const colorFilter = useStore((s) => s.colorFilter);
+  const cinema = useStore((s) => s.cinema);
+  const currentId = useStore((s) => s.currentId);
+  const projects = useStore((s) => s.projects);
   const loading = useStore((s) => s.loadingItems);
   const selection = useStore((s) => s.selection);
   const focusId = useStore((s) => s.focusId);
@@ -55,10 +60,13 @@ export function Board() {
 
   const sort = project?.sort_mode ?? 'manual';
   const cols = useFitCols(project?.cols ?? 5);
-  const gap = project?.gap ?? 24;
+  const gap = cinema ? 0 : (project?.gap ?? 24);
   const manual = sort === 'manual';
 
-  const view = useMemo(() => buildView(items, { sort, minRating: filter }), [items, sort, filter]);
+  const view = useMemo(
+    () => buildView(items, viewOptsOf({ projects, currentId, filter, query, colorFilter, cinema })),
+    [items, projects, currentId, filter, query, colorFilter, cinema],
+  );
   const ordered = useMemo(() => liveSorted(items), [items]);
   const sections = useMemo(() => sectionsOf(ordered), [ordered]);
   const hasSections = sections.length > 1;
@@ -148,7 +156,7 @@ export function Board() {
   // ----- 박스 선택 (빈 곳에서 끌기) -----
   const [box, setBox] = useState<{ x1: number; y1: number; x2: number; y2: number } | null>(null);
   const onPointerDown = (e: React.PointerEvent) => {
-    if (e.button !== 0 || e.pointerType === 'touch') return;
+    if (cinema || e.button !== 0 || e.pointerType === 'touch') return;
     if ((e.target as HTMLElement).closest('[data-card],[data-sec],button,input,textarea,a')) return;
     const sx = e.clientX;
     const sy = e.clientY;
@@ -191,7 +199,7 @@ export function Board() {
   const totalLive = ordered.filter((i) => i.type !== 'divider').length;
 
   return (
-    <div className="relative min-h-full px-4 pb-40 pt-6 md:px-10" onPointerDown={onPointerDown} style={{ ['--cols' as string]: cols, ['--gap' as string]: `${gap}px` }}>
+    <div className={`relative min-h-full ${cinema ? 'cinema' : 'px-4 pb-40 pt-6 md:px-10'}`} onPointerDown={onPointerDown} style={{ ['--cols' as string]: cols, ['--gap' as string]: `${gap}px` }}>
       <DndContext sensors={sensors} collisionDetection={collision} onDragStart={onDragStart} onDragMove={onDragMove} onDragEnd={onDragEnd} onDragCancel={clearDrag}>
         <TopZone active={!!activeId && hasSections && manual} />
         <div className="masonry mx-auto max-w-[2400px]">
@@ -200,7 +208,7 @@ export function Board() {
               const idx = sectionIdx.get(it.id) ?? 0;
               return <SectionHeader key={it.id} item={it} count={sections[idx]?.items.length ?? 0} canUp={idx > 1} canDown={idx < sections.length - 1} dragOver={overSec === it.id} />;
             }
-            return <Card key={it.id} item={it} ctx={{ gap, cols, canDrag: manual, hint: hint?.id === it.id ? hint.side : null }} />;
+            return <Card key={it.id} item={it} ctx={{ gap, cols, canDrag: manual && !cinema, cinema, hint: hint?.id === it.id ? hint.side : null }} />;
           })}
         </div>
         <DragOverlay dropAnimation={null}>
@@ -221,7 +229,7 @@ export function Board() {
         </div>
       )}
 
-      {!loading && totalLive === 0 && (
+      {!loading && totalLive === 0 && !cinema && (
         <div className="pointer-events-none fixed inset-0 z-0 flex items-center justify-center">
           <div className="fade-in flex flex-col items-center rounded-3xl border border-line bg-panel/60 px-12 py-10 text-center">
             <Layers size={44} className="mb-4 text-faint" />
