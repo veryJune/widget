@@ -11,6 +11,18 @@ function isTyping(el: EventTarget | null): boolean {
   return t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable;
 }
 
+/** 파일 묶음을 나눠서 처리: 영상 파일은 프레임 캡처 화면, 나머지는 이미지로 추가 */
+function addFileList(files: File[]) {
+  const s = useStore.getState();
+  const video = files.find((f) => f.type.startsWith('video/'));
+  const rest = files.filter((f) => !f.type.startsWith('video/'));
+  if (rest.length) void s.addFiles(rest);
+  if (video) {
+    if (files.filter((f) => f.type.startsWith('video/')).length > 1) s.toast('영상은 한 번에 하나만 열 수 있어요. 첫 번째 영상을 엽니다.');
+    s.setVideoView({ kind: 'file', file: video });
+  }
+}
+
 function addUrl(url: string) {
   const s = useStore.getState();
   if (looksLikeImageUrl(url)) void s.addImageUrl(url);
@@ -41,7 +53,7 @@ export function useInput() {
       const files = [...(clip.items ?? [])].filter((i) => i.type.startsWith('image/')).map((i) => i.getAsFile()).filter((f): f is File => !!f);
       if (files.length) {
         e.preventDefault();
-        void s.addFiles(files);
+        addFileList(files);
         return;
       }
       const text = clip.getData('text');
@@ -64,7 +76,7 @@ export function useInput() {
       const s = useStore.getState();
       if (!s.currentId) return;
       const dt = e.dataTransfer as DataTransfer;
-      if (dt.files.length) return void s.addFiles([...dt.files]);
+      if (dt.files.length) return addFileList([...dt.files]);
       // 다른 웹페이지에서 끌어온 이미지: html 안의 <img src> 를 우선
       const html = dt.getData('text/html');
       if (html) {
@@ -82,7 +94,7 @@ export function useInput() {
 
     const onKey = (e: KeyboardEvent) => {
       const s = useStore.getState();
-      if (s.viewerId) return; // 크게 보기 화면이 자기 키를 처리
+      if (s.viewerId || s.videoView) return; // 크게 보기 · 영상 화면이 자기 키를 처리
       const typing = isTyping(e.target);
       const mod = e.ctrlKey || e.metaKey;
 

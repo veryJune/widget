@@ -6,10 +6,12 @@ import { useInput } from './hooks/useInput';
 import { Board } from './components/Board';
 import { Editor } from './components/Editor';
 import { Header } from './components/Header';
+import { ItemTrash } from './components/ItemTrash';
 import { Help } from './components/Help';
 import { Lightbox } from './components/Lightbox';
 import { Login } from './components/Login';
 import { SelectionBar } from './components/SelectionBar';
+import { VideoModal } from './components/VideoModal';
 import { AskDialog, Toasts } from './components/Toasts';
 
 export default function App() {
@@ -39,7 +41,9 @@ export default function App() {
       <SelectionBar />
       <Editor />
       <Lightbox />
+      <VideoModal />
       <Help />
+      <ItemTrash />
       <AskDialog />
       <Toasts />
     </div>

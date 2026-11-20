@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { AlertTriangle, Check, CheckSquare, Download, FileArchive, HelpCircle, ImagePlus, ImageDown, LayoutGrid, Loader2, LogOut, Menu, Moon, Redo2, Shuffle, SlidersHorizontal, Split, Sun, Type, Undo2, WifiOff, KeyRound, ArrowUpFromLine } from 'lucide-react';
+import { AlertTriangle, Check, CheckSquare, FileArchive, HelpCircle, ImagePlus, ImageDown, LayoutGrid, Loader2, LogOut, Menu, Moon, Redo2, Shuffle, SlidersHorizontal, Split, Sun, Type, Undo2, WifiOff, KeyRound, ArrowUpFromLine, Trash2, Clapperboard } from 'lucide-react';
 import { backend } from '../lib/backend';
 import { exportBoardPng } from '../lib/exportPng';
 import { relTime } from '../lib/util';
@@ -130,12 +130,14 @@ export function Header() {
   const redoCount = useStore((s) => s.redoCount);
   const selectMode = useStore((s) => s.selectMode);
   const session = useStore((s) => s.session);
+  const trashCount = useStore((s) => s.items.filter((i) => i.deleted_at).length);
   const act = useStore.getState;
   const [menu, setMenu] = useState(false);
   const [view, setView] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const videoRef = useRef<HTMLInputElement>(null);
   useClickAway(menuRef, () => setMenu(false), menu);
   useClickAway(viewRef, () => setView(false), view);
   const dark = theme === 'dark' || (theme === 'system' && !matchMedia('(prefers-color-scheme: light)').matches);
@@ -173,6 +175,7 @@ export function Header() {
         </div>
         <span className="mx-1 hidden h-5 w-px bg-line sm:block" />
         <input ref={fileRef} type="file" multiple accept="image/*" className="hidden" onChange={(e) => { const f = [...(e.target.files ?? [])]; e.target.value = ''; if (f.length) void act().addFiles(f); }} />
+        <input ref={videoRef} type="file" accept="video/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) act().setVideoView({ kind: 'file', file: f }); }} />
         <IconButton label="이미지 추가" onClick={() => fileRef.current?.click()}>
           <ImagePlus size={18} />
         </IconButton>
@@ -203,13 +206,14 @@ export function Header() {
               <MenuItem icon={<CheckSquare size={16} />} label={selectMode ? '선택 모드 끄기' : '선택 모드 (터치용)'} hint="Esc" onClick={close(() => act().setSelectMode(!selectMode))} />
               <MenuItem icon={<Shuffle size={16} />} label="맨 위 묶음 섞기" onClick={close(() => act().shuffleTop())} disabled={sort !== 'manual'} />
               <MenuItem icon={<Undo2 size={16} />} label="되돌리기" hint="Ctrl+Z" disabled={undoCount === 0} onClick={close(() => act().undo())} />
+              <MenuItem icon={<Clapperboard size={16} />} label="영상에서 프레임 캡처…" onClick={close(() => videoRef.current?.click())} />
+              <MenuItem icon={<Trash2 size={16} />} label="휴지통" hint={trashCount ? String(trashCount) : undefined} onClick={close(() => act().setTrash(true))} />
               <div className="my-1 h-px bg-line" />
               <MenuItem icon={<ImageDown size={16} />} label="PNG 로 내보내기" onClick={close(() => void exportBoardPng(project?.title ?? 'moodgrid'))} />
               <MenuItem icon={<FileArchive size={16} />} label="백업 내려받기 (.zip)" onClick={close(() => void act().exportBackup())} />
               <MenuItem icon={<ArrowUpFromLine size={16} />} label="파일에서 가져오기…" onClick={close(() => act().setSwitcher(true))} />
               <div className="my-1 h-px bg-line" />
               <MenuItem icon={<HelpCircle size={16} />} label="단축키" hint="?" onClick={close(() => act().setHelp(true))} />
-              <MenuItem icon={<Download size={16} />} label="예전 버전 열기" onClick={close(() => window.open('/legacy/', '_blank', 'noopener'))} />
               {backend.mode === 'cloud' && session && (
                 <>
                   <div className="my-1 h-px bg-line" />

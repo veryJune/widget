@@ -1,5 +1,5 @@
 // 공통 UI 조각
-import { useEffect, useRef, type ButtonHTMLAttributes, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ButtonHTMLAttributes, type ReactNode } from 'react';
 import { Star, X } from 'lucide-react';
 import type { Rating } from '../types';
 
@@ -87,10 +87,12 @@ export function Modal({ open, onClose, title, children, footer, width = 520 }: {
   );
 }
 
-/** 별 1~3 */
+/** 별 1~3 — 칸 안에서 위아래 중앙 정렬, 마우스를 올린 별까지 미리 채워서 보여줌 */
 export function Stars({ value, onChange, size = 16, className = '' }: { value: Rating; onChange?: (r: Rating) => void; size?: number; className?: string }) {
+  const [hover, setHover] = useState(0);
+  const shown = onChange && hover ? hover : value;
   return (
-    <span className={`inline-flex items-center gap-0.5 ${className}`}>
+    <span className={`inline-flex items-center ${className}`} onMouseLeave={() => setHover(0)}>
       {([1, 2, 3] as Rating[]).map((n) => (
         <button
           key={n}
@@ -98,13 +100,15 @@ export function Stars({ value, onChange, size = 16, className = '' }: { value: R
           aria-label={`별점 ${n}`}
           aria-pressed={value >= n}
           disabled={!onChange}
+          onMouseEnter={() => setHover(n)}
           onClick={(e) => {
             e.stopPropagation();
             onChange?.(n);
           }}
-          className={`p-0.5 transition-transform ${onChange ? 'hover:scale-110' : 'cursor-default'}`}
+          className={`flex items-center justify-center transition-transform ${onChange ? 'hover:scale-110' : 'cursor-default'}`}
+          style={{ width: size + 8, height: size + 8 }}
         >
-          <Star size={size} className={value >= n ? 'fill-mark text-mark' : 'text-faint'} />
+          <Star size={size} className={`block ${shown >= n ? 'fill-mark text-mark' : 'text-mute/60'}`} />
         </button>
       ))}
     </span>
