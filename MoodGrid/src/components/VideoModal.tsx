@@ -28,20 +28,39 @@ function Inner() {
 
   // 항목이 사라지면(삭제 등) 닫기
   useEffect(() => {
-    if (view.kind === 'item' && (!item || item.deleted_at || !ref)) close();
+    if (view.kind === 'item' && (!item || item.deleted_at || (!ref && !item.embed))) close();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [item, ref?.kind]);
 
+  const generic = item && !ref && item.embed ? item : null;
+  // Esc 로 닫기 — 모든 종류의 재생 화면에서 (영상 파일 화면은 자체 키 처리도 있음). 입력칸에서는 입력만 빠져나옴
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      const t = e.target as HTMLElement;
+      if (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT') {
+        t.blur();
+        e.stopPropagation();
+        return;
+      }
+      e.stopPropagation();
+      act().setVideoView(null);
+    };
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
+  }, [act]);
+
   const playable = view.kind === 'file' ? fileUrl : ref?.kind === 'file' ? ref.url : null;
   const embed = ref ? embedSrc(ref) : null;
-  const title = view.kind === 'file' ? view.file.name : item?.title || (ref ? domainOf(ref.url) : '영상');
-  const original = ref ? safeHttpUrl(ref.url) : null;
+  const title = view.kind === 'file' ? view.file.name : item?.title || (ref ? domainOf(ref.url) : generic ? domainOf(generic.embed ?? '') : '영상');
+  const original = ref ? safeHttpUrl(ref.url) : generic ? safeHttpUrl(generic.content) : null;
 
   return (
     <div data-theme="dark" className="fade-in fixed inset-0 z-[70] flex flex-col bg-[#0b0b0b] text-white" role="dialog" aria-modal="true" aria-label="영상 보기">
       <div className="flex h-14 shrink-0 items-center gap-3 px-4">
         <span className="min-w-0 flex-1 truncate text-[15px] font-semibold">{title}</span>
         {ref && <span className="rounded-full bg-white/10 px-2.5 py-0.5 text-[12px] text-white/70">{PROVIDER_LABEL[ref.kind]}</span>}
+        {generic && <span className="rounded-full bg-white/10 px-2.5 py-0.5 text-[12px] text-white/70">임베드 · {domainOf(generic.embed ?? '')}</span>}
         {original && (
           <IconButton label="원본 링크 열기" onClick={() => window.open(original, '_blank', 'noopener,noreferrer')} className="!text-white/80 hover:!bg-white/15">
             <ExternalLink size={18} />
@@ -52,6 +71,7 @@ function Inner() {
         </IconButton>
       </div>
 
+      {generic && <GenericEmbed key={generic.embed} src={generic.embed as string} title={title} w={generic.w} h={generic.h} />}
       {embed && ref && item ? <Embed key={ref.start} src={embed} title={title} start={ref.start} onStart={(sec) => act().setVideoStart(item.id, sec)} /> : null}
       {playable && <Capture key={playable} src={playable} name={title} crossOrigin={view.kind === 'item'} sourceUrl={view.kind === 'item' ? ref?.url : undefined} initialStart={ref?.start ?? 0} onClose={close} />}
     </div>
@@ -105,6 +125,31 @@ function Embed({ src, title, start, onStart }: { src: string; title: string; sta
         숫자만 쳐도 돼요 (<b className="text-white/60">936</b> · <b className="text-white/60">9 36</b> → 9:36, <b className="text-white/60">10236</b> → 1:02:36). 카드에도 저장됩니다.
         <br />
         YouTube/Vimeo 는 브라우저 보안상 프레임 캡처가 안 돼요 — 화면 캡처(<kbd className="rounded border border-white/20 px-1">Win+Shift+S</kbd> · <kbd className="rounded border border-white/20 px-1">⌘⇧4</kbd>)를 찍고 <kbd className="rounded border border-white/20 px-1">Ctrl+V</kbd> 로 붙여넣으면 보드에 담겨요.
+      </p>
+    </div>
+  );
+}
+
+// ---------- 그 밖의 사이트의 임베드 플레이어 (붙여넣은 임베드 코드 · 사이트가 알려 준 플레이어) ----------
+// 모르는 사이트의 화면이므로 sandbox 로 가둠: 스크립트는 돌지만 이 앱의 화면을 이동시키거나 정보를 읽을 수 없음
+function GenericEmbed({ src, title, w, h }: { src: string; title: string; w: number | null; h: number | null }) {
+  const ratio = w && h ? Math.min(4, Math.max(0.4, w / h)) : 16 / 9;
+  return (
+    <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-5 px-4 pb-6">
+      <div className="overflow-hidden rounded-xl bg-black shadow-2xl" style={{ aspectRatio: String(ratio), width: `min(1100px, 92vw, calc((100vh - 200px) * ${ratio}))` }}>
+        <iframe
+          src={src}
+          title={title}
+          className="h-full w-full"
+          sandbox="allow-scripts allow-same-origin allow-presentation allow-popups allow-popups-to-escape-sandbox"
+          allow="autoplay; encrypted-media; picture-in-picture; fullscreen; clipboard-write"
+          allowFullScreen
+          referrerPolicy="strict-origin-when-cross-origin"
+        />
+      </div>
+      <p className="max-w-[640px] text-center text-[12px] leading-relaxed text-white/40">
+        임베드 플레이어예요. 재생이 안 되면 그 사이트가 다른 사이트 안에서의 재생을 막은 것일 수 있으니 위의 원본 링크 열기를 써 보세요. 장면은 화면 캡처(<kbd className="rounded border border-white/20 px-1">Win+Shift+S</kbd> · <kbd className="rounded border border-white/20 px-1">⌘⇧4</kbd>) 후{' '}
+        <kbd className="rounded border border-white/20 px-1">Ctrl+V</kbd> 로 붙여넣으면 보드에 담겨요.
       </p>
     </div>
   );

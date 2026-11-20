@@ -42,6 +42,11 @@ create table if not exists public.mg_items (
   deleted_at  timestamptz
 );
 
+-- (추가) 링크 카드가 안에서 재생할 플레이어 주소 — 붙여넣은 임베드 코드 · 사이트가 알려 준 플레이어 (https 만)
+alter table public.mg_items add column if not exists embed text;
+alter table public.mg_items drop constraint if exists mg_items_embed_https;
+alter table public.mg_items add constraint mg_items_embed_https check (embed is null or embed like 'https://%');
+
 create index if not exists mg_projects_user_idx on public.mg_projects (user_id, updated_at desc);
 create index if not exists mg_items_project_pos_idx on public.mg_items (project_id, pos);
 create index if not exists mg_items_user_idx on public.mg_items (user_id);

@@ -2,6 +2,7 @@
 import { useEffect } from 'react';
 import { useStore, viewOptsOf } from '../store';
 import { buildView } from '../lib/order';
+import { parseEmbedCode } from '../lib/embed';
 import { isUrl, looksLikeImageUrl } from '../lib/util';
 import { hover } from '../ui';
 
@@ -34,6 +35,9 @@ function addFromText(text: string) {
   const s = useStore.getState();
   const t = text.trim();
   if (!t) return;
+  // 임베드 코드(<iframe …>)를 붙여넣으면 바로 재생되는 카드로
+  const code = parseEmbedCode(t);
+  if (code) return s.addEmbedCode(code);
   const lines = t.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
   if (lines.length && lines.every(isUrl)) {
     lines.slice(0, 30).forEach(addUrl);

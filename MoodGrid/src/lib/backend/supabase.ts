@@ -39,6 +39,7 @@ function rowToItem(r: Record<string, unknown>): Item {
     collapsed: !!r.collapsed,
     pos: (r.pos as number) ?? 0,
     colors: (r.colors as string[]) || [],
+    embed: typeof r.embed === 'string' && r.embed.startsWith('https://') ? r.embed : null,
     created_at: r.created_at as string,
     updated_at: r.updated_at as string,
     deleted_at: (r.deleted_at as string) ?? null,
@@ -117,9 +118,10 @@ export function createSupabaseBackend(url: string, key: string): Backend {
     async saveItems(items) {
       for (let i = 0; i < items.length; i += 200) {
         const rows = items.slice(i, i + 200).map((it) => {
-          const { updated_at: _u, ...row } = it;
+          const { updated_at: _u, embed, ...row } = it;
           void _u;
-          return row;
+          // embed 열이 없는 예전 DB 에서도 저장되도록, 값이 있을 때만 보냄
+          return embed ? { ...row, embed } : row;
         });
         check(await sb.from('mg_items').upsert(rows));
       }
