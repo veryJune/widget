@@ -72,7 +72,7 @@ export function ProjectSwitcher() {
   };
 
   return (
-    <div ref={ref} className="relative min-w-0 flex-1 xl:flex-none">
+    <div ref={ref} className="relative min-w-0 flex-1">
       <button type="button" onClick={() => setOpen(!open)} aria-haspopup="listbox" aria-expanded={open} title="프로젝트 전환 (Ctrl+K)" className="flex h-10 max-w-full items-center gap-2 rounded-lg px-2.5 text-left transition hover:bg-raise">
         <span className="truncate text-[16px] font-bold tracking-tight">{current?.title ?? '프로젝트'}</span>
         <ChevronDown size={16} className={`shrink-0 text-mute transition ${open ? 'rotate-180' : ''}`} />

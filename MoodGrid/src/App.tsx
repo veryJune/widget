@@ -5,6 +5,10 @@ import { useStore } from './store';
 import { useInput } from './hooks/useInput';
 import { Board } from './components/Board';
 import { Editor } from './components/Editor';
+import { CinemaHud } from './components/CinemaHud';
+import { Compare } from './components/Compare';
+import { ContextMenu } from './components/ContextMenu';
+import { FilterBar } from './components/FilterBar';
 import { Header } from './components/Header';
 import { ItemTrash } from './components/ItemTrash';
 import { Help } from './components/Help';
@@ -17,6 +21,7 @@ import { AskDialog, Toasts } from './components/Toasts';
 export default function App() {
   const booting = useStore((s) => s.booting);
   const session = useStore((s) => s.session);
+  const cinema = useStore((s) => s.cinema);
   useInput();
 
   useEffect(() => {
@@ -34,14 +39,18 @@ export default function App() {
 
   return (
     <div className="flex h-full flex-col">
-      <Header />
+      {!cinema && <Header />}
+      {!cinema && <FilterBar />}
       <main className="min-h-0 flex-1 overflow-y-auto scroll-thin" id="scroll-root">
         <Board />
       </main>
-      <SelectionBar />
+      {!cinema && <SelectionBar />}
       <Editor />
       <Lightbox />
       <VideoModal />
+      <Compare />
+      <ContextMenu />
+      {cinema && <CinemaHud />}
       <Help />
       <ItemTrash />
       <AskDialog />

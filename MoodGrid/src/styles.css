@@ -264,3 +264,29 @@ input[type='range'] {
 .safe-bottom {
   padding-bottom: env(safe-area-inset-bottom);
 }
+
+/* ---------- 시네마틱 모드: UI 를 모두 숨기고 이미지만 ---------- */
+.cinema .masonry {
+  max-width: none;
+}
+.cinema .card {
+  border-radius: 0;
+  border: 0;
+  cursor: zoom-in;
+}
+.cinema .card-ui,
+.cinema .card-tools,
+.cinema .card-note {
+  display: none !important;
+}
+.cinema [data-sec] {
+  display: none;
+}
+.cinema-idle,
+.cinema-idle * {
+  cursor: none !important;
+}
+.cinema .card:focus-visible,
+.cinema .card:focus {
+  outline: none;
+}

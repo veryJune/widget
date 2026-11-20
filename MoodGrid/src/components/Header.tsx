@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
-import { AlertTriangle, Check, CheckSquare, FileArchive, HelpCircle, ImagePlus, ImageDown, LayoutGrid, Loader2, LogOut, Menu, Moon, Redo2, Shuffle, SlidersHorizontal, Split, Sun, Type, Undo2, WifiOff, KeyRound, ArrowUpFromLine, Trash2, Clapperboard } from 'lucide-react';
+import { AlertTriangle, Check, CheckSquare, FileArchive, HelpCircle, ImagePlus, ImageDown, LayoutGrid, Loader2, LogOut, Menu, Moon, Redo2, Shuffle, SlidersHorizontal, Split, Sun, Type, Undo2, WifiOff, KeyRound, ArrowUpFromLine, Trash2, Clapperboard, Search, Film } from 'lucide-react';
 import { backend } from '../lib/backend';
 import { exportBoardPng } from '../lib/exportPng';
+import { isFiltering } from '../lib/order';
 import { relTime } from '../lib/util';
 import { useStore } from '../store';
 import { SORT_LABEL, type SortMode } from '../types';
@@ -70,25 +71,27 @@ function StatusChip() {
   );
 }
 
-function ViewControls({ stacked = false }: { stacked?: boolean }) {
+function ViewControls({ onCinema }: { onCinema: () => void }) {
   const project = useStore((s) => s.projects.find((p) => p.id === s.currentId));
-  const filter = useStore((s) => s.filter);
   const setView = useStore((s) => s.setView);
-  const setFilter = useStore((s) => s.setFilter);
   if (!project) return null;
-  const row = stacked ? 'flex items-center justify-between gap-4' : 'flex items-center gap-2';
-  const lab = 'text-[12px] font-semibold text-mute';
+  const row = 'flex items-center justify-between gap-4';
+  const lab = 'text-[13px] font-semibold text-mute';
   return (
-    <div className={stacked ? 'space-y-4' : 'flex items-center gap-5'}>
+    <div className="space-y-4">
       <label className={row} title="열 수 ( [ / ] 키 )">
         <span className={lab}>열</span>
-        <input type="range" min={2} max={8} step={1} value={10 - project.cols} onChange={(e) => setView({ cols: 10 - Number(e.target.value) })} aria-label="카드 크기 (오른쪽일수록 크게)" className="w-28" />
-        <span className="num w-4 text-[12px] text-faint">{project.cols}</span>
+        <span className="flex items-center gap-2">
+          <input type="range" min={2} max={8} step={1} value={10 - project.cols} onChange={(e) => setView({ cols: 10 - Number(e.target.value) })} aria-label="카드 크기 (오른쪽일수록 크게)" className="w-32" />
+          <span className="num w-4 text-right text-[12px] text-faint">{project.cols}</span>
+        </span>
       </label>
       <label className={row} title="카드 사이 간격">
         <span className={lab}>간격</span>
-        <input type="range" min={0} max={48} step={2} value={project.gap} onChange={(e) => setView({ gap: Number(e.target.value) })} aria-label="카드 간격" className="w-28" />
-        <span className="num w-7 text-[12px] text-faint">{project.gap}</span>
+        <span className="flex items-center gap-2">
+          <input type="range" min={0} max={48} step={2} value={project.gap} onChange={(e) => setView({ gap: Number(e.target.value) })} aria-label="카드 간격" className="w-32" />
+          <span className="num w-5 text-right text-[12px] text-faint">{project.gap}</span>
+        </span>
       </label>
       <label className={row}>
         <span className={lab}>정렬</span>
@@ -100,15 +103,9 @@ function ViewControls({ stacked = false }: { stacked?: boolean }) {
           ))}
         </select>
       </label>
-      <label className={row}>
-        <span className={lab}>별점</span>
-        <select value={filter} onChange={(e) => setFilter(Number(e.target.value) as 0 | 1 | 2 | 3)} aria-label="별점 필터" className="h-8 rounded-lg border border-line bg-bg px-2 text-[13px] font-medium focus:border-mark focus:outline-none">
-          <option value={0}>전체</option>
-          <option value={1}>★ 1 이상</option>
-          <option value={2}>★ 2 이상</option>
-          <option value={3}>★ 3</option>
-        </select>
-      </label>
+      <button type="button" onClick={onCinema} className="flex h-10 w-full items-center justify-center gap-2 rounded-lg bg-raise text-[14px] font-semibold transition hover:bg-line">
+        <Clapperboard size={16} /> 시네마틱 모드 <span className="text-[12px] font-medium text-faint">F</span>
+      </button>
     </div>
   );
 }
@@ -131,6 +128,8 @@ export function Header() {
   const selectMode = useStore((s) => s.selectMode);
   const session = useStore((s) => s.session);
   const trashCount = useStore((s) => s.items.filter((i) => i.deleted_at).length);
+  const filterOpen = useStore((s) => s.filterOpen);
+  const filtering = useStore((s) => isFiltering({ minRating: s.filter, query: s.query, color: s.colorFilter }));
   const act = useStore.getState;
   const [menu, setMenu] = useState(false);
   const [view, setView] = useState(false);
@@ -150,26 +149,31 @@ export function Header() {
 
   return (
     <header className="z-40 flex h-14 shrink-0 items-center gap-2 border-b border-line bg-bg/85 px-3 backdrop-blur-md md:px-5">
-      <div className="flex min-w-0 flex-1 items-center gap-2 xl:flex-none">
+      <div className="flex min-w-0 flex-1 items-center gap-2">
         <div className="hidden h-8 w-8 shrink-0 sm:flex items-center justify-center rounded-lg bg-ink text-bg" aria-hidden>
           <LayoutGrid size={17} />
         </div>
         <ProjectSwitcher />
       </div>
 
-      <div className="mx-auto hidden xl:block">
-        <ViewControls />
-      </div>
-
-      <div className="flex shrink-0 items-center gap-1 xl:ml-0">
+      <div className="flex shrink-0 items-center gap-1">
         <StatusChip />
-        <div ref={viewRef} className="relative xl:hidden">
-          <IconButton label="보기 설정 (열 · 간격 · 정렬 · 필터)" active={view} onClick={() => setView((v) => !v)}>
+        <IconButton label="검색 · 필터 ( / )" active={filterOpen || filtering} onClick={() => act().setFilterOpen(!filterOpen)} className="relative">
+          <Search size={18} />
+          {filtering && <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-mark" aria-label="필터 적용 중" />}
+        </IconButton>
+        <div ref={viewRef} className="relative">
+          <IconButton label="보기 설정 (열 · 간격 · 정렬)" active={view} onClick={() => setView((v) => !v)}>
             <SlidersHorizontal size={18} />
           </IconButton>
           {view && (
             <div className="sheet-up absolute right-0 top-full z-[55] mt-2 w-[300px] rounded-2xl border border-line bg-panel p-4 shadow-2xl">
-              <ViewControls stacked />
+              <ViewControls
+                onCinema={() => {
+                  setView(false);
+                  act().setCinema(true);
+                }}
+              />
             </div>
           )}
         </div>
@@ -203,6 +207,7 @@ export function Header() {
             <div className="sheet-up absolute right-0 top-full z-[55] mt-2 w-64 rounded-2xl border border-line bg-panel p-1.5 shadow-2xl" role="menu">
               <MenuItem icon={<Split size={16} />} label="섹션(구분선) 추가" hint="S" disabled={sort !== 'manual'} onClick={close(() => act().addDivider())} />
               <MenuItem icon={dark ? <Sun size={16} /> : <Moon size={16} />} label={dark ? '밝은 화면으로' : '어두운 화면으로'} onClick={close(() => act().setTheme(dark ? 'light' : 'dark'))} />
+              <MenuItem icon={<Film size={16} />} label="시네마틱 모드" hint="F" onClick={close(() => act().setCinema(true))} />
               <MenuItem icon={<CheckSquare size={16} />} label={selectMode ? '선택 모드 끄기' : '선택 모드 (터치용)'} hint="Esc" onClick={close(() => act().setSelectMode(!selectMode))} />
               <MenuItem icon={<Shuffle size={16} />} label="맨 위 묶음 섞기" onClick={close(() => act().shuffleTop())} disabled={sort !== 'manual'} />
               <MenuItem icon={<Undo2 size={16} />} label="되돌리기" hint="Ctrl+Z" disabled={undoCount === 0} onClick={close(() => act().undo())} />

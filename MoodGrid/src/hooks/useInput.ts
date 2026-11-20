@@ -1,6 +1,6 @@
 // 붙여넣기 · 끌어다 놓기 · 단축키 (앱 전체에 한 번만 등록)
 import { useEffect } from 'react';
-import { useStore } from '../store';
+import { useStore, viewOptsOf } from '../store';
 import { buildView } from '../lib/order';
 import { isUrl, looksLikeImageUrl } from '../lib/util';
 import { hover } from '../ui';
@@ -94,9 +94,22 @@ export function useInput() {
 
     const onKey = (e: KeyboardEvent) => {
       const s = useStore.getState();
-      if (s.viewerId || s.videoView) return; // 크게 보기 · 영상 화면이 자기 키를 처리
+      if (s.viewerId || s.videoView || s.compareIds) return; // 크게 보기 · 영상 · 비교 화면이 자기 키를 처리
       const typing = isTyping(e.target);
       const mod = e.ctrlKey || e.metaKey;
+
+      // 시네마틱 모드: 나가기 · 슬라이드쇼만 (실수로 지우거나 바꾸지 않도록 나머지 단축키는 끔)
+      if (s.cinema) {
+        if (typing || mod) return;
+        if (e.key === 'Escape' || e.key === 'f' || e.key === 'F') {
+          e.preventDefault();
+          s.setCinema(false);
+        } else if (e.key === ' ') {
+          e.preventDefault();
+          s.startSlideshow();
+        }
+        return;
+      }
 
       if (mod && e.key.toLowerCase() === 'k') {
         e.preventDefault();
@@ -119,7 +132,7 @@ export function useInput() {
       }
       if (mod && e.key.toLowerCase() === 'a') {
         e.preventDefault();
-        const view = buildView(s.items, { sort: project?.sort_mode ?? 'manual', minRating: s.filter });
+        const view = buildView(s.items, viewOptsOf(s));
         s.select(view.filter((i) => i.type !== 'divider').map((i) => i.id));
         return;
       }
@@ -158,6 +171,25 @@ export function useInput() {
             e.preventDefault();
             s.setViewer(it.id);
           }
+          break;
+        }
+        case '/':
+          e.preventDefault();
+          s.setFilterOpen(true);
+          requestAnimationFrame(() => document.getElementById('filter-search')?.focus());
+          break;
+        case 'f':
+        case 'F':
+          e.preventDefault();
+          s.setCinema(true);
+          break;
+        case 'c':
+        case 'C': {
+          const imgs = [...s.selection].filter((id) => s.items.find((i) => i.id === id)?.type === 'image');
+          if (imgs.length >= 2) {
+            e.preventDefault();
+            s.openCompare(imgs);
+          } else s.toast('비교하려면 이미지를 2~4장 선택한 뒤 C 를 누르세요.');
           break;
         }
         case 'n':
