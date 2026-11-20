@@ -5,6 +5,7 @@ import { useStore } from './store';
 import { useInput } from './hooks/useInput';
 import { Board } from './components/Board';
 import { Editor } from './components/Editor';
+import { ExportDialog } from './components/ExportDialog';
 import { CinemaHud } from './components/CinemaHud';
 import { Compare } from './components/Compare';
 import { ContextMenu } from './components/ContextMenu';
@@ -53,6 +54,7 @@ export default function App() {
       {cinema && <CinemaHud />}
       <Help />
       <ItemTrash />
+      <ExportDialog />
       <AskDialog />
       <Toasts />
     </div>

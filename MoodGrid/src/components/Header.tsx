@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { AlertTriangle, Check, CheckSquare, FileArchive, HelpCircle, ImagePlus, ImageDown, LayoutGrid, Loader2, LogOut, Menu, Moon, Redo2, Shuffle, SlidersHorizontal, Split, Sun, Type, Undo2, WifiOff, KeyRound, ArrowUpFromLine, Trash2, Clapperboard, Search, Film } from 'lucide-react';
+import { AlertTriangle, Check, CheckSquare, FileArchive, HelpCircle, ImagePlus, ImageDown, LayoutGrid, Loader2, LogOut, Menu, Moon, Redo2, Shuffle, SlidersHorizontal, Split, Sun, Type, Undo2, WifiOff, KeyRound, ArrowUpFromLine, Trash2, Clapperboard, Search, Film, FolderDown } from 'lucide-react';
 import { backend } from '../lib/backend';
 import { exportBoardPng } from '../lib/exportPng';
 import { isFiltering } from '../lib/order';
@@ -26,7 +26,12 @@ function StatusChip() {
   if (busy) {
     body = (
       <>
-        <Loader2 size={13} className="animate-spin" /> {busy.label} <span className="num">{busy.done}/{busy.total}</span>
+        <Loader2 size={13} className="animate-spin" /> <span className="max-w-[220px] truncate">{busy.label}</span> <span className="num">{busy.done}/{busy.total}</span>
+        {busy.cancel && (
+          <span role="button" tabIndex={0} aria-label="취소" onClick={(e) => { e.stopPropagation(); busy.cancel?.(); }} onKeyDown={(e) => e.key === 'Enter' && busy.cancel?.()} className="ml-1 rounded-md bg-raise px-1.5 py-0.5 text-[11px] font-bold text-ink hover:bg-line">
+            취소
+          </span>
+        )}
       </>
     );
   } else if (uploading > 0) {
@@ -62,7 +67,7 @@ function StatusChip() {
       </>
     );
   }
-  const clickable = save.state === 'error' || save.state === 'offline';
+  const clickable = (save.state === 'error' || save.state === 'offline') && !busy;
   return (
     <button type="button" disabled={!clickable} onClick={() => act().retrySave()} title={save.error ?? (backend.mode === 'local' ? '체험 모드: 이 브라우저에만 저장됩니다' : '클라우드에 저장됨')} className={`hidden h-8 items-center gap-1.5 rounded-full px-3 text-[12.5px] font-medium sm:inline-flex ${cls} ${clickable ? 'hover:bg-raise' : 'cursor-default'}`} aria-live="polite">
       {body}
@@ -129,7 +134,7 @@ export function Header() {
   const session = useStore((s) => s.session);
   const trashCount = useStore((s) => s.items.filter((i) => i.deleted_at).length);
   const filterOpen = useStore((s) => s.filterOpen);
-  const filtering = useStore((s) => isFiltering({ minRating: s.filter, query: s.query, color: s.colorFilter }));
+  const filtering = useStore((s) => isFiltering({ minRating: s.filter, query: s.query, color: s.colorFilter, kinds: s.kinds }));
   const act = useStore.getState;
   const [menu, setMenu] = useState(false);
   const [view, setView] = useState(false);
@@ -215,7 +220,8 @@ export function Header() {
               <MenuItem icon={<Trash2 size={16} />} label="휴지통" hint={trashCount ? String(trashCount) : undefined} onClick={close(() => act().setTrash(true))} />
               <div className="my-1 h-px bg-line" />
               <MenuItem icon={<ImageDown size={16} />} label="PNG 로 내보내기" onClick={close(() => void exportBoardPng(project?.title ?? 'moodgrid'))} />
-              <MenuItem icon={<FileArchive size={16} />} label="백업 내려받기 (.zip)" onClick={close(() => void act().exportBackup())} />
+              <MenuItem icon={<FolderDown size={16} />} label="모든 요소 내려받기…" hint="이미지 · 메모 · 영상" onClick={close(() => act().openExport(useStore.getState().selection.size ? 'selection' : 'all'))} />
+              <MenuItem icon={<FileArchive size={16} />} label="백업 내려받기 (복원용 .zip)" onClick={close(() => void act().exportBackup())} />
               <MenuItem icon={<ArrowUpFromLine size={16} />} label="파일에서 가져오기…" onClick={close(() => act().setSwitcher(true))} />
               <div className="my-1 h-px bg-line" />
               <MenuItem icon={<HelpCircle size={16} />} label="단축키" hint="?" onClick={close(() => act().setHelp(true))} />

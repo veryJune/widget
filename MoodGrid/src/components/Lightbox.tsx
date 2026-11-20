@@ -1,6 +1,6 @@
 // 크게 보기: 필름스트립 · 휠/핀치 확대 · 더블클릭 100% · 키보드 별점 · 정보/메모 패널
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ChevronLeft, ChevronRight, ExternalLink, Info, Pause, Pin, Play, Trash2, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Download, ExternalLink, Info, Pause, Pin, Play, Trash2, X } from 'lucide-react';
 import { useStore, viewOptsOf } from '../store';
 import { buildView } from '../lib/order';
 import { safeHttpUrl } from '../lib/util';
@@ -23,6 +23,7 @@ function Viewer() {
   const filter = useStore((s) => s.filter);
   const query = useStore((s) => s.query);
   const colorFilter = useStore((s) => s.colorFilter);
+  const kinds = useStore((s) => s.kinds);
   const cinema = useStore((s) => s.cinema);
   const slideshow = useStore((s) => s.slideshow);
   const urls = useStore((s) => s.urls);
@@ -30,8 +31,8 @@ function Viewer() {
   const act = useStore.getState;
 
   const images = useMemo(
-    () => buildView(items, viewOptsOf({ projects, currentId, filter, query, colorFilter, cinema })).filter((i) => i.type === 'image' && i.path),
-    [items, projects, currentId, filter, query, colorFilter, cinema],
+    () => buildView(items, viewOptsOf({ projects, currentId, filter, query, colorFilter, kinds, cinema })).filter((i) => i.type === 'image' && i.path),
+    [items, projects, currentId, filter, query, colorFilter, kinds, cinema],
   );
   const index = Math.max(0, images.findIndex((i) => i.id === viewerId));
   const item = images[index];
@@ -364,6 +365,9 @@ function InfoPanel({ item, note, setNote, added, fullUrl, onCommit }: { item: Re
       <section className="flex flex-wrap gap-2">
         <button type="button" onClick={() => act().togglePin([item.id])} className={`flex h-9 items-center gap-1.5 rounded-lg px-3 text-[13px] font-semibold transition hover:bg-white/15 ${item.pinned ? 'bg-white/15 text-mark' : 'bg-white/8 text-white/80'}`}>
           <Pin size={14} /> {item.pinned ? '고정됨' : '고정'}
+        </button>
+        <button type="button" onClick={() => void act().downloadImage(item.id)} className="flex h-9 items-center gap-1.5 rounded-lg bg-white/8 px-3 text-[13px] font-semibold text-white/80 transition hover:bg-white/15">
+          <Download size={14} /> 내려받기
         </button>
         {fullUrl && (
           <button type="button" onClick={() => window.open(fullUrl, '_blank', 'noopener,noreferrer')} className="flex h-9 items-center gap-1.5 rounded-lg bg-white/8 px-3 text-[13px] font-semibold text-white/80 transition hover:bg-white/15">

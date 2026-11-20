@@ -29,6 +29,17 @@ const HOST_LABEL: [RegExp, string][] = [
   [/^player\.vimeo\.com$/, 'Vimeo'],
 ];
 
+/** 영상을 보여 주는 서비스의 플레이어인지 (분류에서 '영상'으로 셈) */
+export function isVideoEmbed(embedUrl: string | null | undefined): boolean {
+  if (!embedUrl) return false;
+  try {
+    const host = new URL(embedUrl).hostname;
+    return /^(www\.)?(loom\.com|dailymotion\.com|tiktok\.com|youtube\.com|youtube-nocookie\.com)$/.test(host) || host === 'streamable.com' || host === 'fast.wistia.net' || host === 'player.vimeo.com';
+  } catch {
+    return false;
+  }
+}
+
 /** 임베드 주소 → 보기 좋은 서비스 이름 (모르면 호스트 이름) */
 export function embedLabel(embedUrl: string | null | undefined): string {
   if (!embedUrl) return '임베드';
