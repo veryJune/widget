@@ -1,10 +1,11 @@
 // 보드 위의 카드 한 장 (이미지 · 메모 · 링크) 과 섹션 헤더
 import { memo, useLayoutEffect, useRef, useState } from 'react';
 import { useDraggable, useDroppable } from '@dnd-kit/core';
-import { Check, ChevronDown, ChevronRight, ChevronUp, ExternalLink, Link2, Loader2, MessageSquare, Pin, Trash2, X } from 'lucide-react';
+import { Check, ChevronDown, ChevronRight, ChevronUp, ExternalLink, Link2, Loader2, MessageSquare, Pin, Play, Trash2, X } from 'lucide-react';
 import { useStore } from '../store';
 import { dragState, hover } from '../ui';
 import { domainOf, safeHttpUrl } from '../lib/util';
+import { PROVIDER_LABEL, fmtStart, parseVideo } from '../lib/video';
 import type { Item, TextColor } from '../types';
 import { Stars } from './ui';
 
@@ -76,6 +77,7 @@ function CardBase({ item, ctx }: { item: Item; ctx: CardCtx }) {
     }
     if (item.type === 'image') s.setViewer(item.id);
     else if (item.type === 'text') s.setEditor({ mode: 'text', id: item.id });
+    else if (item.type === 'bookmark' && parseVideo(item.content)) s.setVideoView({ kind: 'item', id: item.id });
     else if (item.type === 'bookmark') {
       const u = safeHttpUrl(item.content);
       if (u) window.open(u, '_blank', 'noopener,noreferrer');
@@ -83,6 +85,7 @@ function CardBase({ item, ctx }: { item: Item; ctx: CardCtx }) {
     }
   };
 
+  const video = item.type === 'bookmark' ? parseVideo(item.content) : null;
   const hasNote = !!item.note.trim();
   const ratio = item.w && item.h ? item.w / item.h : undefined;
   const dragging = drag.isDragging;
@@ -124,18 +127,23 @@ function CardBase({ item, ctx }: { item: Item; ctx: CardCtx }) {
 
           {item.type === 'bookmark' && (
             <div className="bg-card">
-              {src && (
-                <div className="w-full bg-raise" style={{ aspectRatio: ratio ? String(ratio) : '16 / 9' }}>
-                  <img src={src} alt="" draggable={false} decoding="async" className="block h-full w-full object-cover" />
+              {(src || video) && (
+                <div className={`relative w-full ${video ? 'bg-[#0f0f0f]' : 'bg-raise'}`} style={{ aspectRatio: video ? '16 / 9' : ratio ? String(ratio) : '16 / 9' }}>
+                  {src && <img src={src} alt="" draggable={false} decoding="async" className="block h-full w-full object-cover" />}
+                  {video && (
+                    <span className="absolute inset-0 flex items-center justify-center">
+                      <span className="flex h-12 w-12 items-center justify-center rounded-full bg-black/60 text-white backdrop-blur-sm transition group-hover:scale-110 group-hover:bg-black/75">
+                        <Play size={20} className="ml-0.5 fill-white" />
+                      </span>
+                    </span>
+                  )}
                 </div>
               )}
               <div className="flex items-start gap-3 p-4">
-                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-raise text-mute">
-                  <Link2 size={17} />
-                </div>
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-raise text-mute">{video ? <Play size={16} /> : <Link2 size={17} />}</div>
                 <div className="min-w-0 flex-1">
                   <p className="line-clamp-2 text-[14px] font-bold leading-snug">{item.title || domainOf(item.content) || '링크'}</p>
-                  <p className="mt-0.5 truncate text-[12px] text-mute">{item.content}</p>
+                  <p className="mt-0.5 truncate text-[12px] text-mute">{video ? `${PROVIDER_LABEL[video.kind]}${video.start ? ` · ${fmtStart(video.start)}부터` : ''}` : item.content}</p>
                 </div>
               </div>
             </div>
@@ -158,10 +166,15 @@ function CardBase({ item, ctx }: { item: Item; ctx: CardCtx }) {
               {item.rating}
             </span>
           )}
-          {hasNote && !selecting && (
-            <span className="pointer-events-none absolute bottom-2 left-2 z-10 flex h-6 w-6 items-center justify-center rounded-full bg-black/55 text-mark backdrop-blur-sm">
-              <MessageSquare size={12} />
-            </span>
+          {((item.type === 'image' && item.title) || (hasNote && !selecting)) && (
+            <div className="pointer-events-none absolute bottom-2 left-2 z-10 flex items-center gap-1">
+              {item.type === 'image' && item.title && <span className="num rounded-full bg-black/60 px-2 py-0.5 text-[11px] font-semibold text-white backdrop-blur-sm">{item.title}</span>}
+              {hasNote && !selecting && (
+                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-black/55 text-mark backdrop-blur-sm">
+                  <MessageSquare size={12} />
+                </span>
+              )}
+            </div>
           )}
 
           {/* 메모는 아래에서 올라오는 자막처럼 */}

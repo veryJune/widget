@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronLeft, ChevronRight, ExternalLink, Info, Pin, Trash2, X } from 'lucide-react';
 import { useStore } from '../store';
 import { buildView } from '../lib/order';
+import { safeHttpUrl } from '../lib/util';
 import type { Rating } from '../types';
 import { IconButton, Stars } from './ui';
 
@@ -302,6 +303,17 @@ function InfoPanel({ item, note, setNote, added, fullUrl, onCommit }: { item: Re
           </p>
         )}
         <p>추가한 날 {added}</p>
+        {item.title && <p className="num">타임코드 {item.title}</p>}
+        {item.content && (safeHttpUrl(item.content) ? (
+          <p className="truncate">
+            출처{' '}
+            <a href={safeHttpUrl(item.content) as string} target="_blank" rel="noopener noreferrer" className="underline hover:text-white">
+              {item.content}
+            </a>
+          </p>
+        ) : (
+          <p className="truncate">출처 {item.content}</p>
+        ))}
       </section>
       {item.colors.length > 0 && (
         <section>

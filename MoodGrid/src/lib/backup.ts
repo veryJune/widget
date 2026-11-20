@@ -87,7 +87,7 @@ export function parseBackup(bytes: Uint8Array): ParsedBackup {
     items.push({
       id: typeof r.id === 'string' ? r.id : '',
       type,
-      content: content.slice(0, 20000),
+      content: content.slice(0, type === 'image' ? 2000 : 20000),
       title: typeof r.title === 'string' ? r.title.slice(0, 300) : '',
       color: TEXT_COLORS.includes(r.color as TextColor) ? (r.color as TextColor) : 'white',
       note: typeof r.note === 'string' ? r.note.slice(0, 20000) : '',

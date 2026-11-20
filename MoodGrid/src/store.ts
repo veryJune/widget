@@ -8,7 +8,9 @@ import { backend, type Session } from './lib/backend';
 import { buildBackup, parseBackup } from './lib/backup';
 import { detectLegacyBoard, parseLegacyJson, readLegacyBoard, type LegacyBoard } from './lib/legacy';
 import { fetchImageFile, processImage } from './lib/media';
+import { outbox } from './lib/outbox';
 import { liveSorted, moveSection as planMoveSection, planMove, posForNew, sectionIdOf, type MoveDest } from './lib/order';
+import { parseVideo, withStart } from './lib/video';
 import { clamp, domainOf, fileExt, nowIso, safeHttpUrl, shuffled, uid } from './lib/util';
 import type { Item, ItemType, Project, Rating, SortMode, TextColor } from './types';
 
@@ -82,6 +84,9 @@ let retryCount = 0;
 let toastSeq = 0;
 let lastLoadAt = 0;
 const requestedUrls = new Set<string>();
+let persistTimer: ReturnType<typeof setTimeout> | undefined;
+/** 시작할 때 서버에 못 올린 저장 대기 변경 (열리는 프로젝트에 겹쳐서 다시 저장 시도) */
+let pendingRecovery: { items: Item[]; projects: Project[] } = { items: [], projects: [] };
 
 export function hasUnsavedWork(): boolean {
   const s = useStore.getState();
@@ -115,6 +120,8 @@ interface Store {
   editor: { mode: 'new' | 'text' | 'note'; id?: string } | null;
   helpOpen: boolean;
   switcherOpen: boolean;
+  trashOpen: boolean;
+  videoView: { kind: 'item'; id: string } | { kind: 'file'; file: File } | null;
   focusId: string | null;
   save: { state: SaveState; at: number; error?: string };
   undoCount: number;
@@ -152,8 +159,13 @@ interface Store {
   setEditor(e: Store['editor']): void;
   setHelp(on: boolean): void;
   setSwitcher(on: boolean): void;
+  setTrash(on: boolean): void;
+  restoreItems(ids: string[]): void;
+  purgeItems(ids: string[]): Promise<void>;
 
-  addFiles(files: File[]): Promise<void>;
+  addFiles(files: File[], meta?: { title?: string; content?: string }): Promise<void>;
+  setVideoView(v: Store['videoView']): void;
+  setVideoStart(id: string, seconds: number): void;
   addImageUrl(url: string): Promise<void>;
   addText(text: string, color: TextColor): void;
   addBookmark(url: string): void;
@@ -202,7 +214,23 @@ export const useStore = create<Store>()((set, get) => {
     scheduleFlush();
   }
 
+  /** 저장 대기 중인 변경을 이 브라우저에 먼저 적어 둠 (탭이 닫히거나 오프라인이어도 보존) */
+  function persistSoon() {
+    clearTimeout(persistTimer);
+    persistTimer = setTimeout(async () => {
+      const s = get();
+      const uidv = s.session?.userId;
+      if (!uidv) return;
+      const byId = new Map(s.items.map((i) => [i.id, i]));
+      const list = [...dirtyItems].filter((id) => !s.uploading[id]).map((id) => byId.get(id)).filter((i): i is Item => !!i);
+      await outbox.putItems(uidv, list);
+      const cur = currentProject();
+      if (dirtyProject && cur) await outbox.putProject(uidv, cur);
+    }, 250);
+  }
+
   function scheduleFlush(delay = FLUSH_DELAY) {
+    persistSoon();
     clearTimeout(flushTimer);
     flushTimer = setTimeout(() => void flush(), delay);
     if (get().save.state === 'saved') setSave('saving');
@@ -249,6 +277,9 @@ export const useStore = create<Store>()((set, get) => {
             set((st) => ({ projects: st.projects.map((p) => (p.id === next.id ? { ...next, updated_at: nowIso() } : p)) }));
           }
           retryCount = 0;
+          // 저장에 성공한 것은 대기함에서 지움 (저장하는 사이 또 바뀐 항목은 남김)
+          void outbox.removeItems(ids.filter((id) => !dirtyItems.has(id)));
+          if (cur && hadProject && !dirtyProject) void outbox.removeProjects([cur.id]);
         } catch (e) {
           ids.forEach((id) => dirtyItems.add(id));
           dirtyProject = true;
@@ -316,6 +347,7 @@ export const useStore = create<Store>()((set, get) => {
   function forget(id: string) {
     set((s) => ({ items: s.items.filter((i) => i.id !== id) }));
     dirtyItems.delete(id);
+    void outbox.removeItems([id]);
     for (const stack of [undoStack, redoStack]) {
       for (let k = stack.length - 1; k >= 0; k--) {
         const e = stack[k];
@@ -426,12 +458,36 @@ export const useStore = create<Store>()((set, get) => {
     markDirty(ids);
   }
 
+  /** 지난번에 저장하지 못한 변경(탭을 닫았거나 오프라인이었던)을 서버에 올림. 실패하면 보관하고 프로젝트를 열 때 다시 시도 */
+  async function recoverOutbox(projects: Project[]): Promise<Project[]> {
+    const uidv = get().session?.userId;
+    if (!uidv) return projects;
+    const ob = await outbox.loadAll(uidv);
+    if (!ob.items.length && !ob.projects.length) return projects;
+    const known = new Set(projects.map((p) => p.id));
+    const items = ob.items.filter((i) => known.has(i.project_id));
+    const projs = ob.projects.filter((p) => known.has(p.id));
+    try {
+      if (items.length) await backend.saveItems(items);
+      for (const p of projs) await backend.saveProject(p);
+      await outbox.removeItems(ob.items.map((i) => i.id));
+      await outbox.removeProjects(ob.projects.map((p) => p.id));
+      if (items.length || projs.length) toast(`저장되지 못했던 변경 ${items.length || projs.length}건을 복구해 저장했습니다.`);
+      return projs.length ? projects.map((p) => projs.find((x) => x.id === p.id) ?? p) : projects;
+    } catch {
+      pendingRecovery = { items, projects: projs };
+      toast('이전에 저장하지 못한 변경이 있습니다. 연결되면 자동으로 저장합니다.', { kind: 'error' });
+      return projects.map((p) => projs.find((x) => x.id === p.id) ?? p);
+    }
+  }
+
   async function loadAll() {
     let projects = await backend.fetchProjects();
     // 휴지통에 30일 넘게 있던 프로젝트는 영구 삭제
     const old = projects.filter((p) => p.deleted_at && Date.now() - Date.parse(p.deleted_at) > TRASH_MS);
     for (const p of old) await get().purgeProject(p.id).catch(() => {});
     projects = projects.filter((p) => !old.includes(p));
+    projects = await recoverOutbox(projects);
     set({ projects });
     const prefs = readPrefs();
     const live = projects.filter((p) => !p.deleted_at);
@@ -460,6 +516,8 @@ export const useStore = create<Store>()((set, get) => {
     editor: null,
     helpOpen: false,
     switcherOpen: false,
+    trashOpen: false,
+    videoView: null,
     focusId: null,
     save: { state: 'saved', at: Date.now() },
     undoCount: 0,
@@ -562,7 +620,16 @@ export const useStore = create<Store>()((set, get) => {
           void backend.deleteItems(old.map((i) => i.id)).then(() => purgeItemFiles(old)).catch(() => {});
         }
         const oldIds = new Set(old.map((i) => i.id));
-        set({ items: all.filter((i) => !oldIds.has(i.id)), loadingItems: false });
+        let loaded = all.filter((i) => !oldIds.has(i.id));
+        // 이전에 서버에 올리지 못한 변경이 있으면 겹쳐서 다시 저장 시도
+        const mine = pendingRecovery.items.filter((i) => i.project_id === id);
+        if (mine.length) {
+          const ids = new Set(mine.map((i) => i.id));
+          loaded = [...loaded.filter((i) => !ids.has(i.id)), ...mine];
+          pendingRecovery.items = pendingRecovery.items.filter((i) => i.project_id !== id);
+        }
+        set({ items: loaded, loadingItems: false });
+        if (mine.length) markDirty(mine.map((i) => i.id));
         lastLoadAt = Date.now();
       } catch (e) {
         if (get().currentId === id) set({ loadingItems: false });
@@ -711,9 +778,47 @@ export const useStore = create<Store>()((set, get) => {
     setSwitcher(on) {
       set({ switcherOpen: on });
     },
+    setTrash(on) {
+      set({ trashOpen: on });
+    },
+    setVideoView(v) {
+      set({ videoView: v });
+    },
+    setVideoStart(id, seconds) {
+      const it = get().items.find((i) => i.id === id);
+      const v = it ? parseVideo(it.content) : null;
+      if (!it || !v) return;
+      mutate([{ ...it, content: withStart(v, seconds) }]);
+    },
+
+    // ---------- 항목 휴지통 ----------
+    restoreItems(ids) {
+      const want = new Set(ids);
+      const next = get().items.filter((i) => want.has(i.id) && i.deleted_at).map((i) => ({ ...i, deleted_at: null }));
+      if (!next.length) return;
+      mutate(next);
+      toast(next.length === 1 ? '복구했습니다.' : `${next.length}개를 복구했습니다.`);
+    },
+
+    async purgeItems(ids) {
+      const want = new Set(ids);
+      const targets = get().items.filter((i) => want.has(i.id) && i.deleted_at);
+      if (!targets.length) return;
+      try {
+        await backend.deleteItems(targets.map((i) => i.id));
+      } catch (e) {
+        toast(`영구 삭제하지 못했습니다: ${(e as Error).message}`, { kind: 'error' });
+        return;
+      }
+      targets.forEach((i) => forget(i.id));
+      await purgeItemFiles(targets);
+      dirtyProject = true;
+      scheduleFlush();
+      toast(targets.length === 1 ? '영구 삭제했습니다.' : `${targets.length}개를 영구 삭제했습니다.`);
+    },
 
     // ---------- 항목 추가 ----------
-    async addFiles(files) {
+    async addFiles(files, meta) {
       const pid = get().currentId;
       const imgs = files.filter((f) => f.type.startsWith('image/'));
       if (!pid || !imgs.length) {
@@ -734,7 +839,7 @@ export const useStore = create<Store>()((set, get) => {
             if (get().currentId !== pid) throw new Error('다른 프로젝트로 이동해서 취소되었습니다.');
             const id = uid();
             const base = `${uid_}/${pid}/${id}`;
-            const item: Item = { ...newItemBase(pid, 'image'), id, w: res.w, h: res.h, colors: res.colors, path: `${base}.${res.main.ext}`, thumb: `${base}_t.${res.thumb.ext}` };
+            const item: Item = { ...newItemBase(pid, 'image'), id, title: (meta?.title ?? '').slice(0, 300), content: (meta?.content ?? '').slice(0, 2000), w: res.w, h: res.h, colors: res.colors, path: `${base}.${res.main.ext}`, thumb: `${base}_t.${res.thumb.ext}` };
             const preview = URL.createObjectURL(res.thumb.blob);
             set((s) => ({ uploading: { ...s.uploading, [id]: true }, previews: { ...s.previews, [id]: preview } }));
             addNew(item);
@@ -989,7 +1094,7 @@ export const useStore = create<Store>()((set, get) => {
         if (/\.zip$/i.test(file.name)) {
           const parsed = parseBackup(new Uint8Array(await file.arrayBuffer()));
           const entries: ImportEntry[] = parsed.data.items.map((b) => ({
-            item: { type: b.type, content: b.type === 'image' ? '' : b.content, title: b.title, color: b.color, note: b.note, rating: b.rating, pinned: b.pinned, collapsed: b.collapsed, colors: b.colors, created_at: b.created_at, w: b.w, h: b.h },
+            item: { type: b.type, content: b.content, title: b.title, color: b.color, note: b.note, rating: b.rating, pinned: b.pinned, collapsed: b.collapsed, colors: b.colors, created_at: b.created_at, w: b.w, h: b.h },
             getFile: b.type === 'image' ? async () => parsed.fileOf(b) : undefined,
           }));
           // 백업의 순서(pos)를 그대로 쓰기 위해 정렬해서 넘김
