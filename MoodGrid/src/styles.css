@@ -132,8 +132,11 @@
   grid-column: 1 / -1;
 }
 
-/* 카드 도구: 카드에 올리면 아주 연하게(미리보기를 가리지 않게) 보이고, 도구 위에 올리면 선명해짐.
-   터치 화면에서는 늘 보임 */
+/* 카드 도구
+   - 카드에 올리면: 배경·테두리는 완전히 투명, 아이콘만 연하게 (미리보기를 가리지 않음).
+     어떤 사진 위에서도 읽히도록 아이콘 둘레에 테마 색 번짐을 아주 옅게
+   - 도구 위에 올리면: 테마 색 배경이 나타나고 아이콘이 선명해짐
+   - 터치 화면에서는 늘 보임 */
 .card-tools {
   opacity: 0;
   transition: opacity 160ms ease;
@@ -141,15 +144,48 @@
 .card:hover .card-tools,
 .card:focus-within .card-tools,
 .card[data-selected='true'] .card-tools {
-  opacity: 0.36;
+  opacity: 0.5;
 }
 .card .card-tools:hover,
 .card .card-tools:focus-within {
   opacity: 1;
 }
+.tool-pill {
+  /* 위치(absolute)는 Tailwind 클래스가 지정 — 여기서 position 을 건드리면 덮어쓰므로 지정하지 않음 */
+  isolation: isolate;
+}
+.tool-pill::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  box-shadow: 0 4px 14px rgb(0 0 0 / 0.18);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  opacity: 0;
+  transition: opacity 160ms ease;
+}
+.tool-pill:hover::before,
+.tool-pill:focus-within::before {
+  opacity: 0.9;
+}
+.tool-pill svg {
+  filter: drop-shadow(0 0 1.5px color-mix(in srgb, var(--panel) 70%, transparent));
+  transition: filter 160ms ease;
+}
+.tool-pill:hover svg,
+.tool-pill:focus-within svg {
+  filter: none;
+}
 @media (hover: none) {
   .card-tools {
     opacity: 0.92;
+  }
+  .tool-pill::before {
+    opacity: 0.8;
   }
 }
 .card-note {

@@ -186,7 +186,7 @@ function CardBase({ item, ctx }: { item: Item; ctx: CardCtx }) {
 
           {/* 도구 */}
           {!uploading && (
-            <div className="card-tools absolute right-2 top-2 z-30 flex h-9 items-center gap-0.5 rounded-full border border-line/70 bg-panel/80 px-1 text-ink shadow-md backdrop-blur-md" onClick={(e) => e.stopPropagation()} onPointerDown={(e) => e.stopPropagation()}>
+            <div className="card-tools absolute right-2 top-2 z-30 flex h-9 items-center gap-0.5 rounded-full tool-pill px-1 text-ink" onClick={(e) => e.stopPropagation()} onPointerDown={(e) => e.stopPropagation()}>
               <ToolBtn label={item.pinned ? '고정 해제 (P)' : '맨 위에 고정 (P)'} active={item.pinned} onClick={() => act().togglePin([item.id])}>
                 <Pin size={14} />
               </ToolBtn>
@@ -204,7 +204,7 @@ function CardBase({ item, ctx }: { item: Item; ctx: CardCtx }) {
             </div>
           )}
           {!uploading && (
-            <div className="card-tools absolute bottom-2 left-1/2 z-30 flex h-9 -translate-x-1/2 items-center rounded-full border border-line/70 bg-panel/80 px-1.5 text-ink shadow-md backdrop-blur-md" onClick={(e) => e.stopPropagation()} onPointerDown={(e) => e.stopPropagation()}>
+            <div className="card-tools absolute bottom-2 left-1/2 z-30 flex h-9 -translate-x-1/2 items-center rounded-full tool-pill px-1.5 text-ink" onClick={(e) => e.stopPropagation()} onPointerDown={(e) => e.stopPropagation()}>
               <Stars value={item.rating} size={16} onChange={(r) => act().setRating([item.id], r)} />
             </div>
           )}
