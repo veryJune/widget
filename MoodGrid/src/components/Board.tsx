@@ -49,6 +49,7 @@ export function Board() {
   const filter = useStore((s) => s.filter);
   const query = useStore((s) => s.query);
   const colorFilter = useStore((s) => s.colorFilter);
+  const kinds = useStore((s) => s.kinds);
   const cinema = useStore((s) => s.cinema);
   const currentId = useStore((s) => s.currentId);
   const projects = useStore((s) => s.projects);
@@ -64,8 +65,8 @@ export function Board() {
   const manual = sort === 'manual';
 
   const view = useMemo(
-    () => buildView(items, viewOptsOf({ projects, currentId, filter, query, colorFilter, cinema })),
-    [items, projects, currentId, filter, query, colorFilter, cinema],
+    () => buildView(items, viewOptsOf({ projects, currentId, filter, query, colorFilter, kinds, cinema })),
+    [items, projects, currentId, filter, query, colorFilter, kinds, cinema],
   );
   const ordered = useMemo(() => liveSorted(items), [items]);
   const sections = useMemo(() => sectionsOf(ordered), [ordered]);

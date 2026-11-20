@@ -1,7 +1,8 @@
-// 필터 바: 검색 · 별점 · 보드의 대표 색. 헤더 아래에 필요할 때만 나타남 (`/` 키로 열기)
+// 필터 바: 분류 · 검색 · 별점 · 보드의 대표 색. 헤더 아래에 필요할 때만 나타남 (`/` 키로 열기)
 import { useMemo } from 'react';
 import { Search, X } from 'lucide-react';
 import { useStore, viewOptsOf } from '../store';
+import { CATEGORIES, CATEGORY_LABEL, countByCategory } from '../lib/categories';
 import { buildPalette } from '../lib/colors';
 import { buildView, isFiltering } from '../lib/order';
 
@@ -17,18 +18,20 @@ export function FilterBar() {
   const query = useStore((s) => s.query);
   const color = useStore((s) => s.colorFilter);
   const rating = useStore((s) => s.filter);
+  const kinds = useStore((s) => s.kinds);
   const items = useStore((s) => s.items);
   const projects = useStore((s) => s.projects);
   const currentId = useStore((s) => s.currentId);
   const act = useStore.getState;
 
-  const active = isFiltering({ minRating: rating, query, color });
+  const active = isFiltering({ minRating: rating, query, color, kinds });
   const palette = useMemo(() => buildPalette(items, 10), [items]);
+  const catCounts = useMemo(() => countByCategory(items), [items]);
   const counts = useMemo(() => {
     const total = items.filter((i) => !i.deleted_at && i.type !== 'divider').length;
-    const shown = buildView(items, { ...viewOptsOf({ projects, currentId, filter: rating, query, colorFilter: color, cinema: false }), sort: 'manual' }).filter((i) => i.type !== 'divider').length;
+    const shown = buildView(items, { ...viewOptsOf({ projects, currentId, filter: rating, query, colorFilter: color, kinds, cinema: false }), sort: 'manual' }).filter((i) => i.type !== 'divider').length;
     return { total, shown };
-  }, [items, projects, currentId, rating, query, color]);
+  }, [items, projects, currentId, rating, query, color, kinds]);
 
   if (!open && !active) return null;
 
@@ -39,7 +42,18 @@ export function FilterBar() {
 
   return (
     <div className="fade-in flex shrink-0 flex-wrap items-center gap-x-4 gap-y-2 border-b border-line bg-bg/85 px-3 py-2 backdrop-blur-md md:px-5" role="search" aria-label="필터">
-      <label className="relative flex min-w-[180px] flex-1 items-center sm:max-w-[360px]">
+      <div className="flex items-center rounded-lg bg-raise p-0.5" role="group" aria-label="분류로 보기">
+        <button type="button" aria-pressed={kinds.length === 0} onClick={() => useStore.setState({ kinds: [] })} className={`h-8 rounded-md px-2.5 text-[12.5px] font-semibold transition ${kinds.length === 0 ? 'bg-panel text-ink shadow-sm' : 'text-mute hover:text-ink'}`}>
+          전체
+        </button>
+        {CATEGORIES.map((c) => (
+          <button key={c} type="button" aria-pressed={kinds.includes(c)} disabled={catCounts[c] === 0 && !kinds.includes(c)} onClick={() => act().toggleKind(c)} title={`${CATEGORY_LABEL[c]}만 보기 (여러 개 선택 가능)`} className={`h-8 rounded-md px-2.5 text-[12.5px] font-semibold transition disabled:opacity-35 ${kinds.includes(c) ? 'bg-panel text-ink shadow-sm' : 'text-mute hover:text-ink'}`}>
+            {CATEGORY_LABEL[c]} <span className="num ml-0.5 text-[11.5px] font-medium text-faint">{catCounts[c]}</span>
+          </button>
+        ))}
+      </div>
+
+      <label className="relative flex min-w-[180px] flex-1 items-center sm:max-w-[320px]">
         <Search size={15} className="pointer-events-none absolute left-3 text-faint" />
         <input
           id="filter-search"

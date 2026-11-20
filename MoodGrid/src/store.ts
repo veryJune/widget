@@ -6,6 +6,8 @@
 import { create } from 'zustand';
 import { backend, type Session } from './lib/backend';
 import { buildBackup, parseBackup } from './lib/backup';
+import type { Category } from './lib/categories';
+import { buildExportZip, entriesOf, imageFileName, type ExportOptions } from './lib/exporter';
 import { detectLegacyBoard, parseLegacyJson, readLegacyBoard, type LegacyBoard } from './lib/legacy';
 import { fetchImageFile, processImage } from './lib/media';
 import { outbox } from './lib/outbox';
@@ -42,7 +44,11 @@ export interface Busy {
   label: string;
   done: number;
   total: number;
+  /** 있으면 진행 표시줄에 '취소' 버튼이 나타남 */
+  cancel?: () => void;
 }
+
+export type ExportScope = 'all' | 'selection' | 'view';
 
 interface Prefs {
   theme?: Theme;
@@ -91,9 +97,20 @@ let persistTimer: ReturnType<typeof setTimeout> | undefined;
 let pendingRecovery: { items: Item[]; projects: Project[] } = { items: [], projects: [] };
 
 /** 지금 화면 상태(정렬 · 필터 · 검색 · 색 · 시네마틱)에서 보드에 보일 항목을 고르는 옵션 */
-export function viewOptsOf(s: { projects: Project[]; currentId: string | null; filter: number; query: string; colorFilter: string | null; cinema: boolean }): ViewOpts {
+export function viewOptsOf(s: { projects: Project[]; currentId: string | null; filter: number; query: string; colorFilter: string | null; kinds: Category[]; cinema: boolean }): ViewOpts {
   const p = s.projects.find((x) => x.id === s.currentId);
-  return { sort: p?.sort_mode ?? 'manual', minRating: s.filter, query: s.query, color: s.colorFilter, flat: s.cinema };
+  return { sort: p?.sort_mode ?? 'manual', minRating: s.filter, query: s.query, color: s.colorFilter, kinds: s.kinds, flat: s.cinema };
+}
+
+/** 브라우저의 '다른 이름으로 저장' 동작 */
+function saveBlob(blob: Blob, name: string) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = name;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 8000);
 }
 
 export function hasUnsavedWork(): boolean {
@@ -138,6 +155,8 @@ interface Store {
   videoView: { kind: 'item'; id: string } | { kind: 'file'; file: File } | null;
   query: string;
   colorFilter: string | null;
+  kinds: Category[];
+  exportDialog: { scope: ExportScope } | null;
   filterOpen: boolean;
   cinema: boolean;
   slideshow: boolean;
@@ -172,6 +191,12 @@ interface Store {
   purgeProject(id: string): Promise<void>;
   setView(v: Partial<Pick<Project, 'cols' | 'gap' | 'sort_mode'>>): void;
   setFilter(f: 0 | 1 | 2 | 3): void;
+  toggleKind(c: Category): void;
+  setBusy(b: Busy | null): void;
+  openExport(scope: ExportScope): void;
+  closeExport(): void;
+  runExport(scope: ExportScope, opts: ExportOptions): Promise<void>;
+  downloadImage(id: string): Promise<void>;
 
   select(ids: string[], mode?: 'replace' | 'add' | 'toggle'): void;
   clearSelection(): void;
@@ -184,7 +209,7 @@ interface Store {
   restoreItems(ids: string[]): void;
   purgeItems(ids: string[]): Promise<void>;
 
-  addFiles(files: File[], meta?: { title?: string; content?: string }): Promise<void>;
+  addFiles(files: File[], meta?: { title?: string; content?: string }, opts?: { sectionId?: string | null; quiet?: boolean }): Promise<void>;
   setVideoView(v: Store['videoView']): void;
   setQuery(q: string): void;
   setColorFilter(hex: string | null): void;
@@ -201,7 +226,7 @@ interface Store {
   addText(text: string, color: TextColor): void;
   addBookmark(url: string, extra?: { embed?: string | null; title?: string; w?: number | null; h?: number | null }): void;
   addEmbedCode(code: ParsedEmbedCode): void;
-  addDivider(title?: string): void;
+  addDivider(title?: string): string | null;
   editText(id: string, content: string, color: TextColor): void;
   setNote(id: string, note: string): void;
   setRating(ids: string[], rating: Rating): void;
@@ -367,8 +392,8 @@ export const useStore = create<Store>()((set, get) => {
   }
 
   /** 새 항목 하나를 맨 위 묶음 끝(섹션이 없으면 맨 끝)에 추가 */
-  function addNew(item: Item): Item {
-    const { pos, renumbered } = posForNew(get().items, item.type === 'divider' ? 'divider' : 'item');
+  function addNew(item: Item, sectionId?: string | null): Item {
+    const { pos, renumbered } = posForNew(get().items, item.type === 'divider' ? 'divider' : 'item', sectionId);
     const placed = { ...item, pos };
     const moved = get().items.filter((i) => renumbered.has(i.id)).map((i) => ({ ...i, pos: renumbered.get(i.id) as number }));
     mutate([placed, ...moved]);
@@ -552,6 +577,8 @@ export const useStore = create<Store>()((set, get) => {
     videoView: null,
     query: '',
     colorFilter: null,
+    kinds: [],
+    exportDialog: null,
     filterOpen: false,
     cinema: false,
     slideshow: false,
@@ -652,7 +679,7 @@ export const useStore = create<Store>()((set, get) => {
       await flushNow();
       undoStack.length = 0;
       redoStack.length = 0;
-      set({ currentId: id, items: [], loadingItems: true, selection: new Set(), anchor: null, selectMode: false, viewerId: null, filter: 0, query: '', colorFilter: null, filterOpen: false, cinema: false, slideshow: false, menu: null, compareIds: null, undoCount: 0, redoCount: 0, switcherOpen: false });
+      set({ currentId: id, items: [], loadingItems: true, selection: new Set(), anchor: null, selectMode: false, viewerId: null, filter: 0, query: '', colorFilter: null, kinds: [], exportDialog: null, filterOpen: false, cinema: false, slideshow: false, menu: null, compareIds: null, undoCount: 0, redoCount: 0, switcherOpen: false });
       writePrefs({ lastProject: id });
       try {
         const all = await backend.fetchItems(id);
@@ -836,8 +863,14 @@ export const useStore = create<Store>()((set, get) => {
     setFilterOpen(on) {
       set({ filterOpen: on });
     },
+    toggleKind(c) {
+      set((s) => ({ kinds: s.kinds.includes(c) ? s.kinds.filter((x) => x !== c) : [...s.kinds, c] }));
+    },
+    setBusy(b) {
+      set({ busy: b });
+    },
     clearFilters() {
-      set({ filter: 0, query: '', colorFilter: null });
+      set({ filter: 0, query: '', colorFilter: null, kinds: [] });
     },
     setCinema(on) {
       set({ cinema: on, slideshow: false, selection: new Set(), anchor: null, selectMode: false, menu: null, viewerId: null });
@@ -869,6 +902,111 @@ export const useStore = create<Store>()((set, get) => {
     },
     closeCompare() {
       set({ compareIds: null });
+    },
+
+    // ---------- 내려받기 ----------
+    openExport(scope) {
+      set({ exportDialog: { scope }, menu: null });
+    },
+    closeExport() {
+      set({ exportDialog: null });
+    },
+
+    async runExport(scope, opts) {
+      const s = get();
+      const p = currentProject();
+      if (!p) return;
+      const ordered = liveSorted(s.items);
+      let pick: Set<string> | null = null;
+      if (scope === 'selection') pick = new Set(s.selection);
+      else if (scope === 'view') pick = new Set(buildView(s.items, viewOptsOf(s)).filter((i) => i.type !== 'divider').map((i) => i.id));
+      const entries = entriesOf(ordered, pick);
+      if (!entries.length) return toast('내려받을 항목이 없습니다.');
+
+      const ac = new AbortController();
+      const cancel = () => ac.abort();
+      set({ busy: { label: '내려받기 준비 중', done: 0, total: 1, cancel }, exportDialog: null });
+      try {
+        // 이미지 주소를 한꺼번에 받아 둠
+        const paths = entries.flatMap((e) => (e.item.type === 'image' && e.item.path ? [e.item.path] : []));
+        const urls = paths.length ? await backend.signUrls(paths) : {};
+        const getImage = async (path: string) => {
+          const u = urls[path];
+          if (!u) return null;
+          try {
+            const r = await fetch(u, { signal: ac.signal });
+            return r.ok ? await r.blob() : null;
+          } catch (e) {
+            if (ac.signal.aborted) throw e;
+            return null;
+          }
+        };
+        const MAX_ONE = 150 * 1024 * 1024;
+        const MAX_ALL = 400 * 1024 * 1024;
+        let videoBytes = 0;
+        const getVideo = async (url: string): Promise<{ blob: Blob } | { skip: string }> => {
+          try {
+            const r = await fetch(url, { mode: 'cors', signal: ac.signal });
+            if (!r.ok) return { skip: `서버 응답 오류 (${r.status})` };
+            const len = Number(r.headers.get('content-length') || 0);
+            const mb = (n: number) => `${Math.round(n / 1024 / 1024)}MB`;
+            if (len > MAX_ONE || videoBytes + len > MAX_ALL) {
+              await r.body?.cancel();
+              return { skip: `파일이 너무 큼 (${mb(len)} · 한 파일 ${mb(MAX_ONE)} / 전체 ${mb(MAX_ALL)} 한도)` };
+            }
+            const chunks: Uint8Array[] = [];
+            let got = 0;
+            const reader = r.body?.getReader();
+            if (!reader) return { skip: '내려받기를 지원하지 않는 응답' };
+            for (;;) {
+              const { done, value } = await reader.read();
+              if (done || !value) break;
+              got += value.length;
+              if (got > MAX_ONE || videoBytes + got > MAX_ALL) {
+                await reader.cancel();
+                return { skip: `파일이 너무 큼 (${mb(got)} 이상 · 한 파일 ${mb(MAX_ONE)} / 전체 ${mb(MAX_ALL)} 한도)` };
+              }
+              chunks.push(value);
+            }
+            videoBytes += got;
+            return { blob: new Blob(chunks as BlobPart[], { type: r.headers.get('content-type') || 'video/mp4' }) };
+          } catch (e) {
+            if (ac.signal.aborted) throw e;
+            return { skip: '서버가 내려받기(CORS)를 허용하지 않거나 연결에 실패함' };
+          }
+        };
+        const { zip, report, rootName } = await buildExportZip({
+          project: p,
+          entries,
+          opts,
+          getImage,
+          getVideo,
+          signal: ac.signal,
+          onProgress: (done, total, label) => set({ busy: { label: `내려받는 중 · ${label}`, done, total, cancel } }),
+        });
+        const stamp = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+        saveBlob(new Blob([zip as BlobPart], { type: 'application/zip' }), `${rootName}_${stamp}.zip`);
+        const parts = [report.images && `이미지 ${report.images}`, report.memos && `메모 ${report.memos}`, report.videos && `영상 ${report.videos}`, report.links && opts.links && `링크 목록 ${report.links}`].filter(Boolean).join(' · ');
+        toast(`내려받았습니다 · ${parts || '목록'}${report.skipped.length ? ` · 건너뜀 ${report.skipped.length} (README.txt 참고)` : ''}`, { ms: 6000 });
+      } catch (e) {
+        if ((e as Error).name === 'AbortError') toast('내려받기를 취소했습니다.');
+        else toast(`내려받지 못했습니다: ${(e as Error).message}`, { kind: 'error' });
+      } finally {
+        set({ busy: null });
+      }
+    },
+
+    async downloadImage(id) {
+      const it = get().items.find((i) => i.id === id && !i.deleted_at);
+      if (!it?.path) return;
+      try {
+        const url = (await backend.signUrls([it.path]))[it.path];
+        const r = url ? await fetch(url) : null;
+        if (!r?.ok) throw new Error('파일을 불러오지 못했습니다.');
+        saveBlob(await r.blob(), imageFileName(it));
+      } catch (e) {
+        toast(`내려받지 못했습니다: ${(e as Error).message}`, { kind: 'error' });
+      }
     },
 
     setVideoStart(id, seconds) {
@@ -905,7 +1043,7 @@ export const useStore = create<Store>()((set, get) => {
     },
 
     // ---------- 항목 추가 ----------
-    async addFiles(files, meta) {
+    async addFiles(files, meta, opts) {
       const pid = get().currentId;
       const imgs = files.filter((f) => f.type.startsWith('image/'));
       if (!pid || !imgs.length) {
@@ -917,7 +1055,8 @@ export const useStore = create<Store>()((set, get) => {
       const errors: string[] = [];
       let next = 0;
       let finished = 0;
-      if (imgs.length > 1) set({ busy: { label: '이미지 올리는 중', done: 0, total: imgs.length } });
+      const useBusy = imgs.length > 1 && !opts?.quiet;
+      if (useBusy) set({ busy: { label: '이미지 올리는 중', done: 0, total: imgs.length } });
       const run = async () => {
         while (next < imgs.length) {
           const file = imgs[next++];
@@ -929,7 +1068,7 @@ export const useStore = create<Store>()((set, get) => {
             const item: Item = { ...newItemBase(pid, 'image'), id, title: (meta?.title ?? '').slice(0, 300), content: (meta?.content ?? sourceNameOf(file)).slice(0, 2000), w: res.w, h: res.h, colors: res.colors, path: `${base}.${res.main.ext}`, thumb: `${base}_t.${res.thumb.ext}` };
             const preview = URL.createObjectURL(res.thumb.blob);
             set((s) => ({ uploading: { ...s.uploading, [id]: true }, previews: { ...s.previews, [id]: preview } }));
-            addNew(item);
+            addNew(item, opts?.sectionId);
             try {
               await backend.upload(item.path as string, res.main.blob, res.main.mime);
               await backend.upload(item.thumb as string, res.thumb.blob, res.thumb.mime);
@@ -964,13 +1103,13 @@ export const useStore = create<Store>()((set, get) => {
             errors.push(`${file.name || '이미지'}: ${(e as Error).message || '실패'}`);
           }
           finished++;
-          if (imgs.length > 1) set({ busy: { label: '이미지 올리는 중', done: finished, total: imgs.length } });
+          if (useBusy) set({ busy: { label: '이미지 올리는 중', done: finished, total: imgs.length } });
         }
       };
       await Promise.all(Array.from({ length: Math.min(3, imgs.length) }, run));
-      set({ busy: null });
+      if (useBusy) set({ busy: null });
       if (errors.length) toast(errors.length === 1 ? errors[0] : `${errors.length}장을 추가하지 못했습니다. (${errors[0]})`, { kind: 'error' });
-      if (added) toast(added === 1 ? '이미지를 추가했습니다.' : `이미지 ${added}장을 추가했습니다.`);
+      if (added && !opts?.quiet) toast(added === 1 ? '이미지를 추가했습니다.' : `이미지 ${added}장을 추가했습니다.`);
     },
 
     async addImageUrl(url) {
@@ -1044,8 +1183,8 @@ export const useStore = create<Store>()((set, get) => {
 
     addDivider(title = '새 섹션') {
       const pid = get().currentId;
-      if (!pid) return;
-      addNew({ ...newItemBase(pid, 'divider'), content: title });
+      if (!pid) return null;
+      return addNew({ ...newItemBase(pid, 'divider'), content: title.slice(0, 200) }).id;
     },
 
     // ---------- 항목 수정 ----------

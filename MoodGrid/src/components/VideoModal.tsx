@@ -2,12 +2,13 @@
 //  - YouTube / Vimeo 링크: 안에서 재생 + 시작 시간 지정
 //  - 영상 파일(내 컴퓨터) / 영상 파일 주소: 재생하며 원하는 장면을 타임코드와 함께 이미지 카드로 캡처
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Camera, ChevronsLeft, ChevronsRight, ExternalLink, Pause, Play, SkipBack, SkipForward, X } from 'lucide-react';
+import { Camera, Clapperboard, ChevronsLeft, ChevronsRight, ExternalLink, Pause, Play, SkipBack, SkipForward, X } from 'lucide-react';
 import { useStore } from '../store';
 import { domainOf, safeHttpUrl } from '../lib/util';
 import { embedBadge, embedLabel } from '../lib/providers';
 import { PROVIDER_LABEL, embedSrc, fmtStart, fmtTimecode, parseTimeInput, parseVideo, previewTime } from '../lib/video';
 import { Button, IconButton, Kbd } from './ui';
+import { StillSheet } from './StillSheet';
 
 export function VideoModal() {
   const v = useStore((s) => s.videoView);
@@ -167,6 +168,7 @@ function Capture({ src, name, crossOrigin, sourceUrl, initialStart, onClose }: {
   const [count, setCount] = useState(0);
   const [flash, setFlash] = useState(false);
   const [failed, setFailed] = useState(false);
+  const [sheet, setSheet] = useState(false);
   const busy = useRef(false);
 
   // 현재 시간을 부드럽게 표시
@@ -314,7 +316,11 @@ function Capture({ src, name, crossOrigin, sourceUrl, initialStart, onClose }: {
           <Button variant="primary" onClick={() => void capture()} disabled={failed} className="ml-3 !bg-white !text-black">
             <Camera size={16} /> 이 장면 캡처 <Kbd>C</Kbd>
           </Button>
+          <Button variant="quiet" onClick={() => setSheet((v) => !v)} disabled={failed || !duration} aria-expanded={sheet} className="!bg-white/10 !text-white hover:!bg-white/20">
+            <Clapperboard size={16} /> 스틸 시트
+          </Button>
         </div>
+        {sheet && duration > 0 && <StillSheet src={src} name={name} crossOrigin={crossOrigin} sourceUrl={sourceUrl} duration={duration} onClose={() => setSheet(false)} onDone={onClose} />}
         <p className="text-center text-[12px] text-white/40">
           {count > 0 ? `${count}장 캡처했어요 · 보드에 타임코드와 함께 담겨 있습니다. ` : '캡처하면 보드에 타임코드가 붙은 이미지 카드로 저장돼요. '}
           <Kbd>Space</Kbd> 재생 · <Kbd>,</Kbd> <Kbd>.</Kbd> 프레임 · <Kbd>←</Kbd> <Kbd>→</Kbd> 1초

@@ -1,7 +1,7 @@
 // 카드 우클릭 메뉴: 크게 보기 · 별점 · 고정 · 메모 · 섹션으로 이동 · 비교 · 삭제
 // 선택한 카드 위에서 열면 선택한 전체에, 아니면 그 카드 한 장에만 적용
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { ChevronRight, Columns2, ExternalLink, FolderInput, Maximize2, MessageSquare, Pencil, Pin, Play, Trash2 } from 'lucide-react';
+import { ChevronRight, Columns2, Download, ExternalLink, FolderInput, Maximize2, MessageSquare, Pencil, Pin, Play, Trash2 } from 'lucide-react';
 import { useStore } from '../store';
 import { liveSorted, sectionsOf } from '../lib/order';
 import { safeHttpUrl } from '../lib/util';
@@ -103,6 +103,8 @@ function Inner({ m }: { m: NonNullable<ReturnType<typeof useStore.getState>['men
         />
       </div>
       <Item icon={<Pin size={15} />} label={allPinned ? '고정 해제' : '맨 위에 고정'} hint="P" onClick={run(() => act().togglePin(targets))} />
+      {single && item.type === 'image' && item.path && <Item icon={<Download size={15} />} label="이미지 내려받기" onClick={run(() => void act().downloadImage(item.id))} />}
+      {!single && <Item icon={<Download size={15} />} label={`선택한 ${picked.length}개 내려받기…`} onClick={run(() => act().openExport('selection'))} />}
       {imageIds.length >= 2 && imageIds.length <= 4 && <Item icon={<Columns2 size={15} />} label={`선택한 ${imageIds.length}장 비교`} hint="C" onClick={run(() => act().openCompare(imageIds))} />}
 
       <button type="button" role="menuitem" aria-expanded={sectionsOpen} onClick={() => setSectionsOpen((v) => !v)} className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-[13.5px] transition hover:bg-raise">

@@ -4,6 +4,7 @@
 // 이웃 사이에 넣을 틈이 너무 좁아졌을 때만 전체를 다시 번호 매깁니다.
 // 필터·접힌 섹션 때문에 화면에 안 보이는 항목도 항상 '전체 목록' 기준으로 계산하므로 순서가 꼬이지 않습니다.
 import type { Item, SortMode } from '../types';
+import { categoryOf, type Category } from './categories';
 import { hexToHsl, itemMatchesColor } from './colors';
 
 export const byPos = (a: Item, b: Item) => a.pos - b.pos || a.created_at.localeCompare(b.created_at) || a.id.localeCompare(b.id);
@@ -33,6 +34,8 @@ export interface ViewOpts {
   color?: string | null;
   /** 섹션을 무시하고 순서대로 쭉 (시네마틱 모드) */
   flat?: boolean;
+  /** 분류 필터 (비어 있으면 전체): 이미지 · 영상 · 메모 · 링크 · 임베드 */
+  kinds?: Category[];
 }
 
 export const queryTokens = (q: string | undefined): string[] => (q ?? '').toLowerCase().split(/\s+/).filter(Boolean);
@@ -44,8 +47,8 @@ export function matchesQuery(it: Item, tokens: string[]): boolean {
 }
 
 /** 별점 · 검색 · 색 중 하나라도 걸려 있는지 */
-export function isFiltering(o: Pick<ViewOpts, 'minRating' | 'query' | 'color'>): boolean {
-  return o.minRating > 0 || queryTokens(o.query).length > 0 || !!o.color;
+export function isFiltering(o: Pick<ViewOpts, 'minRating' | 'query' | 'color'> & { kinds?: Category[] }): boolean {
+  return o.minRating > 0 || queryTokens(o.query).length > 0 || !!o.color || !!o.kinds?.length;
 }
 
 /** 화면에 그릴 항목들 (표시 순서대로) */
@@ -53,7 +56,16 @@ export function buildView(items: Item[], opts: ViewOpts): Item[] {
   const { sort, minRating, color, flat } = opts;
   const tokens = queryTokens(opts.query);
   const ordered = liveSorted(items);
-  const keep = (i: Item) => i.type !== 'divider' && i.rating >= minRating && matchesQuery(i, tokens) && (!color || itemMatchesColor(i, color));
+  const kinds = opts.kinds ?? [];
+  const keep = (i: Item) => {
+    if (i.type === 'divider' || i.rating < minRating || !matchesQuery(i, tokens)) return false;
+    if (color && !itemMatchesColor(i, color)) return false;
+    if (kinds.length) {
+      const c = categoryOf(i);
+      if (!c || !kinds.includes(c)) return false;
+    }
+    return true;
+  };
   if (sort === 'manual') {
     // 필터가 걸렸거나 flat 이면 섹션 없이 순서대로 쭉 (끌어서 옮기는 것은 전체 목록 기준이라 안전)
     if (flat || isFiltering(opts)) return ordered.filter(keep);
@@ -195,10 +207,18 @@ export function planMove(all: Item[], movingIds: Iterable<string>, dest: MoveDes
 }
 
 /** 새 항목을 넣을 위치: 보드에 섹션이 있으면 맨 위 묶음의 끝, 없으면 맨 끝 (예전 MoodGrid 와 같은 동작) */
-export function posForNew(all: Item[], kind: 'item' | 'divider'): { pos: number; renumbered: Map<string, number> } {
+export function posForNew(all: Item[], kind: 'item' | 'divider', sectionId?: string | null): { pos: number; renumbered: Map<string, number> } {
   const ordered = liveSorted(all);
   const firstDivider = ordered.findIndex((i) => i.type === 'divider');
-  const at = kind === 'item' && firstDivider >= 0 ? firstDivider : ordered.length;
+  let at = kind === 'item' && firstDivider >= 0 ? firstDivider : ordered.length;
+  // 특정 섹션을 지정하면 그 섹션의 끝(다음 구분선 앞)에 넣음 — 스틸 시트처럼 순서대로 이어 붙일 때
+  if (kind === 'item' && sectionId) {
+    const d = ordered.findIndex((i) => i.id === sectionId && i.type === 'divider');
+    if (d >= 0) {
+      const next = ordered.findIndex((i, idx) => idx > d && i.type === 'divider');
+      at = next >= 0 ? next : ordered.length;
+    }
+  }
   const prev = at > 0 ? ordered[at - 1].pos : undefined;
   const next = at < ordered.length ? ordered[at].pos : undefined;
   const slot = slotsBetween(prev, next, 1);

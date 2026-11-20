@@ -1,6 +1,6 @@
 // 항목을 선택하면 아래에 뜨는 막대: 별점 · 고정 · 섹션으로 이동 · 삭제
 import { useMemo, useRef, useState } from 'react';
-import { ArrowRightToLine, ChevronUp, Columns2, Pin, Trash2, X } from 'lucide-react';
+import { ArrowRightToLine, ChevronUp, Columns2, Download, Pin, Trash2, X } from 'lucide-react';
 import { useStore } from '../store';
 import { liveSorted, sectionsOf } from '../lib/order';
 import { useClickAway } from '../hooks/useClickAway';
@@ -63,6 +63,9 @@ export function SelectionBar() {
             <ArrowRightToLine size={15} /> 섹션으로 이동 <ChevronUp size={13} className={open ? '' : 'rotate-180'} />
           </button>
         )}
+        <button type="button" title="선택한 항목 내려받기 (.zip)" aria-label="내려받기" onClick={() => act().openExport('selection')} className="flex h-9 w-9 items-center justify-center rounded-full text-mute transition hover:bg-raise hover:text-ink">
+          <Download size={16} />
+        </button>
         <button type="button" title="삭제 (Delete)" aria-label="삭제" onClick={() => act().deleteItems(ids)} disabled={!selection.size} className="flex h-9 w-9 items-center justify-center rounded-full text-[#e5534b] transition hover:bg-raise disabled:opacity-40">
           <Trash2 size={16} />
         </button>
