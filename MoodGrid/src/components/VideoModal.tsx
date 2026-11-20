@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Camera, ChevronsLeft, ChevronsRight, ExternalLink, Pause, Play, SkipBack, SkipForward, X } from 'lucide-react';
 import { useStore } from '../store';
 import { domainOf, safeHttpUrl } from '../lib/util';
+import { embedBadge, embedLabel } from '../lib/providers';
 import { PROVIDER_LABEL, embedSrc, fmtStart, fmtTimecode, parseTimeInput, parseVideo, previewTime } from '../lib/video';
 import { Button, IconButton, Kbd } from './ui';
 
@@ -52,7 +53,7 @@ function Inner() {
 
   const playable = view.kind === 'file' ? fileUrl : ref?.kind === 'file' ? ref.url : null;
   const embed = ref ? embedSrc(ref) : null;
-  const title = view.kind === 'file' ? view.file.name : item?.title || (ref ? domainOf(ref.url) : generic ? domainOf(generic.embed ?? '') : '영상');
+  const title = view.kind === 'file' ? view.file.name : item?.title || (ref ? domainOf(ref.url) : generic ? embedLabel(generic.embed) : '영상');
   const original = ref ? safeHttpUrl(ref.url) : generic ? safeHttpUrl(generic.content) : null;
 
   return (
@@ -60,7 +61,7 @@ function Inner() {
       <div className="flex h-14 shrink-0 items-center gap-3 px-4">
         <span className="min-w-0 flex-1 truncate text-[15px] font-semibold">{title}</span>
         {ref && <span className="rounded-full bg-white/10 px-2.5 py-0.5 text-[12px] text-white/70">{PROVIDER_LABEL[ref.kind]}</span>}
-        {generic && <span className="rounded-full bg-white/10 px-2.5 py-0.5 text-[12px] text-white/70">임베드 · {domainOf(generic.embed ?? '')}</span>}
+        {generic && <span className="rounded-full bg-white/10 px-2.5 py-0.5 text-[12px] text-white/70">{embedBadge(generic.embed)}</span>}
         {original && (
           <IconButton label="원본 링크 열기" onClick={() => window.open(original, '_blank', 'noopener,noreferrer')} className="!text-white/80 hover:!bg-white/15">
             <ExternalLink size={18} />
